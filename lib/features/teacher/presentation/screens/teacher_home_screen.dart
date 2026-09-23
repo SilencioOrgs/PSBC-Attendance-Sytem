@@ -5,100 +5,99 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/router/route_names.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_widgets.dart';
+import '../../../../core/utils/iterable_extensions.dart';
 import '../../../attendance/presentation/providers/attendance_provider.dart';
 import '../../../classes/presentation/providers/class_provider.dart';
 import '../../../classes/presentation/screens/class_screens.dart';
 import '../providers/teacher_provider.dart';
 
-/// Teacher dashboard with today's class and attendance summary.
 class TeacherHomeScreen extends ConsumerWidget {
   const TeacherHomeScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final teacherAsync = ref.watch(teacherProvider);
-    final classesAsync = ref.watch(classListProvider);
-    final sessionAsync = ref.watch(todaySessionProvider);
-    final historyAsync = ref.watch(attendanceHistoryProvider);
+    final teacher = ref.watch(teacherProvider);
+    final classes = ref.watch(classListProvider);
+    final sessions = ref.watch(attendanceHistoryProvider);
     return PageScaffold(
       title: 'Home',
       body: SingleChildScrollView(
-        padding: const EdgeInsets.only(bottom: Spacing.xl),
+        padding: const EdgeInsets.only(top: Spacing.md, bottom: Spacing.xl),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: Spacing.md),
-            teacherAsync.when(
-              data: (teacher) => Text(
-                'Good morning, ${teacher.name.split(' ').first}',
+            teacher.when(
+              data: (profile) => Text(
+                'Good morning, ${profile.name.split(' ').first}',
                 style: Theme.of(context).textTheme.headlineMedium,
               ),
               loading: () => const LinearProgressIndicator(),
               error: (error, stack) => Text(
-                'Welcome back',
+                'Welcome',
                 style: Theme.of(context).textTheme.headlineMedium,
               ),
             ),
             const SizedBox(height: Spacing.xs),
             Text(
-              'Here is what is happening in your classes today.',
+              'Manage your classes and attendance.',
               style: Theme.of(context).textTheme.bodyMedium
                   ?.copyWith(color: AppColors.muted),
             ),
             const SizedBox(height: Spacing.lg),
-            sessionAsync.when(
-              data: (session) => ref
-                  .watch(attendanceRecordsProvider(session.id))
-                  .when(
-                    data: (records) {
-                      final present = records
-                          .where((record) => record.isPresent)
-                          .length;
-                      return LayoutBuilder(
-                        builder: (context, constraints) {
-                          final columns = constraints.maxWidth < 420 ? 2 : 3;
-                          return GridView.count(
-                            crossAxisCount: columns,
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            crossAxisSpacing: Spacing.sm,
-                            mainAxisSpacing: Spacing.sm,
-                            childAspectRatio: columns == 2 ? 1.25 : 1.08,
-                            children: [
-                              MetricStatCard(
-                                label: 'Present today',
+            sessions.when(
+              data: (list) {
+                if (list.isEmpty) return const SizedBox.shrink();
+                final completed = list
+                    .where((session) => session.status == 'Completed')
+                    .toList();
+                if (completed.isEmpty) return const SizedBox.shrink();
+                final session = completed.first;
+                return ref
+                    .watch(attendanceRecordsProvider(session.id))
+                    .when(
+                      data: (records) {
+                        final present = records
+                            .where((record) => record.isPresent)
+                            .length;
+                        return Row(
+                          children: [
+                            Expanded(
+                              child: MetricStatCard(
+                                label: 'Present',
                                 value: '$present',
                                 icon: Icons.check_circle_outline,
                                 color: AppColors.success,
                               ),
-                              MetricStatCard(
-                                label: 'Absent today',
+                            ),
+                            const SizedBox(width: Spacing.sm),
+                            Expanded(
+                              child: MetricStatCard(
+                                label: 'Other statuses',
                                 value: '${records.length - present}',
-                                icon: Icons.person_off_outlined,
-                                color: AppColors.danger,
+                                icon: Icons.fact_check_outlined,
+                                color: AppColors.warning,
                               ),
-                              MetricStatCard(
+                            ),
+                            const SizedBox(width: Spacing.sm),
+                            Expanded(
+                              child: MetricStatCard(
                                 label: 'Sessions',
-                                value:
-                                    historyAsync.value?.length.toString() ??
-                                    '—',
+                                value: '${completed.length}',
                                 icon: Icons.event_available_outlined,
-                                color: AppColors.primary,
                               ),
-                            ],
-                          );
-                        },
-                      );
-                    },
-                    loading: () =>
-                        const Center(child: CircularProgressIndicator()),
-                    error: (error, stack) => const _InlineError(
-                      message: 'Attendance summary is unavailable.',
-                    ),
-                  ),
+                            ),
+                          ],
+                        );
+                      },
+                      loading: () => const LinearProgressIndicator(),
+                      error: (error, stack) => const _InlineError(
+                        message: 'Attendance summary is unavailable.',
+                      ),
+                    );
+              },
               loading: () => const LinearProgressIndicator(),
               error: (error, stack) => const _InlineError(
-                message: 'Today’s session is unavailable.',
+                message: 'Attendance history is unavailable.',
               ),
             ),
             const SizedBox(height: Spacing.lg),
@@ -106,7 +105,7 @@ class TeacherHomeScreen extends ConsumerWidget {
               children: [
                 Expanded(
                   child: Text(
-                    'Today’s classes',
+                    'Classes',
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                 ),
@@ -117,64 +116,101 @@ class TeacherHomeScreen extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: Spacing.sm),
-            classesAsync.when(
-              data: (classes) => Column(
-                children: classes
-                    .map(
-                      (section) => Padding(
-                        padding: const EdgeInsets.only(bottom: Spacing.sm),
-                        child: ClassSectionCard(
-                          section: section,
-                          onTap: () => context.pushNamed(
-                            AppRoutes.teacherClassDetails,
-                            pathParameters: {'classId': section.id},
-                          ),
-                        ),
-                      ),
+            classes.when(
+              data: (list) => list.isEmpty
+                  ? HelpfulEmptyState(
+                      title: 'No class yet',
+                      message: "You haven't created a class yet. Create one to begin taking attendance.",
+                      actionLabel: 'Create Class',
+                      onAction: () =>
+                          context.pushNamed(AppRoutes.teacherClassCreate),
                     )
-                    .toList(),
-              ),
+                  : Column(
+                      children: list
+                          .map(
+                            (section) => Padding(
+                              padding: const EdgeInsets.only(
+                                bottom: Spacing.sm,
+                              ),
+                              child: ClassSectionCard(
+                                section: section,
+                                onTap: () => context.pushNamed(
+                                  AppRoutes.teacherClassDetails,
+                                  pathParameters: {'classId': section.id},
+                                ),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                    ),
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (error, stack) =>
                   const _InlineError(message: 'Class list is unavailable.'),
             ),
             const SizedBox(height: Spacing.md),
-            SectionCard(
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.bluetooth_connected,
-                    color: AppColors.primary,
-                  ),
-                  const SizedBox(width: Spacing.md),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Ready to take attendance?',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        Text(
-                          'Start a BLE scan for Grade 12 - STEM A.',
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: AppColors.muted),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Start scan',
-                    onPressed: () => sessionAsync.whenData(
-                      (session) => context.pushNamed(
-                        AppRoutes.bleScanner,
-                        pathParameters: {'sessionId': session.id},
+            classes.when(
+              data: (list) {
+                final active = sessions.value
+                    ?.where((session) => session.status == 'Scanning')
+                    .firstOrNull;
+                final label = active != null
+                    ? 'Continue Attendance'
+                    : list.isEmpty
+                    ? 'Create Class'
+                    : 'Start Attendance';
+                return SectionCard(
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.bluetooth_searching,
+                        color: AppColors.primary,
                       ),
-                    ),
-                    icon: const Icon(Icons.arrow_forward),
+                      const SizedBox(width: Spacing.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              active != null
+                                  ? 'Attendance is in progress'
+                                  : list.isEmpty
+                                  ? 'Create a class to begin'
+                                  : 'Ready to take attendance?',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            Text(
+                              active?.title ??
+                                  (list.isEmpty
+                                      ? 'Your class list is empty.'
+                                      : 'Choose a class to start a local BLE scan.'),
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(color: AppColors.muted),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: label,
+                        onPressed: () {
+                          if (active != null) {
+                            context.pushNamed(
+                              AppRoutes.bleScanner,
+                              pathParameters: {'sessionId': active.id},
+                            );
+                          } else if (list.isEmpty) {
+                            context.pushNamed(AppRoutes.teacherClassCreate);
+                          } else {
+                            context.goNamed(AppRoutes.teacherClasses);
+                          }
+                        },
+                        icon: const Icon(Icons.arrow_forward),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                );
+              },
+              loading: () => const SizedBox.shrink(),
+              error: (error, stack) => const SizedBox.shrink(),
             ),
           ],
         ),
@@ -185,9 +221,7 @@ class TeacherHomeScreen extends ConsumerWidget {
 
 class _InlineError extends StatelessWidget {
   const _InlineError({required this.message});
-
   final String message;
-
   @override
   Widget build(BuildContext context) => SectionCard(
     child: Row(

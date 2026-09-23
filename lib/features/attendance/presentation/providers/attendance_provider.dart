@@ -8,6 +8,38 @@ final todaySessionProvider = StreamProvider<AttendanceSession>(
   (ref) => ref.watch(attendanceRepositoryProvider).watchTodaySession(),
 );
 
+final attendanceActionControllerProvider =
+    NotifierProvider<AttendanceActionController, bool>(
+      AttendanceActionController.new,
+    );
+
+class AttendanceActionController extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  Future<AttendanceSession> start(String classId) async {
+    state = true;
+    try {
+      return await ref.read(attendanceRepositoryProvider).startSession(classId);
+    } finally {
+      state = false;
+      ref.invalidate(attendanceHistoryProvider);
+      ref.invalidate(todaySessionProvider);
+    }
+  }
+
+  Future<void> complete(String sessionId) async {
+    state = true;
+    try {
+      await ref.read(attendanceRepositoryProvider).completeSession(sessionId);
+    } finally {
+      state = false;
+      ref.invalidate(attendanceHistoryProvider);
+      ref.invalidate(attendanceRecordsProvider(sessionId));
+    }
+  }
+}
+
 final attendanceHistoryProvider = StreamProvider<List<AttendanceSession>>(
   (ref) => ref.watch(attendanceRepositoryProvider).watchSessions(),
 );

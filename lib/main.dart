@@ -7,7 +7,7 @@ import 'core/providers/repository_providers.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'mock/drift_demo_data_loader.dart';
-import 'mock/mock_ble_service.dart';
+import 'services/ble/production_ble_service.dart';
 import 'services/auth/teacher_pin_service.dart';
 import 'services/storage/app_database.dart';
 
@@ -21,7 +21,7 @@ void main() {
       overrides: [
         appDatabaseProvider.overrideWithValue(database),
         teacherPinServiceProvider.overrideWithValue(pinService),
-        bleServiceProvider.overrideWithValue(MockBleService()),
+        bleServiceProvider.overrideWithValue(ProductionBleService()),
         if (kDebugMode)
           demoDataLoaderProvider.overrideWithValue(
             DriftDemoDataLoader(database, pinService),

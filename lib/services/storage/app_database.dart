@@ -283,13 +283,24 @@ class StudentDao extends DatabaseAccessor<AppDatabase> with _$StudentDaoMixin {
   Future<void> insert(StudentsCompanion row) => into(students).insert(row);
   Future<void> upsert(StudentsCompanion row) =>
       into(students).insertOnConflictUpdate(row);
+  Future<void> updateStudent(String id, StudentsCompanion values) async =>
+      (update(students)..where((row) => row.id.equals(id))).write(values);
   Future<void> setAllNotCurrent() async =>
       (update(students)..where((t) => t.isCurrent.equals(true))).write(
         StudentsCompanion(isCurrent: const Value(false)),
       );
 }
 
-@DriftAccessor(tables: [ClassSections, Enrollments, Students, Devices])
+@DriftAccessor(
+  tables: [
+    ClassSections,
+    Enrollments,
+    Students,
+    Devices,
+    AttendanceSessions,
+    AttendanceRecords,
+  ],
+)
 class ClassDao extends DatabaseAccessor<AppDatabase> with _$ClassDaoMixin {
   ClassDao(super.db);
   Stream<List<domain.ClassSection>> watchClasses() =>
@@ -432,6 +443,27 @@ class ClassDao extends DatabaseAccessor<AppDatabase> with _$ClassDaoMixin {
       into(classSections).insert(row);
   Future<void> upsert(ClassSectionsCompanion row) =>
       into(classSections).insertOnConflictUpdate(row);
+  Future<void> updateClass(String id, ClassSectionsCompanion values) async =>
+      (update(classSections)..where((row) => row.id.equals(id))).write(values);
+  Future<void> deleteClass(String id) async {
+    await transaction(() async {
+      final sessions = await (select(
+        attendanceSessions,
+      )..where((row) => row.classSectionId.equals(id))).get();
+      for (final session in sessions) {
+        await (delete(
+          attendanceRecords,
+        )..where((row) => row.sessionId.equals(session.id))).go();
+      }
+      await (delete(
+        attendanceSessions,
+      )..where((row) => row.classSectionId.equals(id))).go();
+      await (delete(
+        enrollments,
+      )..where((row) => row.classSectionId.equals(id))).go();
+      await (delete(classSections)..where((row) => row.id.equals(id))).go();
+    });
+  }
 }
 
 @DriftAccessor(tables: [Enrollments])
@@ -442,6 +474,13 @@ class EnrollmentDao extends DatabaseAccessor<AppDatabase>
       into(enrollments).insert(row);
   Future<void> upsert(EnrollmentsCompanion row) =>
       into(enrollments).insertOnConflictUpdate(row);
+  Future<void> deletePair(String studentId, String classId) async =>
+      (delete(enrollments)..where(
+            (row) =>
+                row.studentId.equals(studentId) &
+                row.classSectionId.equals(classId),
+          ))
+          .go();
 }
 
 @DriftAccessor(tables: [AttendanceSessions, AttendanceRecords])
@@ -470,7 +509,9 @@ class AttendanceDao extends DatabaseAccessor<AppDatabase>
         syncStatus: row.syncStatus,
         sessionId: row.sessionId,
         studentId: row.studentId,
-        isPresent: row.status == domain.AttendanceRecordStatus.present,
+        isPresent:
+            row.status == domain.AttendanceRecordStatus.present ||
+            row.status == domain.AttendanceRecordStatus.manualPresent,
         detectedAt: row.detectedAt,
         rssi: row.rssi,
         recordStatus: row.status,
@@ -497,14 +538,33 @@ class AttendanceDao extends DatabaseAccessor<AppDatabase>
           .watch()
           .map((rows) => rows.map(_session).toList());
   Future<domain.AttendanceSession> getLatest() async {
-    final rows = await getSessions();
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day);
+    final end = start.add(const Duration(days: 1));
+    final rows =
+        await (select(attendanceSessions)
+              ..where(
+                (row) =>
+                    row.date.isBiggerOrEqualValue(start) &
+                    row.date.isSmallerThanValue(end),
+              )
+              ..orderBy([(row) => OrderingTerm.desc(row.startedAt)]))
+            .get()
+            .then((items) => items.map(_session).toList());
     if (rows.isEmpty) throw StateError('No attendance session is available.');
     return rows.first;
   }
 
   Stream<domain.AttendanceSession> watchLatest() => watchSessions().map((rows) {
-    if (rows.isEmpty) throw StateError('No attendance session is available.');
-    return rows.first;
+    final now = DateTime.now();
+    final today = rows.where(
+      (row) =>
+          row.startedAt.year == now.year &&
+          row.startedAt.month == now.month &&
+          row.startedAt.day == now.day,
+    );
+    if (today.isEmpty) throw StateError('No attendance session is available.');
+    return today.first;
   });
   Future<List<domain.AttendanceRecord>> getRecords(String id) =>
       (select(attendanceRecords)..where((t) => t.sessionId.equals(id)))
@@ -530,6 +590,68 @@ class AttendanceDao extends DatabaseAccessor<AppDatabase>
       into(attendanceSessions).insertOnConflictUpdate(row);
   Future<void> upsertRecord(AttendanceRecordsCompanion row) =>
       into(attendanceRecords).insertOnConflictUpdate(row);
+  Future<void> startSession({
+    required AttendanceSessionsCompanion session,
+    required List<domain.Student> roster,
+  }) async {
+    await transaction(() async {
+      await into(attendanceSessions).insert(session);
+      final now = DateTime.now();
+      for (final student in roster) {
+        await into(attendanceRecords).insert(
+          AttendanceRecordsCompanion.insert(
+            id: newDatabaseId(),
+            updatedAt: now,
+            syncStatus: domain.SyncStatus.pendingCreate,
+            sessionId: session.id.value,
+            studentId: student.id,
+            status: domain.AttendanceRecordStatus.unverified,
+          ),
+        );
+      }
+    });
+  }
+
+  Future<void> markDetected(String sessionId, String studentId, {int? rssi}) =>
+      updateRecord(
+        sessionId,
+        studentId,
+        domain.AttendanceRecordStatus.present,
+        detectedAt: DateTime.now(),
+        rssi: rssi,
+      );
+  Future<void> completeSession(String id) async {
+    await transaction(() async {
+      final rows = await (select(
+        attendanceRecords,
+      )..where((row) => row.sessionId.equals(id))).get();
+      final now = DateTime.now();
+      for (final row in rows.where(
+        (row) => row.status == domain.AttendanceRecordStatus.unverified,
+      )) {
+        await (update(
+          attendanceRecords,
+        )..where((item) => item.id.equals(row.id))).write(
+          AttendanceRecordsCompanion(
+            status: const Value(domain.AttendanceRecordStatus.absent),
+            updatedAt: Value(now),
+            syncStatus: const Value(domain.SyncStatus.pendingUpdate),
+          ),
+        );
+      }
+      await (update(
+        attendanceSessions,
+      )..where((row) => row.id.equals(id))).write(
+        AttendanceSessionsCompanion(
+          status: const Value(domain.AttendanceSessionStatus.completed),
+          endedAt: Value(now),
+          updatedAt: Value(now),
+          syncStatus: const Value(domain.SyncStatus.pendingUpdate),
+        ),
+      );
+    });
+  }
+
   Future<void> updateRecord(
     String sessionId,
     String studentId,
@@ -595,8 +717,8 @@ class DeviceDao extends DatabaseAccessor<AppDatabase> with _$DeviceDaoMixin {
     deviceModel: row.deviceModel,
     address: row.bleUuid,
     ownerStudentId: row.studentId,
-    isConnected: true,
-    lastSeenAt: row.registeredAt,
+    isConnected: false,
+    lastSeenAt: null,
     registeredAt: row.registeredAt,
   );
   Future<List<domain.Device>> getAll() =>

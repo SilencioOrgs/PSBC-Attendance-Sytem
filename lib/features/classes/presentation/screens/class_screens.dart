@@ -9,6 +9,7 @@ import '../../../../core/widgets/app_widgets.dart';
 import '../../../attendance/presentation/providers/attendance_provider.dart';
 import '../providers/class_provider.dart';
 import '../../../../domain/models.dart';
+import '../../../../domain/repositories.dart';
 
 /// Reusable summary card for one class section.
 class ClassSectionCard extends StatelessWidget {
@@ -112,25 +113,41 @@ class TeacherClassesScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) => PageScaffold(
     title: 'Classes',
+    trailing: IconButton(
+      tooltip: 'Create class',
+      onPressed: () => context.pushNamed(AppRoutes.teacherClassCreate),
+      icon: const Icon(Icons.add),
+    ),
     body: ref
         .watch(classListProvider)
         .when(
-          data: (classes) => ListView.separated(
-            padding: const EdgeInsets.only(top: Spacing.md, bottom: Spacing.xl),
-            itemCount: classes.length,
-            separatorBuilder: (context, index) =>
-                const SizedBox(height: Spacing.sm),
-            itemBuilder: (context, index) {
-              final section = classes[index];
-              return ClassSectionCard(
-                section: section,
-                onTap: () => context.pushNamed(
-                  AppRoutes.teacherClassDetails,
-                  pathParameters: {'classId': section.id},
+          data: (classes) => classes.isEmpty
+              ? HelpfulEmptyState(
+                  title: 'No classes yet',
+                  message: 'Create your first class to start managing students and attendance.',
+                  actionLabel: 'Create Class',
+                  onAction: () =>
+                      context.pushNamed(AppRoutes.teacherClassCreate),
+                )
+              : ListView.separated(
+                  padding: const EdgeInsets.only(
+                    top: Spacing.md,
+                    bottom: Spacing.xl,
+                  ),
+                  itemCount: classes.length,
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: Spacing.sm),
+                  itemBuilder: (context, index) {
+                    final section = classes[index];
+                    return ClassSectionCard(
+                      section: section,
+                      onTap: () => context.pushNamed(
+                        AppRoutes.teacherClassDetails,
+                        pathParameters: {'classId': section.id},
+                      ),
+                    );
+                  },
                 ),
-              );
-            },
-          ),
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (error, stack) => const _ClassError(),
         ),
@@ -146,12 +163,60 @@ class ClassDetailsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final sessionsAsync = ref.watch(attendanceHistoryProvider);
-    final session = sessionsAsync.value
-        ?.where((item) => item.classId == classId)
-        .firstOrNull;
     return PageScaffold(
       title: 'Class details',
       showBack: true,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            tooltip: 'Edit class',
+            onPressed: () => context.pushNamed(
+              AppRoutes.teacherClassEdit,
+              pathParameters: {'classId': classId},
+            ),
+            icon: const Icon(Icons.edit_outlined),
+          ),
+          IconButton(
+            tooltip: 'Delete class',
+            onPressed: () async {
+              final accepted = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Delete class?'),
+                  content: const Text('This action cannot be undone.'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('Cancel'),
+                    ),
+                    FilledButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text('Delete'),
+                    ),
+                  ],
+                ),
+              );
+              if (accepted != true) return;
+              try {
+                await ref
+                    .read(classRemovalControllerProvider.notifier)
+                    .remove(classId);
+                if (context.mounted) context.goNamed(AppRoutes.teacherClasses);
+              } catch (_) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Unable to delete this class.'),
+                    ),
+                  );
+                }
+              }
+            },
+            icon: const Icon(Icons.delete_outline),
+          ),
+        ],
+      ),
       body: ref
           .watch(classByIdProvider(classId))
           .when(
@@ -224,6 +289,23 @@ class ClassDetailsScreen extends ConsumerWidget {
                                 final presentCount = records
                                     .where((record) => record.isPresent)
                                     .length;
+                                final absentCount = records
+                                    .where(
+                                      (record) =>
+                                          record.recordStatus ==
+                                              AttendanceRecordStatus.absent ||
+                                          record.recordStatus ==
+                                              AttendanceRecordStatus
+                                                  .manualAbsent,
+                                    )
+                                    .length;
+                                final pendingCount = records
+                                    .where(
+                                      (record) =>
+                                          record.recordStatus ==
+                                          AttendanceRecordStatus.unverified,
+                                    )
+                                    .length;
                                 return Row(
                                   children: [
                                     Expanded(
@@ -237,11 +319,21 @@ class ClassDetailsScreen extends ConsumerWidget {
                                     const SizedBox(width: Spacing.sm),
                                     Expanded(
                                       child: MetricStatCard(
-                                        label: 'Absent',
+                                        label:
+                                            classSession.status == 'Completed'
+                                            ? 'Absent'
+                                            : 'Not confirmed',
                                         value:
-                                            '${records.length - presentCount}',
-                                        icon: Icons.person_off_outlined,
-                                        color: AppColors.danger,
+                                            classSession.status == 'Completed'
+                                            ? '$absentCount'
+                                            : '$pendingCount',
+                                        icon: classSession.status == 'Completed'
+                                            ? Icons.person_off_outlined
+                                            : Icons.help_outline,
+                                        color:
+                                            classSession.status == 'Completed'
+                                            ? AppColors.danger
+                                            : AppColors.warning,
                                       ),
                                     ),
                                   ],
@@ -262,15 +354,59 @@ class ClassDetailsScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: Spacing.lg),
                     PrimaryActionButton(
-                      label: 'Start attendance scan',
+                      label: 'Start attendance',
                       icon: Icons.bluetooth_searching,
-                      onPressed: session == null
+                      onPressed: section.studentCount == 0
                           ? null
-                          : () {
-                              context.pushNamed(
-                                AppRoutes.bleScanner,
-                                pathParameters: {'sessionId': session.id},
+                          : () async {
+                              final accepted = await showDialog<bool>(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: const Text('Start attendance?'),
+                                  content: Text(
+                                    '${section.name}\n${section.studentCount} students\n\nMake sure student devices are nearby and Bluetooth is enabled.',
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.pop(context, false),
+                                      child: const Text('Cancel'),
+                                    ),
+                                    FilledButton(
+                                      onPressed: () =>
+                                          Navigator.pop(context, true),
+                                      child: const Text('Start scan'),
+                                    ),
+                                  ],
+                                ),
                               );
+                              if (accepted != true) return;
+                              try {
+                                final created = await ref
+                                    .read(
+                                      attendanceActionControllerProvider
+                                          .notifier,
+                                    )
+                                    .start(classId);
+                                if (context.mounted) {
+                                  context.pushNamed(
+                                    AppRoutes.bleScanner,
+                                    pathParameters: {'sessionId': created.id},
+                                  );
+                                }
+                              } catch (error) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        error is RepositoryException
+                                            ? error.message
+                                            : 'Unable to start attendance.',
+                                      ),
+                                    ),
+                                  );
+                                }
+                              }
                             },
                     ),
                     const SizedBox(height: Spacing.sm),
@@ -282,6 +418,19 @@ class ClassDetailsScreen extends ConsumerWidget {
                         pathParameters: {'classId': classId},
                       ),
                     ),
+                    const SizedBox(height: Spacing.sm),
+                    SecondaryActionButton(
+                      label: 'Attendance history',
+                      icon: Icons.history,
+                      onPressed: () =>
+                          context.goNamed(AppRoutes.teacherAttendance),
+                    ),
+                    if (section.studentCount == 0) ...[
+                      const SizedBox(height: Spacing.sm),
+                      const Text(
+                        'Add students to this class before starting attendance.',
+                      ),
+                    ],
                   ],
                 ),
               );
@@ -294,70 +443,328 @@ class ClassDetailsScreen extends ConsumerWidget {
 }
 
 /// Class roster with registration status for each student.
-class StudentListScreen extends ConsumerWidget {
+class StudentListScreen extends ConsumerStatefulWidget {
   const StudentListScreen({super.key, required this.classId});
 
   final String classId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) => PageScaffold(
+  ConsumerState<StudentListScreen> createState() => _StudentListScreenState();
+}
+
+class _StudentListScreenState extends ConsumerState<StudentListScreen> {
+  String _query = '';
+
+  Future<void> _edit(Student? student) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) =>
+          _StudentEditorSheet(classId: widget.classId, student: student),
+    );
+  }
+
+  Future<void> _actions(Student student) async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('Edit student'),
+              onTap: () => Navigator.pop(context, 'edit'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.person_remove_outlined),
+              title: const Text('Remove from class'),
+              onTap: () => Navigator.pop(context, 'remove'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted) return;
+    if (action == 'edit') {
+      await _edit(student);
+    }
+    if (!mounted) return;
+    if (action == 'remove') {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Remove student?'),
+          content: const Text(
+            'This student will no longer appear in this class.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Remove'),
+            ),
+          ],
+        ),
+      );
+      if (confirm != true) return;
+      try {
+        await ref
+            .read(studentManagementControllerProvider.notifier)
+            .remove(widget.classId, student.id);
+      } catch (_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Unable to remove this student.')),
+          );
+        }
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => PageScaffold(
     title: 'Student list',
     showBack: true,
+    trailing: IconButton(
+      tooltip: 'Add student',
+      onPressed: () => _edit(null),
+      icon: const Icon(Icons.person_add_alt_1_outlined),
+    ),
     body: ref
-        .watch(classRosterProvider(classId))
+        .watch(classRosterProvider(widget.classId))
         .when(
-          data: (students) => Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(
-                  top: Spacing.sm,
-                  bottom: Spacing.sm,
-                ),
-                child: SectionCard(
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.groups_outlined,
-                        color: AppColors.primary,
+          data: (students) {
+            final filtered = students
+                .where(
+                  (student) =>
+                      student.name.toLowerCase().contains(
+                        _query.toLowerCase(),
+                      ) ||
+                      student.studentNumber.toLowerCase().contains(
+                        _query.toLowerCase(),
                       ),
-                      const SizedBox(width: Spacing.sm),
-                      Expanded(
-                        child: Text(
-                          '${students.length} enrolled students',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                      ),
-                      const StatusPill(
-                        status: AttendanceStatus.registered,
-                        label: 'Roster',
-                      ),
-                    ],
+                )
+                .toList();
+            if (students.isEmpty) {
+              return HelpfulEmptyState(
+                title: 'No students yet',
+                message:
+                    'Add students to this class before starting attendance.',
+                actionLabel: 'Add Student',
+                onAction: () => _edit(null),
+              );
+            }
+            return Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: Spacing.sm),
+                  child: TextField(
+                    decoration: InputDecoration(
+                      hintText: 'Search name or student number',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: _query.isEmpty
+                          ? null
+                          : IconButton(
+                              tooltip: 'Clear search',
+                              onPressed: () => setState(() => _query = ''),
+                              icon: const Icon(Icons.close),
+                            ),
+                    ),
+                    onChanged: (value) => setState(() => _query = value),
                   ),
                 ),
-              ),
-              Expanded(
-                child: ListView.separated(
-                  padding: const EdgeInsets.only(bottom: Spacing.xl),
-                  itemCount: students.length,
-                  separatorBuilder: (context, index) =>
-                      const Divider(height: 1),
-                  itemBuilder: (context, index) {
-                    final student = students[index];
-                    return PersonListTile(
-                      name: student.name,
-                      subtitle: student.studentNumber,
-                      status: student.deviceRegistered
-                          ? AttendanceStatus.registered
-                          : AttendanceStatus.unverified,
-                    );
-                  },
+                Padding(
+                  padding: const EdgeInsets.only(
+                    top: Spacing.sm,
+                    bottom: Spacing.sm,
+                  ),
+                  child: SectionCard(
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.groups_outlined,
+                          color: AppColors.primary,
+                        ),
+                        const SizedBox(width: Spacing.sm),
+                        Expanded(
+                          child: Text(
+                            '${students.length} enrolled students',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                        ),
+                        const StatusPill(
+                          status: AttendanceStatus.registered,
+                          label: 'Roster',
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-            ],
-          ),
+                Expanded(
+                  child: filtered.isEmpty
+                      ? const HelpfulEmptyState(
+                          title: 'No results found',
+                          message: 'Try a different name or student number.',
+                        )
+                      : ListView.separated(
+                          padding: const EdgeInsets.only(bottom: Spacing.xl),
+                          itemCount: filtered.length,
+                          separatorBuilder: (context, index) =>
+                              const Divider(height: 1),
+                          itemBuilder: (context, index) {
+                            final student = filtered[index];
+                            return PersonListTile(
+                              name: student.name,
+                              subtitle: student.studentNumber,
+                              status: student.deviceRegistered
+                                  ? AttendanceStatus.registered
+                                  : AttendanceStatus.unverified,
+                              onTap: () => _actions(student),
+                              trailing: IconButton(
+                                tooltip: 'Student actions',
+                                onPressed: () => _actions(student),
+                                icon: const Icon(Icons.more_vert),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            );
+          },
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (error, stack) => const _ClassError(),
         ),
+  );
+}
+
+class _StudentEditorSheet extends ConsumerStatefulWidget {
+  const _StudentEditorSheet({required this.classId, this.student});
+  final String classId;
+  final Student? student;
+
+  @override
+  ConsumerState<_StudentEditorSheet> createState() =>
+      _StudentEditorSheetState();
+}
+
+class _StudentEditorSheetState extends ConsumerState<_StudentEditorSheet> {
+  late final _name = TextEditingController(text: widget.student?.name ?? '');
+  late final _number = TextEditingController(
+    text: widget.student?.studentNumber ?? '',
+  );
+  final _bleUuid = TextEditingController();
+  String? _error;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _number.dispose();
+    _bleUuid.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_name.text.trim().isEmpty || _number.text.trim().isEmpty) {
+      setState(() => _error = 'Enter the student name and number.');
+      return;
+    }
+    try {
+      final controller = ref.read(studentManagementControllerProvider.notifier);
+      if (widget.student == null) {
+        await controller.add(
+          widget.classId,
+          _name.text,
+          _number.text,
+          bleUuid: _bleUuid.text.trim().isEmpty ? null : _bleUuid.text.trim(),
+        );
+      } else {
+        await controller.update(
+          widget.classId,
+          widget.student!.id,
+          _name.text,
+          _number.text,
+        );
+      }
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              widget.student == null ? 'Student added.' : 'Student updated.',
+            ),
+          ),
+        );
+      }
+    } on RepositoryException catch (error) {
+      setState(() => _error = error.message);
+    } catch (_) {
+      setState(() => _error = 'Unable to save this student.');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: EdgeInsets.fromLTRB(
+      Spacing.md,
+      Spacing.lg,
+      Spacing.md,
+      MediaQuery.viewInsetsOf(context).bottom + Spacing.lg,
+    ),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          widget.student == null ? 'Add student' : 'Edit student',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        const SizedBox(height: Spacing.md),
+        TextField(
+          controller: _name,
+          textCapitalization: TextCapitalization.words,
+          decoration: const InputDecoration(labelText: 'Full name'),
+        ),
+        const SizedBox(height: Spacing.md),
+        TextField(
+          controller: _number,
+          decoration: const InputDecoration(labelText: 'Student number'),
+        ),
+        if (widget.student == null) ...[
+          const SizedBox(height: Spacing.md),
+          TextField(
+            controller: _bleUuid,
+            autocorrect: false,
+            enableSuggestions: false,
+            decoration: const InputDecoration(
+              labelText: 'Student device sharing code (optional)',
+              helperText: 'Enter the code shown on the student’s Device tab.',
+              prefixIcon: Icon(Icons.bluetooth_outlined),
+            ),
+          ),
+        ],
+        if (_error != null)
+          Padding(
+            padding: const EdgeInsets.only(top: Spacing.sm),
+            child: Text(
+              _error!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ),
+        const SizedBox(height: Spacing.md),
+        PrimaryActionButton(
+          label: ref.watch(studentManagementControllerProvider)
+              ? 'Saving...'
+              : 'Save student',
+          onPressed: ref.watch(studentManagementControllerProvider)
+              ? null
+              : _save,
+        ),
+      ],
+    ),
   );
 }
 

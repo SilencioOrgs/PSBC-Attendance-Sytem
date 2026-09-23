@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_theme.dart';
@@ -22,14 +23,12 @@ class _DeviceRegistrationScreenState
   final _deviceNameController = TextEditingController(
     text: 'ClassAttend Companion',
   );
-  final _bleUuidController = TextEditingController();
   String? _deviceError;
   bool _isRegistering = false;
 
   @override
   void dispose() {
     _deviceNameController.dispose();
-    _bleUuidController.dispose();
     super.dispose();
   }
 
@@ -43,12 +42,15 @@ class _DeviceRegistrationScreenState
             _deviceNameController.text.trim().isEmpty
                 ? 'ClassAttend Companion'
                 : _deviceNameController.text.trim(),
-            bleUuid: _bleUuidController.text.trim().isEmpty
-                ? null
-                : _bleUuidController.text.trim(),
           );
     } on RepositoryException catch (error) {
       setState(() => _deviceError = error.message);
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _deviceError = 'Bluetooth access is unavailable. Turn on Bluetooth and try again.',
+        );
+      }
     } finally {
       if (mounted) setState(() => _isRegistering = false);
     }
@@ -123,20 +125,15 @@ class _DeviceRegistrationScreenState
                     ),
                   ),
                   const SizedBox(height: Spacing.md),
-                  TextField(
-                    controller: _bleUuidController,
-                    decoration: InputDecoration(
-                      labelText: 'BLE UUID (optional)',
-                      helperText: 'Leave blank to assign a local device ID.',
-                      errorText: _deviceError,
-                      prefixIcon: const Icon(Icons.fingerprint_outlined),
+                  if (_deviceError != null) ...[
+                    Text(
+                      _deviceError!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
                     ),
-                    onChanged: (_) {
-                      if (_deviceError != null) {
-                        setState(() => _deviceError = null);
-                      }
-                    },
-                  ),
+                    const SizedBox(height: Spacing.sm),
+                  ],
                   const SizedBox(height: Spacing.md),
                   PrimaryActionButton(
                     label: _isRegistering
@@ -153,7 +150,54 @@ class _DeviceRegistrationScreenState
                       children: [
                         _DeviceLine(label: 'Device', value: device.name),
                         const Divider(height: Spacing.lg),
-                        _DeviceLine(label: 'Address', value: device.address),
+                        const _DeviceLine(
+                          label: 'Attendance beacon',
+                          value: 'Ready to advertise',
+                        ),
+                        const Divider(height: Spacing.lg),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Device sharing code',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(color: AppColors.muted),
+                                  ),
+                                  const SizedBox(height: Spacing.xs),
+                                  SelectableText(
+                                    device.address,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: 'Copy device sharing code',
+                              onPressed: () async {
+                                await Clipboard.setData(
+                                  ClipboardData(text: device.address),
+                                );
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Device sharing code copied.',
+                                      ),
+                                    ),
+                                  );
+                                }
+                              },
+                              icon: const Icon(Icons.copy_outlined),
+                            ),
+                          ],
+                        ),
                         const Divider(height: Spacing.lg),
                         _DeviceLine(
                           label: 'Last seen',
@@ -163,6 +207,33 @@ class _DeviceRegistrationScreenState
                         ),
                       ],
                     ),
+                  ),
+                  const SizedBox(height: Spacing.md),
+                  PrimaryActionButton(
+                    label: 'Enable attendance beacon',
+                    icon: Icons.bluetooth_searching,
+                    onPressed: () async {
+                      try {
+                        await ref
+                            .read(deviceRegistrationControllerProvider.notifier)
+                            .startBeacon(device.address);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Your device is ready to be detected.',
+                              ),
+                            ),
+                          );
+                        }
+                      } catch (_) {
+                        if (context.mounted) {
+                          setState(
+                            () => _deviceError = 'Bluetooth permission is required. Turn on Bluetooth and try again.',
+                          );
+                        }
+                      }
+                    },
                   ),
                 ],
                 const SizedBox(height: Spacing.lg),
@@ -174,7 +245,7 @@ class _DeviceRegistrationScreenState
                       const SizedBox(width: Spacing.sm),
                       Expanded(
                         child: Text(
-                          'Keep Bluetooth enabled and carry this device during class. Attendance is stored on the teacher’s device.',
+                          'Share your device code with your teacher so they can add it to your class roster. Keep Bluetooth enabled and carry this device during class.',
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ),

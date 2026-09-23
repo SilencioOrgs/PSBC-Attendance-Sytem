@@ -1,3 +1,5 @@
+import 'package:drift/drift.dart';
+
 import '../../../domain/models.dart';
 import '../../../domain/repositories.dart';
 import '../../../services/storage/app_database.dart';
@@ -5,6 +7,28 @@ import '../../../services/storage/app_database.dart';
 class DriftAttendanceRepository implements AttendanceRepository {
   DriftAttendanceRepository(this._db);
   final AppDatabase _db;
+  @override
+  Future<AttendanceSession> startSession(String classId) async {
+    final section = await _db.classDao.getClass(classId);
+    if (section == null) throw const ClassSectionNotFoundException();
+    final roster = await _db.classDao.getStudents(classId);
+    if (roster.isEmpty) throw const EmptyClassRosterException();
+    final now = DateTime.now();
+    final id = newDatabaseId();
+    final session = AttendanceSessionsCompanion.insert(
+      id: id,
+      updatedAt: now,
+      syncStatus: SyncStatus.pendingCreate,
+      classSectionId: classId,
+      title: Value(section.name),
+      date: DateTime(now.year, now.month, now.day),
+      startedAt: now,
+      status: AttendanceSessionStatus.scanning,
+    );
+    await _db.attendanceDao.startSession(session: session, roster: roster);
+    return (await _db.attendanceDao.getSession(id))!;
+  }
+
   @override
   Future<AttendanceSession> getTodaySession() => _db.attendanceDao.getLatest();
   @override
@@ -49,7 +73,9 @@ class DriftAttendanceRepository implements AttendanceRepository {
     await _db.attendanceDao.updateRecord(
       sessionId,
       studentId,
-      present ? AttendanceRecordStatus.present : AttendanceRecordStatus.absent,
+      present
+          ? AttendanceRecordStatus.manualPresent
+          : AttendanceRecordStatus.manualAbsent,
       detectedAt: changedAt,
       rssi: existing.rssi,
     );
@@ -57,6 +83,10 @@ class DriftAttendanceRepository implements AttendanceRepository {
   }
 
   @override
-  Future<void> finalizeScan(String sessionId, Set<String> detectedStudentIds) =>
-      _db.attendanceDao.completeScan(sessionId, detectedStudentIds);
+  Future<void> markDetected(String sessionId, String studentId, {int? rssi}) =>
+      _db.attendanceDao.markDetected(sessionId, studentId, rssi: rssi);
+
+  @override
+  Future<void> completeSession(String sessionId) =>
+      _db.attendanceDao.completeSession(sessionId);
 }

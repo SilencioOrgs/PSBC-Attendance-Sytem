@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/router/route_names.dart';
+import '../../../../core/providers/repository_providers.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/input_formatters.dart';
 import '../../../../core/utils/teacher_pin.dart';
@@ -23,6 +24,21 @@ class _TeacherSetupScreenState extends ConsumerState<TeacherSetupScreen> {
   final _nameController = TextEditingController();
   final _pinController = TextEditingController();
   bool _isSubmitting = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        await ref.read(teacherProvider.future);
+        if (!await ref.read(teacherPinServiceProvider).hasPin()) return;
+        if (mounted) context.goNamed(AppRoutes.teacherUnlock);
+      } catch (_) {
+        // A missing teacher profile is the expected first-run state.
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -42,6 +58,10 @@ class _TeacherSetupScreenState extends ConsumerState<TeacherSetupScreen> {
             pin: normalizeTeacherPin(_pinController.text),
           );
       if (mounted) context.goNamed(AppRoutes.teacherHome);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'Unable to save setup. Please try again.');
+      }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -118,6 +138,15 @@ class _TeacherSetupScreenState extends ConsumerState<TeacherSetupScreen> {
                         ? 'Use 4 to 6 digits.'
                         : null,
                   ),
+                  if (_error != null) ...[
+                    const SizedBox(height: Spacing.sm),
+                    Text(
+                      _error!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: Spacing.sm),
                   PrimaryActionButton(
                     label: _isSubmitting
@@ -140,6 +169,13 @@ class _TeacherSetupScreenState extends ConsumerState<TeacherSetupScreen> {
               ),
             ),
           ],
+          const SizedBox(height: Spacing.md),
+          Center(
+            child: TextButton(
+              onPressed: () => context.goNamed(AppRoutes.studentSetup),
+              child: const Text('Set up a student profile'),
+            ),
+          ),
         ],
       ),
     ),

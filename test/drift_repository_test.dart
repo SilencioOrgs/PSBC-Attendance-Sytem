@@ -214,6 +214,105 @@ void main() {
     );
   });
 
+  test(
+    'attendance review keeps undetected students unconfirmed until save',
+    () async {
+      final repository = DriftAttendanceRepository(database);
+      final session = await repository.startSession(_classId);
+      final initial = await repository.getRecords(session.id);
+      expect(initial, hasLength(1));
+      expect(initial.single.recordStatus, AttendanceRecordStatus.unverified);
+
+      await repository.markDetected(session.id, _studentId, rssi: -48);
+      expect(
+        (await repository.getRecords(session.id)).single.isPresent,
+        isTrue,
+      );
+      await repository.completeSession(session.id);
+      expect((await repository.getSession(session.id))?.status, 'Completed');
+      expect(
+        (await repository.getRecords(session.id)).single.recordStatus,
+        AttendanceRecordStatus.present,
+      );
+    },
+  );
+
+  test(
+    'class and student management validate and persist through repositories',
+    () async {
+      final classes = DriftClassRepository(database);
+      final created = await classes.createClass(
+        gradeLevel: 11,
+        sectionLabel: 'HUMSS A',
+        subject: 'English',
+        room: 'Room 2',
+        scheduleStart: DateTime(2000, 1, 1, 10),
+        scheduleEnd: DateTime(2000, 1, 1, 11),
+      );
+      expect(created.sectionCode, 'GRADE11-HUMSS A');
+      final updatedClass = await classes.updateClass(
+        ClassSection(
+          id: created.id,
+          updatedAt: created.updatedAt,
+          syncStatus: created.syncStatus,
+          name: created.name,
+          subject: 'English 2',
+          room: 'Room 3',
+          schedule: created.schedule,
+          studentCount: created.studentCount,
+          gradeLevel: created.gradeLevel,
+          sectionLabel: created.sectionLabel,
+          sectionCode: created.sectionCode,
+          scheduleStart: DateTime(2000, 1, 1, 10),
+          scheduleEnd: DateTime(2000, 1, 1, 11),
+          teacherId: created.teacherId,
+        ),
+      );
+      expect(updatedClass.subject, 'English 2');
+      await expectLater(
+        classes.createClass(
+          gradeLevel: 11,
+          sectionLabel: 'humss a',
+          subject: 'English',
+          room: 'Room 2',
+          scheduleStart: DateTime(2000, 1, 1, 10),
+          scheduleEnd: DateTime(2000, 1, 1, 11),
+        ),
+        throwsA(isA<DuplicateClassException>()),
+      );
+
+      final students = DriftStudentRepository(database);
+      final added = await students.addStudentToClass(
+        name: 'Juan Dela Cruz',
+        studentNumber: 'T-004',
+        classId: created.id,
+      );
+      expect(
+        (await classes.getStudents(created.id)).single.name,
+        'Juan Dela Cruz',
+      );
+      await expectLater(
+        students.addStudentToClass(
+          name: 'Duplicate',
+          studentNumber: 'T-004',
+          classId: created.id,
+        ),
+        throwsA(isA<DuplicateStudentNumberException>()),
+      );
+      await students.updateStudent(
+        studentId: added.id,
+        name: 'Juan Cruz',
+        studentNumber: 'T-004',
+      );
+      expect((await classes.getStudents(created.id)).single.name, 'Juan Cruz');
+      await students.removeStudentFromClass(
+        studentId: added.id,
+        classId: created.id,
+      );
+      expect(await classes.getStudents(created.id), isEmpty);
+    },
+  );
+
   test('debug loader inserts repeatable fixture data through Drift', () async {
     final demoDatabase = AppDatabase(NativeDatabase.memory());
     addTearDown(demoDatabase.close);

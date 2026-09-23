@@ -58,8 +58,8 @@ class DriftDeviceRepository implements DeviceRepository {
       deviceModel: deviceName.trim(),
       address: uuid,
       ownerStudentId: studentId,
-      isConnected: true,
-      lastSeenAt: now,
+      isConnected: false,
+      lastSeenAt: null,
       registeredAt: now,
     );
   }

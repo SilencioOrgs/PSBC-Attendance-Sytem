@@ -1,9 +1,13 @@
 /// Stable route names used throughout app navigation.
 abstract final class AppRoutes {
+  static const welcome = 'welcome';
   static const teacherSetup = 'teacherSetup';
+  static const teacherUnlock = 'teacherUnlock';
   static const teacherHome = 'teacherHome';
   static const teacherClasses = 'teacherClasses';
+  static const teacherClassCreate = 'teacherClassCreate';
   static const teacherClassDetails = 'teacherClassDetails';
+  static const teacherClassEdit = 'teacherClassEdit';
   static const teacherStudentList = 'teacherStudentList';
   static const teacherAttendance = 'teacherAttendance';
   static const teacherSettings = 'teacherSettings';

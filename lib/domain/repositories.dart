@@ -28,9 +28,31 @@ class DuplicateBleUuidException extends RepositoryException {
     : super('That BLE device is already registered.');
 }
 
+class InvalidBleUuidException extends RepositoryException {
+  const InvalidBleUuidException()
+    : super(
+        'Enter the device sharing code exactly as shown on the student device.',
+      );
+}
+
 class StudentAlreadyHasDeviceException extends RepositoryException {
   const StudentAlreadyHasDeviceException()
     : super('A device is already registered for this student.');
+}
+
+class EmptyClassRosterException extends RepositoryException {
+  const EmptyClassRosterException()
+    : super('Add students to this class before starting attendance.');
+}
+
+class ClassValidationException extends RepositoryException {
+  const ClassValidationException()
+    : super('Enter a class section, subject, and room.');
+}
+
+class DuplicateClassException extends RepositoryException {
+  const DuplicateClassException()
+    : super('A class with this grade and section already exists.');
 }
 
 abstract interface class TeacherRepository {
@@ -47,6 +69,16 @@ abstract interface class ClassRepository {
   Future<ClassSection?> getClassByCode(String sectionCode);
   Future<List<Student>> getStudents(String classId);
   Stream<List<Student>> watchStudents(String classId);
+  Future<ClassSection> createClass({
+    required int gradeLevel,
+    required String sectionLabel,
+    required String subject,
+    required String room,
+    required DateTime scheduleStart,
+    required DateTime scheduleEnd,
+  });
+  Future<ClassSection> updateClass(ClassSection section);
+  Future<void> deleteClass(String classId);
 }
 
 abstract interface class StudentRepository {
@@ -61,9 +93,25 @@ abstract interface class StudentRepository {
     required String studentNumber,
     required String sectionCode,
   });
+  Future<Student> addStudentToClass({
+    required String name,
+    required String studentNumber,
+    required String classId,
+    String? bleUuid,
+  });
+  Future<Student> updateStudent({
+    required String studentId,
+    required String name,
+    required String studentNumber,
+  });
+  Future<void> removeStudentFromClass({
+    required String studentId,
+    required String classId,
+  });
 }
 
 abstract interface class AttendanceRepository {
+  Future<AttendanceSession> startSession(String classId);
   Future<AttendanceSession> getTodaySession();
   Stream<AttendanceSession> watchTodaySession();
   Future<List<AttendanceSession>> getSessions();
@@ -75,7 +123,8 @@ abstract interface class AttendanceRepository {
   Future<List<AttendanceRecord>> getStudentRecords(String studentId);
   Stream<List<AttendanceRecord>> watchStudentRecords(String studentId);
   Future<AttendanceRecord> toggleStatus(String sessionId, String studentId);
-  Future<void> finalizeScan(String sessionId, Set<String> detectedStudentIds);
+  Future<void> markDetected(String sessionId, String studentId, {int? rssi});
+  Future<void> completeSession(String sessionId);
 }
 
 abstract interface class DeviceRepository {

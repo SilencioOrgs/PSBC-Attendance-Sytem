@@ -31,11 +31,20 @@ class DeviceRegistrationController extends Notifier<bool> {
     String deviceName, {
     String? bleUuid,
   }) async {
+    final ble = ref.read(bleServiceProvider);
+    await ble.requestAccess();
     await ref
         .read(deviceRepositoryProvider)
         .registerDevice(studentId, deviceName, bleUuid: bleUuid);
+    final device = await ref
+        .read(deviceRepositoryProvider)
+        .getStudentDevice(studentId);
+    if (device != null) await ble.startAdvertising(device.address);
     state = true;
     ref.invalidate(myDeviceProvider);
     ref.invalidate(deviceListProvider);
   }
+
+  Future<void> startBeacon(String serviceUuid) =>
+      ref.read(bleServiceProvider).startAdvertising(serviceUuid);
 }

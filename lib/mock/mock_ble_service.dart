@@ -6,7 +6,11 @@ class MockBleService implements BleService {
   bool _isScanning = false;
 
   @override
-  Stream<BleScanUpdate> scan(List<Student> roster) async* {
+  Stream<BleScanUpdate> scan(
+    List<Student> roster, {
+    List<Device> registeredDevices = const [],
+    Duration timeout = const Duration(seconds: 30),
+  }) async* {
     _isScanning = true;
     final presentStudents = roster.take(32).toList(growable: false);
     final discovered = <Device>[];
@@ -43,4 +47,13 @@ class MockBleService implements BleService {
   Future<void> stopScan() async {
     _isScanning = false;
   }
+
+  @override
+  Future<void> requestAccess() async {}
+
+  @override
+  Future<void> startAdvertising(String serviceUuid) async {}
+
+  @override
+  Future<void> stopAdvertising() async {}
 }

@@ -182,6 +182,57 @@ class SectionCard extends StatelessWidget {
   );
 }
 
+class HelpfulEmptyState extends StatelessWidget {
+  const HelpfulEmptyState({
+    super.key,
+    required this.title,
+    required this.message,
+    this.actionLabel,
+    this.onAction,
+    this.icon = Icons.inbox_outlined,
+  });
+
+  final String title;
+  final String message;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(Spacing.lg),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 40, color: AppColors.muted),
+          const SizedBox(height: Spacing.md),
+          Text(
+            title,
+            style: Theme.of(context).textTheme.titleLarge,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: Spacing.xs),
+          Text(
+            message,
+            style: Theme.of(context).textTheme.bodyMedium
+                ?.copyWith(color: AppColors.muted),
+            textAlign: TextAlign.center,
+          ),
+          if (actionLabel != null) ...[
+            const SizedBox(height: Spacing.md),
+            FilledButton.icon(
+              onPressed: onAction,
+              icon: const Icon(Icons.add),
+              label: Text(actionLabel!),
+            ),
+          ],
+        ],
+      ),
+    ),
+  );
+}
+
 /// Student row with initials, secondary details, and a shared status pill.
 class PersonListTile extends StatelessWidget {
   const PersonListTile({

@@ -9,9 +9,9 @@ import '../../../../core/utils/input_formatters.dart';
 import '../../../../core/utils/iterable_extensions.dart';
 import '../../../../core/utils/section_code.dart';
 import '../../../../core/widgets/app_widgets.dart';
+import '../../../../domain/models.dart';
 import '../../../../domain/repositories.dart';
 import '../../../attendance/presentation/providers/attendance_provider.dart';
-import '../../../classes/presentation/providers/class_provider.dart';
 import '../../../device/presentation/providers/device_provider.dart';
 import '../providers/student_provider.dart';
 
@@ -31,6 +31,19 @@ class _StudentSetupScreenState extends ConsumerState<StudentSetupScreen> {
   String? _sectionError;
   String? _studentNumberError;
   bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        final student = await ref.read(currentStudentProvider.future);
+        if (student != null && mounted) context.goNamed(AppRoutes.studentHome);
+      } catch (_) {
+        // No saved student profile yet.
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -56,7 +69,7 @@ class _StudentSetupScreenState extends ConsumerState<StudentSetupScreen> {
             studentNumber: _numberController.text.trim(),
             sectionCode: _sectionCodeController.text,
           );
-      if (mounted) context.goNamed(AppRoutes.studentHome);
+      if (mounted) context.goNamed(AppRoutes.studentDevice);
     } on RepositoryException catch (error) {
       setState(() {
         if (error is DuplicateStudentNumberException) {
@@ -66,6 +79,13 @@ class _StudentSetupScreenState extends ConsumerState<StudentSetupScreen> {
         }
       });
       _formKey.currentState?.validate();
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _sectionError =
+              'Unable to register your profile. Please try again.',
+        );
+      }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -184,6 +204,13 @@ class _StudentSetupScreenState extends ConsumerState<StudentSetupScreen> {
               ),
             ),
           ],
+          const SizedBox(height: Spacing.md),
+          Center(
+            child: TextButton(
+              onPressed: () => context.goNamed(AppRoutes.teacherSetup),
+              child: const Text('Set up a teacher profile'),
+            ),
+          ),
         ],
       ),
     ),
@@ -197,7 +224,7 @@ class StudentHomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final studentAsync = ref.watch(currentStudentProvider);
-    final classListAsync = ref.watch(classListProvider);
+    final classListAsync = ref.watch(currentStudentClassProvider);
     final sessionAsync = ref.watch(todaySessionProvider);
     final recordsAsync = ref.watch(myAttendanceProvider);
     return PageScaffold(
@@ -271,6 +298,9 @@ class StudentHomeScreen extends ConsumerWidget {
                           StatusPill(
                             status: today.isPresent
                                 ? AttendanceStatus.present
+                                : today.recordStatus ==
+                                      AttendanceRecordStatus.unverified
+                                ? AttendanceStatus.pending
                                 : AttendanceStatus.absent,
                           ),
                       ],
@@ -281,7 +311,9 @@ class StudentHomeScreen extends ConsumerWidget {
                 error: (error, stack) => const _StudentError(),
               ),
               loading: () => const LinearProgressIndicator(),
-              error: (error, stack) => const _StudentError(),
+              error: (error, stack) => const SectionCard(
+                child: Text('Attendance has not been recorded yet.'),
+              ),
             ),
             const SizedBox(height: Spacing.lg),
             Row(
@@ -296,56 +328,56 @@ class StudentHomeScreen extends ConsumerWidget {
             ),
             const SizedBox(height: Spacing.sm),
             classListAsync.when(
-              data: (classes) => Column(
-                children: classes
-                    .take(2)
-                    .map(
-                      (section) => Padding(
-                        padding: const EdgeInsets.only(bottom: Spacing.sm),
-                        child: SectionCard(
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.menu_book_outlined,
-                                color: AppColors.primary,
-                              ),
-                              const SizedBox(width: Spacing.md),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      section.name,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleMedium,
-                                    ),
-                                    Text(
-                                      section.subject,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall
-                                          ?.copyWith(color: AppColors.muted),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: Spacing.sm),
-                              Text(
-                                section.schedule.split(', ').last,
-                                style: Theme.of(context).textTheme.labelSmall,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
+              data: (section) => section == null
+                  ? const HelpfulEmptyState(
+                      title: 'No classes yet',
+                      message: 'Your enrolled classes will appear here.',
                     )
-                    .toList(),
-              ),
+                  : SectionCard(
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.menu_book_outlined,
+                            color: AppColors.primary,
+                          ),
+                          const SizedBox(width: Spacing.md),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  section.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleMedium,
+                                ),
+                                Text(
+                                  section.subject == 'Awaiting teacher details'
+                                      ? 'Section saved locally'
+                                      : section.subject,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(color: AppColors.muted),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: Spacing.sm),
+                          Flexible(
+                            child: Text(
+                              section.subject == 'Awaiting teacher details'
+                                  ? 'Teacher details pending'
+                                  : section.schedule,
+                              textAlign: TextAlign.end,
+                              style: Theme.of(context).textTheme.labelSmall,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
               loading: () => const LinearProgressIndicator(),
               error: (error, stack) => const _StudentError(),
             ),

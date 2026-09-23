@@ -7723,6 +7723,10 @@ mixin _$ClassDaoMixin on DatabaseAccessor<AppDatabase> {
   $StudentsTable get students => attachedDatabase.students;
   $EnrollmentsTable get enrollments => attachedDatabase.enrollments;
   $DevicesTable get devices => attachedDatabase.devices;
+  $AttendanceSessionsTable get attendanceSessions =>
+      attachedDatabase.attendanceSessions;
+  $AttendanceRecordsTable get attendanceRecords =>
+      attachedDatabase.attendanceRecords;
   ClassDaoManager get managers => ClassDaoManager(this);
 }
 
@@ -7739,6 +7743,16 @@ class ClassDaoManager {
       $$EnrollmentsTableTableManager(_db.attachedDatabase, _db.enrollments);
   $$DevicesTableTableManager get devices =>
       $$DevicesTableTableManager(_db.attachedDatabase, _db.devices);
+  $$AttendanceSessionsTableTableManager get attendanceSessions =>
+      $$AttendanceSessionsTableTableManager(
+        _db.attachedDatabase,
+        _db.attendanceSessions,
+      );
+  $$AttendanceRecordsTableTableManager get attendanceRecords =>
+      $$AttendanceRecordsTableTableManager(
+        _db.attachedDatabase,
+        _db.attendanceRecords,
+      );
 }
 
 mixin _$EnrollmentDaoMixin on DatabaseAccessor<AppDatabase> {

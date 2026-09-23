@@ -22,6 +22,31 @@ class BleScannerScreen extends ConsumerStatefulWidget {
 }
 
 class _BleScannerScreenState extends ConsumerState<BleScannerScreen> {
+  Future<void> _stopAndReview() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('End attendance?'),
+        content: const Text(
+          'Students that have not been detected will remain unconfirmed until you review attendance.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Continue scanning'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('End attendance'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      await ref.read(bleScanControllerProvider.notifier).stopForReview();
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -41,139 +66,205 @@ class _BleScannerScreenState extends ConsumerState<BleScannerScreen> {
       }
     });
     final scan = ref.watch(bleScanControllerProvider);
-    final recordsAsync = ref.watch(attendanceRecordsProvider(widget.sessionId));
     final rosterAsync = ref.watch(attendanceRosterProvider(widget.sessionId));
-    return PageScaffold(
-      title: 'BLE scanner',
-      showBack: true,
-      body: Column(
-        children: [
-          const SizedBox(height: Spacing.sm),
-          Text(
-            'Scanning for student devices',
-            style: Theme.of(context).textTheme.titleLarge,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: Spacing.xs),
-          Text(
-            scan.isScanning
-                ? 'Keep this screen open while devices are detected.'
-                : 'Finalize the scan to prepare attendance results.',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium
-                ?.copyWith(color: AppColors.muted),
-          ),
-          const SizedBox(height: Spacing.sm),
-          BleRadarIndicator(
-            isScanning: scan.isScanning,
-            progress: scan.progress,
-          ),
-          Row(
-            children: [
-              Expanded(
-                child: MetricStatCard(
-                  label: 'Devices found',
-                  value: '${scan.discoveredDevices.length}',
-                  icon: Icons.bluetooth_connected,
-                ),
-              ),
-              const SizedBox(width: Spacing.sm),
-              Expanded(
-                child: MetricStatCard(
-                  label: 'Scan progress',
-                  value: '${(scan.progress * 100).round()}%',
-                  icon: Icons.radar,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: Spacing.md),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'Nearby devices',
-              style: Theme.of(context).textTheme.titleMedium,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) _stopAndReview();
+      },
+      child: PageScaffold(
+        title: 'BLE scanner',
+        showBack: true,
+        onBack: _stopAndReview,
+        body: Column(
+          children: [
+            const SizedBox(height: Spacing.sm),
+            Text(
+              'Scanning for student devices',
+              style: Theme.of(context).textTheme.titleLarge,
+              textAlign: TextAlign.center,
             ),
-          ),
-          const SizedBox(height: Spacing.xs),
-          Expanded(
-            child: rosterAsync.when(
-              data: (roster) {
-                final detectedIds = scan.discoveredDevices
-                    .map((device) => device.ownerStudentId)
-                    .whereType<String>()
-                    .toSet();
-                final detected = roster
-                    .where((student) => detectedIds.contains(student.id))
-                    .toList();
-                if (detected.isEmpty) {
-                  return Center(
-                    child: Text(
-                      'Waiting for nearby devices...',
-                      style: Theme.of(context).textTheme.bodyMedium
-                          ?.copyWith(color: AppColors.muted),
-                    ),
-                  );
-                }
-                return ListView.separated(
-                  itemCount: detected.length,
-                  separatorBuilder: (context, index) =>
-                      const Divider(height: 1),
-                  itemBuilder: (context, index) {
-                    final student = detected[index];
-                    final record = recordsAsync.value
-                        ?.where((item) => item.studentId == student.id)
-                        .firstOrNull;
-                    return PersonListTile(
-                      name: student.name,
-                      subtitle: student.studentNumber,
-                      status: record?.isPresent == false
-                          ? AttendanceStatus.absent
-                          : AttendanceStatus.detected,
-                      onTap: () => ref
-                          .read(
-                            attendanceRecordsProvider(widget.sessionId)
-                                .notifier,
-                          )
-                          .toggleStudent(student.id),
+            const SizedBox(height: Spacing.xs),
+            Text(
+              scan.isScanning
+                  ? 'Keep this screen open while devices are detected.'
+                  : 'End the scan when you are ready to review attendance.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium
+                  ?.copyWith(color: AppColors.muted),
+            ),
+            const SizedBox(height: Spacing.sm),
+            BleRadarIndicator(
+              isScanning: scan.isScanning,
+              progress: scan.progress,
+            ),
+            Row(
+              children: [
+                Expanded(
+                  child: MetricStatCard(
+                    label: 'Devices found',
+                    value: '${scan.discoveredDevices.length}',
+                    icon: Icons.bluetooth_connected,
+                  ),
+                ),
+                const SizedBox(width: Spacing.sm),
+                Expanded(
+                  child: MetricStatCard(
+                    label: 'Scan progress',
+                    value: '${(scan.progress * 100).round()}%',
+                    icon: Icons.radar,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: Spacing.md),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Nearby devices',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            const SizedBox(height: Spacing.xs),
+            Expanded(
+              child: rosterAsync.when(
+                data: (roster) {
+                  final detectedIds = scan.discoveredDevices
+                      .map((device) => device.ownerStudentId)
+                      .whereType<String>()
+                      .toSet();
+                  if (roster.isEmpty) {
+                    return Center(
+                      child: Text(
+                        'No students are enrolled in this class yet.',
+                        style: Theme.of(context).textTheme.bodyMedium
+                            ?.copyWith(color: AppColors.muted),
+                      ),
                     );
-                  },
-                );
-              },
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, stack) =>
-                  const Center(child: Text('Student roster is unavailable.')),
+                  }
+                  return ListView.separated(
+                    itemCount: roster.length,
+                    separatorBuilder: (context, index) =>
+                        const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final student = roster[index];
+                      return PersonListTile(
+                        name: student.name,
+                        subtitle: student.studentNumber,
+                        status: detectedIds.contains(student.id)
+                            ? AttendanceStatus.detected
+                            : AttendanceStatus.pending,
+                        trailing: StatusPill(
+                          status: detectedIds.contains(student.id)
+                              ? AttendanceStatus.detected
+                              : AttendanceStatus.pending,
+                          label: detectedIds.contains(student.id)
+                              ? 'Detected'
+                              : 'Not detected',
+                        ),
+                      );
+                    },
+                  );
+                },
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (error, stack) =>
+                    const Center(child: Text('Student roster is unavailable.')),
+              ),
             ),
-          ),
-          const SizedBox(height: Spacing.md),
-          PrimaryActionButton(
-            label: scan.isScanning
-                ? 'Stop scan and view results'
-                : 'Finalize attendance',
-            icon: scan.isScanning ? Icons.stop_circle_outlined : Icons.check,
-            onPressed: scan.isComplete
-                ? null
-                : () => ref
-                      .read(bleScanControllerProvider.notifier)
-                      .stopAndFinalize(),
-          ),
-          const SizedBox(height: Spacing.sm),
-        ],
+            const SizedBox(height: Spacing.md),
+            if (scan.error != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: Spacing.sm),
+                child: SectionCard(child: Text(scan.error!)),
+              ),
+            PrimaryActionButton(
+              label: scan.error != null
+                  ? 'Try again'
+                  : scan.isScanning
+                  ? 'End scan and review'
+                  : 'End scan and review',
+              icon: scan.error != null
+                  ? Icons.refresh
+                  : Icons.stop_circle_outlined,
+              onPressed: scan.isComplete
+                  ? null
+                  : scan.error != null
+                  ? () => ref
+                        .read(bleScanControllerProvider.notifier)
+                        .start(widget.sessionId)
+                  : _stopAndReview,
+            ),
+            const SizedBox(height: Spacing.sm),
+          ],
+        ),
       ),
     );
   }
 }
 
-/// Review detected students and toggle a student's attendance status.
-class AttendanceResultsScreen extends ConsumerWidget {
+/// Review each student and explicitly save the teacher-approved state.
+class AttendanceResultsScreen extends ConsumerStatefulWidget {
   const AttendanceResultsScreen({super.key, required this.sessionId});
 
   final String sessionId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final recordsAsync = ref.watch(attendanceRecordsProvider(sessionId));
-    final studentsAsync = ref.watch(attendanceRosterProvider(sessionId));
+  ConsumerState<AttendanceResultsScreen> createState() =>
+      _AttendanceResultsScreenState();
+}
+
+class _AttendanceResultsScreenState
+    extends ConsumerState<AttendanceResultsScreen> {
+  bool _saving = false;
+
+  Future<void> _save() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Save attendance?'),
+        content: const Text(
+          'Students still marked Not Detected will be recorded as absent.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Review'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Save attendance'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    setState(() => _saving = true);
+    try {
+      await ref
+          .read(attendanceActionControllerProvider.notifier)
+          .complete(widget.sessionId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Attendance saved.')));
+      context.goNamed(AppRoutes.teacherHome);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Unable to save attendance. Your local data is still safe.',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final recordsAsync = ref.watch(attendanceRecordsProvider(widget.sessionId));
+    final studentsAsync = ref.watch(attendanceRosterProvider(widget.sessionId));
     return PageScaffold(
       title: 'Attendance results',
       showBack: true,
@@ -181,7 +272,20 @@ class AttendanceResultsScreen extends ConsumerWidget {
         data: (records) => studentsAsync.when(
           data: (students) {
             final present = records.where((record) => record.isPresent).length;
-            final absent = records.length - present;
+            final notDetected = records
+                .where(
+                  (record) =>
+                      record.recordStatus == AttendanceRecordStatus.unverified,
+                )
+                .length;
+            final absent = records
+                .where(
+                  (record) =>
+                      record.recordStatus == AttendanceRecordStatus.absent ||
+                      record.recordStatus ==
+                          AttendanceRecordStatus.manualAbsent,
+                )
+                .length;
             return Column(
               children: [
                 Padding(
@@ -208,6 +312,15 @@ class AttendanceResultsScreen extends ConsumerWidget {
                           color: AppColors.danger,
                         ),
                       ),
+                      const SizedBox(width: Spacing.sm),
+                      Expanded(
+                        child: MetricStatCard(
+                          label: 'Not detected',
+                          value: '$notDetected',
+                          icon: Icons.help_outline,
+                          color: AppColors.warning,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -222,13 +335,41 @@ class AttendanceResultsScreen extends ConsumerWidget {
                       const SizedBox(width: Spacing.sm),
                       Expanded(
                         child: Text(
-                          'Tap a student to change their attendance status.',
+                          'Tap a student to mark them present or absent. Manual changes are labeled.',
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ),
                     ],
                   ),
                 ),
+                if (present == 0)
+                  Padding(
+                    padding: const EdgeInsets.only(top: Spacing.sm),
+                    child: SectionCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'No student devices detected',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: Spacing.xs),
+                          const Text(
+                            'Make sure student devices are nearby, registered, and Bluetooth is enabled.',
+                          ),
+                          const SizedBox(height: Spacing.sm),
+                          OutlinedButton.icon(
+                            onPressed: () => context.pushNamed(
+                              AppRoutes.bleScanner,
+                              pathParameters: {'sessionId': widget.sessionId},
+                            ),
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Scan Again'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 const SizedBox(height: Spacing.sm),
                 Expanded(
                   child: ListView.separated(
@@ -247,18 +388,44 @@ class AttendanceResultsScreen extends ConsumerWidget {
                         subtitle: student.studentNumber,
                         status: record.isPresent
                             ? AttendanceStatus.present
+                            : record.recordStatus ==
+                                  AttendanceRecordStatus.unverified
+                            ? AttendanceStatus.pending
                             : AttendanceStatus.absent,
+                        trailing: StatusPill(
+                          status: record.isPresent
+                              ? AttendanceStatus.present
+                              : record.recordStatus ==
+                                    AttendanceRecordStatus.unverified
+                              ? AttendanceStatus.pending
+                              : AttendanceStatus.absent,
+                          label:
+                              record.recordStatus ==
+                                      AttendanceRecordStatus.manualPresent ||
+                                  record.recordStatus ==
+                                      AttendanceRecordStatus.manualAbsent
+                              ? 'Manual'
+                              : record.isPresent
+                              ? 'Present'
+                              : record.recordStatus ==
+                                    AttendanceRecordStatus.unverified
+                              ? 'Not detected'
+                              : 'Absent',
+                        ),
                         onTap: () => ref
-                            .read(attendanceRecordsProvider(sessionId).notifier)
+                            .read(
+                              attendanceRecordsProvider(widget.sessionId)
+                                  .notifier,
+                            )
                             .toggleStudent(student.id),
                       );
                     },
                   ),
                 ),
                 PrimaryActionButton(
-                  label: 'Done',
+                  label: _saving ? 'Saving...' : 'Save attendance',
                   icon: Icons.check,
-                  onPressed: () => context.goNamed(AppRoutes.teacherHome),
+                  onPressed: _saving ? null : _save,
                 ),
                 const SizedBox(height: Spacing.sm),
               ],
@@ -284,14 +451,23 @@ class AttendanceHistoryScreen extends ConsumerWidget {
     body: ref
         .watch(attendanceHistoryProvider)
         .when(
-          data: (sessions) => ListView.separated(
-            padding: const EdgeInsets.only(top: Spacing.md, bottom: Spacing.xl),
-            itemCount: sessions.length,
-            separatorBuilder: (context, index) =>
-                const SizedBox(height: Spacing.sm),
-            itemBuilder: (context, index) =>
-                _HistorySessionCard(session: sessions[index]),
-          ),
+          data: (sessions) => sessions.isEmpty
+              ? const HelpfulEmptyState(
+                  title: 'No attendance records yet',
+                  message:
+                      'Attendance sessions for your classes will appear here.',
+                )
+              : ListView.separated(
+                  padding: const EdgeInsets.only(
+                    top: Spacing.md,
+                    bottom: Spacing.xl,
+                  ),
+                  itemCount: sessions.length,
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: Spacing.sm),
+                  itemBuilder: (context, index) =>
+                      _HistorySessionCard(session: sessions[index]),
+                ),
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (error, stack) => const _AttendanceError(),
         ),
@@ -309,6 +485,19 @@ class _HistorySessionCard extends ConsumerWidget {
       .when(
         data: (records) {
           final present = records.where((record) => record.isPresent).length;
+          final absent = records
+              .where(
+                (record) =>
+                    record.recordStatus == AttendanceRecordStatus.absent ||
+                    record.recordStatus == AttendanceRecordStatus.manualAbsent,
+              )
+              .length;
+          final pending = records
+              .where(
+                (record) =>
+                    record.recordStatus == AttendanceRecordStatus.unverified,
+              )
+              .length;
           return SectionCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -321,9 +510,13 @@ class _HistorySessionCard extends ConsumerWidget {
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                     ),
-                    const StatusPill(
-                      status: AttendanceStatus.registered,
-                      label: 'Saved',
+                    StatusPill(
+                      status: session.status == 'Completed'
+                          ? AttendanceStatus.registered
+                          : AttendanceStatus.pending,
+                      label: session.status == 'Completed'
+                          ? 'Saved'
+                          : 'In progress',
                     ),
                   ],
                 ),
@@ -346,15 +539,15 @@ class _HistorySessionCard extends ConsumerWidget {
                     Expanded(
                       child: _HistoryMetric(
                         label: 'Absent',
-                        value: '${records.length - present}',
+                        value: '$absent',
                         color: AppColors.danger,
                       ),
                     ),
                     Expanded(
                       child: _HistoryMetric(
-                        label: 'Total',
-                        value: '${records.length}',
-                        color: AppColors.primary,
+                        label: 'Not detected',
+                        value: '$pending',
+                        color: AppColors.warning,
                       ),
                     ),
                   ],
@@ -447,7 +640,10 @@ class MyAttendanceScreen extends ConsumerWidget {
               const SizedBox(height: Spacing.sm),
               Expanded(
                 child: entries.isEmpty
-                    ? const Center(child: Text('No attendance records yet.'))
+                    ? const HelpfulEmptyState(
+                        title: 'No attendance records yet',
+                        message: 'Your attendance sessions will appear here after your teacher records attendance.',
+                      )
                     : ListView.separated(
                         padding: const EdgeInsets.only(bottom: Spacing.lg),
                         itemCount: entries.length,
@@ -462,6 +658,9 @@ class MyAttendanceScreen extends ConsumerWidget {
                                 '${entry.session.startedAt.day} ${_monthName(entry.session.startedAt.month)} ${entry.session.startedAt.year} · ${_timeLabel(entry.session.startedAt)}',
                             status: record.isPresent
                                 ? AttendanceStatus.present
+                                : record.recordStatus ==
+                                      AttendanceRecordStatus.unverified
+                                ? AttendanceStatus.pending
                                 : AttendanceStatus.absent,
                           );
                         },

@@ -33,20 +33,20 @@ class MockTeacherRepository implements TeacherRepository {
 }
 
 class MockClassRepository implements ClassRepository {
+  final List<ClassSection> _classes = [...seedClasses];
   @override
-  Future<List<ClassSection>> getClasses() async =>
-      List.unmodifiable(seedClasses);
+  Future<List<ClassSection>> getClasses() async => List.unmodifiable(_classes);
   @override
   Stream<List<ClassSection>> watchClasses() => _once(getClasses());
   @override
   Future<ClassSection?> getClass(String classId) async =>
-      seedClasses.where((section) => section.id == classId).firstOrNull;
+      _classes.where((section) => section.id == classId).firstOrNull;
   @override
   Stream<ClassSection?> watchClass(String classId) => _once(getClass(classId));
   @override
   Future<ClassSection?> getClassByCode(String sectionCode) async {
     final normalized = normalizeSectionCode(sectionCode);
-    return seedClasses
+    return _classes
         .where((section) => section.sectionCode == normalized)
         .firstOrNull;
   }
@@ -58,11 +58,67 @@ class MockClassRepository implements ClassRepository {
   @override
   Stream<List<Student>> watchStudents(String classId) =>
       _once(getStudents(classId));
+
+  @override
+  Future<ClassSection> createClass({
+    required int gradeLevel,
+    required String sectionLabel,
+    required String subject,
+    required String room,
+    required DateTime scheduleStart,
+    required DateTime scheduleEnd,
+  }) async {
+    final code = normalizeSectionCode('GRADE$gradeLevel-$sectionLabel');
+    if (parseSectionCode(code) == null ||
+        subject.trim().isEmpty ||
+        room.trim().isEmpty ||
+        !scheduleEnd.isAfter(scheduleStart)) {
+      throw const ClassValidationException();
+    }
+    if (_classes.any((section) => section.sectionCode == code)) {
+      throw const DuplicateClassException();
+    }
+    final now = DateTime.now();
+    final section = ClassSection(
+      id: 'mock-class-${_classes.length}',
+      updatedAt: now,
+      syncStatus: SyncStatus.pendingCreate,
+      name: 'Grade $gradeLevel - ${sectionLabel.trim()}',
+      subject: subject.trim(),
+      room: room.trim(),
+      schedule: '$scheduleStart - $scheduleEnd',
+      studentCount: 0,
+      gradeLevel: gradeLevel,
+      sectionLabel: sectionLabel.trim().toUpperCase(),
+      sectionCode: code,
+    );
+    _classes.add(section);
+    return section;
+  }
+
+  @override
+  Future<ClassSection> updateClass(ClassSection section) async {
+    if (_classes.any(
+      (item) =>
+          item.id != section.id && item.sectionCode == section.sectionCode,
+    )) {
+      throw const DuplicateClassException();
+    }
+    final index = _classes.indexWhere((item) => item.id == section.id);
+    if (index < 0) throw const ClassSectionNotFoundException();
+    _classes[index] = section;
+    return section;
+  }
+
+  @override
+  Future<void> deleteClass(String classId) async =>
+      _classes.removeWhere((section) => section.id == classId);
 }
 
 class MockStudentRepository implements StudentRepository {
   final List<Student> _students = [...seedStudents];
   String _currentStudentId = 'student-01';
+  final Set<String> _removedEnrollments = {};
   @override
   Future<List<Student>> getStudents() async => List.unmodifiable(_students);
   @override
@@ -108,6 +164,80 @@ class MockStudentRepository implements StudentRepository {
     _currentStudentId = student.id;
     return student;
   }
+
+  @override
+  Future<Student> addStudentToClass({
+    required String name,
+    required String studentNumber,
+    required String classId,
+    String? bleUuid,
+  }) async {
+    if (name.trim().isEmpty || studentNumber.trim().isEmpty) {
+      throw const ClassValidationException();
+    }
+    if (_students.any(
+      (student) => student.studentNumber == studentNumber.trim(),
+    )) {
+      throw const DuplicateStudentNumberException();
+    }
+    final section = seedClasses.where((item) => item.id == classId).firstOrNull;
+    if (section == null) throw const ClassSectionNotFoundException();
+    final student = Student(
+      id: 'student-managed-${DateTime.now().microsecondsSinceEpoch}',
+      updatedAt: DateTime.now(),
+      syncStatus: SyncStatus.pendingCreate,
+      name: name.trim(),
+      studentNumber: studentNumber.trim(),
+      classId: classId,
+      gradeLevel: 'Grade ${section.gradeLevel}',
+      deviceRegistered: false,
+    );
+    _students.add(student);
+    return student;
+  }
+
+  @override
+  Future<Student> updateStudent({
+    required String studentId,
+    required String name,
+    required String studentNumber,
+  }) async {
+    if (name.trim().isEmpty || studentNumber.trim().isEmpty) {
+      throw const ClassValidationException();
+    }
+    if (_students.any(
+      (student) =>
+          student.id != studentId &&
+          student.studentNumber == studentNumber.trim(),
+    )) {
+      throw const DuplicateStudentNumberException();
+    }
+    final index = _students.indexWhere((student) => student.id == studentId);
+    if (index < 0) throw const ClassSectionNotFoundException();
+    final current = _students[index];
+    _students[index] = Student(
+      id: current.id,
+      updatedAt: DateTime.now(),
+      syncStatus: SyncStatus.pendingUpdate,
+      name: name.trim(),
+      studentNumber: studentNumber.trim(),
+      classId: current.classId,
+      gradeLevel: current.gradeLevel,
+      deviceRegistered: current.deviceRegistered,
+    );
+    return _students[index];
+  }
+
+  @override
+  Future<void> removeStudentFromClass({
+    required String studentId,
+    required String classId,
+  }) async {
+    _students.removeWhere(
+      (student) => student.id == studentId && student.classId == classId,
+    );
+    _removedEnrollments.add('$classId/$studentId');
+  }
 }
 
 class MockAttendanceRepository implements AttendanceRepository {
@@ -115,10 +245,46 @@ class MockAttendanceRepository implements AttendanceRepository {
     ...seedAttendanceRecords,
     ...seedHistoricalRecords,
   ];
+  final List<AttendanceSession> _extraSessions = [];
   List<AttendanceSession> get _sessions => [
+    ..._extraSessions,
     seedTodaySession,
     ...seedHistoricalSessions,
   ];
+  @override
+  Future<AttendanceSession> startSession(String classId) async {
+    final roster = seedStudents
+        .where((student) => student.classId == classId)
+        .toList();
+    if (roster.isEmpty) throw const EmptyClassRosterException();
+    final now = DateTime.now();
+    final session = AttendanceSession(
+      id: 'mock-session-${_extraSessions.length}',
+      updatedAt: now,
+      syncStatus: SyncStatus.pendingCreate,
+      classId: classId,
+      title: classId,
+      startedAt: now,
+      status: 'Scanning',
+    );
+    _extraSessions.add(session);
+    for (final student in roster) {
+      _records.add(
+        AttendanceRecord(
+          id: 'mock-record-${session.id}-${student.id}',
+          updatedAt: now,
+          syncStatus: SyncStatus.pendingCreate,
+          sessionId: session.id,
+          studentId: student.id,
+          isPresent: false,
+          detectedAt: null,
+          recordStatus: AttendanceRecordStatus.unverified,
+        ),
+      );
+    }
+    return session;
+  }
+
   @override
   Future<AttendanceSession> getTodaySession() async => seedTodaySession;
   @override
@@ -161,17 +327,50 @@ class MockAttendanceRepository implements AttendanceRepository {
   }
 
   @override
-  Future<void> finalizeScan(
+  Future<void> markDetected(
     String sessionId,
-    Set<String> detectedStudentIds,
-  ) async {
+    String studentId, {
+    int? rssi,
+  }) async {
     for (var i = 0; i < _records.length; i++) {
       final record = _records[i];
-      if (record.sessionId != sessionId) continue;
-      final present = detectedStudentIds.contains(record.studentId);
-      _records[i] = record.copyWith(
-        isPresent: present,
-        detectedAt: present ? mockNow : null,
+      if (record.sessionId == sessionId && record.studentId == studentId) {
+        _records[i] = AttendanceRecord(
+          id: record.id,
+          updatedAt: DateTime.now(),
+          syncStatus: SyncStatus.pendingUpdate,
+          sessionId: sessionId,
+          studentId: studentId,
+          isPresent: true,
+          detectedAt: DateTime.now(),
+          rssi: rssi,
+          recordStatus: AttendanceRecordStatus.present,
+        );
+      }
+    }
+  }
+
+  @override
+  Future<void> completeSession(String sessionId) async {
+    for (var i = 0; i < _records.length; i++) {
+      final record = _records[i];
+      if (record.sessionId == sessionId &&
+          record.recordStatus == AttendanceRecordStatus.unverified) {
+        _records[i] = record.copyWith(isPresent: false);
+      }
+    }
+    final index = _extraSessions.indexWhere((item) => item.id == sessionId);
+    if (index >= 0) {
+      final item = _extraSessions[index];
+      _extraSessions[index] = AttendanceSession(
+        id: item.id,
+        updatedAt: DateTime.now(),
+        syncStatus: SyncStatus.pendingUpdate,
+        classId: item.classId,
+        title: item.title,
+        startedAt: item.startedAt,
+        status: 'Completed',
+        endedAt: DateTime.now(),
       );
     }
   }

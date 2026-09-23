@@ -4,24 +4,48 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/attendance/presentation/screens/attendance_screens.dart';
 import '../../features/classes/presentation/screens/class_screens.dart';
+import '../../features/classes/presentation/screens/class_creation_screen.dart';
 import '../../features/device/presentation/screens/device_screens.dart';
 import '../../features/settings/presentation/screens/teacher_settings_screen.dart';
 import '../../features/student/presentation/screens/student_screens.dart';
 import '../../features/teacher/presentation/screens/teacher_home_screen.dart';
 import '../../features/teacher/presentation/screens/teacher_setup_screen.dart';
+import '../../features/teacher/presentation/screens/teacher_unlock_screen.dart';
+import '../auth/teacher_session.dart';
 import 'route_names.dart';
+import 'welcome_screen.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 
 /// Creates the two independent stateful role shells and all pre-shell routes.
 GoRouter createAppRouter() => GoRouter(
   navigatorKey: _rootNavigatorKey,
-  initialLocation: '/teacher/setup',
+  initialLocation: '/welcome',
+  refreshListenable: teacherSessionUnlocked,
+  redirect: (context, state) {
+    final path = state.uri.path;
+    final isTeacherFlow = path.startsWith('/teacher');
+    final isSetupRoute = path == '/teacher/setup' || path == '/teacher/unlock';
+    if (isTeacherFlow && !isSetupRoute && !teacherSessionUnlocked.value) {
+      return '/welcome';
+    }
+    return null;
+  },
   routes: [
+    GoRoute(
+      path: '/welcome',
+      name: AppRoutes.welcome,
+      builder: (context, state) => const WelcomeScreen(),
+    ),
     GoRoute(
       path: '/teacher/setup',
       name: AppRoutes.teacherSetup,
       builder: (context, state) => const TeacherSetupScreen(),
+    ),
+    GoRoute(
+      path: '/teacher/unlock',
+      name: AppRoutes.teacherUnlock,
+      builder: (context, state) => const TeacherUnlockScreen(),
     ),
     GoRoute(
       path: '/student/setup',
@@ -51,6 +75,11 @@ GoRouter createAppRouter() => GoRouter(
               builder: (context, state) => const TeacherClassesScreen(),
               routes: [
                 GoRoute(
+                  path: 'create',
+                  name: AppRoutes.teacherClassCreate,
+                  builder: (context, state) => const ClassCreationScreen(),
+                ),
+                GoRoute(
                   path: ':classId',
                   name: AppRoutes.teacherClassDetails,
                   builder: (context, state) => ClassDetailsScreen(
@@ -61,6 +90,13 @@ GoRouter createAppRouter() => GoRouter(
                       path: 'students',
                       name: AppRoutes.teacherStudentList,
                       builder: (context, state) => StudentListScreen(
+                        classId: state.pathParameters['classId'] ?? '',
+                      ),
+                    ),
+                    GoRoute(
+                      path: 'edit',
+                      name: AppRoutes.teacherClassEdit,
+                      builder: (context, state) => ClassEditLoaderScreen(
                         classId: state.pathParameters['classId'] ?? '',
                       ),
                     ),

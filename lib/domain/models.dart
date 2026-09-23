@@ -3,7 +3,13 @@ enum SyncStatus { synced, pendingCreate, pendingUpdate, pendingDelete }
 
 enum AttendanceSessionStatus { scanning, completed }
 
-enum AttendanceRecordStatus { present, absent, unverified }
+enum AttendanceRecordStatus {
+  present,
+  absent,
+  unverified,
+  manualPresent,
+  manualAbsent,
+}
 
 class Teacher {
   const Teacher({
@@ -152,8 +158,8 @@ class AttendanceRecord {
     detectedAt: detectedAt ?? this.detectedAt,
     rssi: rssi ?? this.rssi,
     recordStatus: (isPresent ?? this.isPresent)
-        ? AttendanceRecordStatus.present
-        : AttendanceRecordStatus.absent,
+        ? AttendanceRecordStatus.manualPresent
+        : AttendanceRecordStatus.manualAbsent,
   );
 }
 
