@@ -1,13 +1,15 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/router/route_names.dart';
 import '../../../../core/providers/repository_providers.dart';
+import '../../../../core/router/route_names.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/input_formatters.dart';
+import '../../../../core/utils/teacher_pin.dart';
 import '../../../../core/widgets/app_widgets.dart';
 import '../../../../domain/models.dart';
+import '../../../authentication/application/teacher_auth_service.dart';
 import '../../../device/presentation/providers/device_provider.dart';
 import '../../../teacher/presentation/providers/teacher_provider.dart';
 import '../providers/settings_provider.dart';
@@ -62,6 +64,37 @@ class TeacherSettingsScreen extends ConsumerWidget {
               loading: () => const LinearProgressIndicator(),
               error: (error, stack) =>
                   const Text('Teacher account is unavailable.'),
+            ),
+          ),
+          const SizedBox(height: Spacing.lg),
+          Text('Security', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: Spacing.sm),
+          SectionCard(
+            padding: EdgeInsets.zero,
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.password_outlined),
+                  title: const Text('Change PIN'),
+                  subtitle: const Text(
+                    'Update the PIN used to unlock teacher access',
+                  ),
+                  onTap: () => _changePin(context, ref),
+                ),
+                const Divider(
+                  height: 1,
+                  indent: Spacing.md,
+                  endIndent: Spacing.md,
+                ),
+                ListTile(
+                  leading: const Icon(Icons.logout),
+                  title: const Text('Log out'),
+                  subtitle: const Text(
+                    'Lock the teacher dashboard on this device',
+                  ),
+                  onTap: () => _logout(context, ref),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: Spacing.lg),
@@ -120,15 +153,41 @@ class TeacherSettingsScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: Spacing.lg),
-          Text(
-            'Devices and storage',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
+          Text('Bluetooth', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: Spacing.sm),
           SectionCard(
             padding: EdgeInsets.zero,
             child: Column(
               children: [
+                ListTile(
+                  leading: const Icon(Icons.bluetooth),
+                  title: const Text('Bluetooth status'),
+                  subtitle: ref
+                      .watch(bleAdapterStateProvider)
+                      .when(
+                        data: (availability) => Text(switch (availability) {
+                          BleAvailability.ready =>
+                            'Ready to scan and advertise',
+                          BleAvailability.poweredOff =>
+                            'Bluetooth is turned off',
+                          BleAvailability.permissionDenied =>
+                            'Bluetooth permission is required',
+                          BleAvailability.unsupported =>
+                            'Bluetooth LE is not supported on this device',
+                          BleAvailability.unknown =>
+                            'Checking Bluetooth status',
+                        }),
+                        loading: () => const Text('Checking Bluetooth status'),
+                        error: (error, stack) => const Text(
+                          'Bluetooth status is unavailable. Try scanning to check access.',
+                        ),
+                      ),
+                ),
+                const Divider(
+                  height: 1,
+                  indent: Spacing.md,
+                  endIndent: Spacing.md,
+                ),
                 ListTile(
                   leading: const Icon(Icons.bluetooth_searching),
                   title: const Text('Device status'),
@@ -150,6 +209,28 @@ class TeacherSettingsScreen extends ConsumerWidget {
                   indent: Spacing.md,
                   endIndent: Spacing.md,
                 ),
+              ],
+            ),
+          ),
+          const SizedBox(height: Spacing.lg),
+          Text('Data & Reports', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: Spacing.sm),
+          SectionCard(
+            padding: EdgeInsets.zero,
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.event_note_outlined),
+                  title: const Text('Attendance history and exports'),
+                  subtitle: const Text('Review sessions and export reports'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.goNamed(AppRoutes.teacherAttendance),
+                ),
+                const Divider(
+                  height: 1,
+                  indent: Spacing.md,
+                  endIndent: Spacing.md,
+                ),
                 const ListTile(
                   leading: Icon(Icons.storage_outlined),
                   title: Text('Local storage'),
@@ -162,57 +243,9 @@ class TeacherSettingsScreen extends ConsumerWidget {
               ],
             ),
           ),
-          if (kDebugMode) ...[
-            const SizedBox(height: Spacing.lg),
-            SectionCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Developer tools',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: Spacing.xs),
-                  Text(
-                    'Load the Phase 1 classroom fixtures into local storage.',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  const SizedBox(height: Spacing.md),
-                  OutlinedButton.icon(
-                    onPressed: () async {
-                      try {
-                        await ref.read(demoDataLoaderProvider).load();
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Demo data loaded.')),
-                          );
-                        }
-                      } catch (error) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Could not load demo data: $error'),
-                            ),
-                          );
-                        }
-                      }
-                    },
-                    icon: const Icon(Icons.dataset_outlined),
-                    label: const Text('Load demo data'),
-                  ),
-                ],
-              ),
-            ),
-          ],
-          if (kDebugMode) ...[
-            const SizedBox(height: Spacing.lg),
-            OutlinedButton.icon(
-              onPressed: () => context.goNamed(AppRoutes.debugRoles),
-              icon: const Icon(Icons.developer_mode),
-              label: const Text('Switch role preview'),
-            ),
-          ],
           const SizedBox(height: Spacing.lg),
+          Text('About', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: Spacing.sm),
           Center(
             child: Text(
               'ClassAttend · Local storage',
@@ -245,6 +278,139 @@ class TeacherSettingsScreen extends ConsumerWidget {
           rssiThreshold: settings.rssiThreshold,
         ),
       );
+
+  static Future<void> _logout(BuildContext context, WidgetRef ref) async {
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Log out?'),
+        content: const Text(
+          "You'll need your teacher PIN to open the teacher dashboard again. "
+          'Your classes and attendance records will remain on this device.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Log out'),
+          ),
+        ],
+      ),
+    );
+    if (accepted != true) return;
+    try {
+      await ref.read(settingsControllerProvider.notifier).logout();
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to log out. Try again.')),
+        );
+      }
+    }
+  }
+
+  static Future<void> _changePin(BuildContext context, WidgetRef ref) async {
+    final currentPin = TextEditingController();
+    final newPin = TextEditingController();
+    final confirmPin = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    final values = await showDialog<List<String>>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Change teacher PIN'),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: currentPin,
+                obscureText: true,
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                inputFormatters: const [DigitsOnlyPinFormatter()],
+                decoration: const InputDecoration(labelText: 'Current PIN'),
+                validator: (value) => !isValidTeacherPin(value ?? '')
+                    ? 'Enter your current 4 to 6 digit PIN.'
+                    : null,
+              ),
+              TextFormField(
+                controller: newPin,
+                obscureText: true,
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                inputFormatters: const [DigitsOnlyPinFormatter()],
+                decoration: const InputDecoration(labelText: 'New PIN'),
+                validator: (value) => !isValidTeacherPin(value ?? '')
+                    ? 'Use 4 to 6 digits.'
+                    : null,
+              ),
+              TextFormField(
+                controller: confirmPin,
+                obscureText: true,
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                inputFormatters: const [DigitsOnlyPinFormatter()],
+                decoration: const InputDecoration(labelText: 'Confirm new PIN'),
+                validator: (value) =>
+                    value != newPin.text ? 'The PINs do not match.' : null,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (formKey.currentState?.validate() != true) return;
+              Navigator.pop(context, [currentPin.text, newPin.text]);
+            },
+            child: const Text('Save PIN'),
+          ),
+        ],
+      ),
+    );
+    if (values == null) {
+      currentPin.dispose();
+      newPin.dispose();
+      confirmPin.dispose();
+      return;
+    }
+    try {
+      await ref
+          .read(settingsControllerProvider.notifier)
+          .changePin(currentPin: values[0], newPin: values[1]);
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Teacher PIN updated.')));
+      }
+    } on InvalidTeacherPinException {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('The current PIN does not match.')),
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Unable to update your PIN. Try again.'),
+          ),
+        );
+      }
+    } finally {
+      currentPin.dispose();
+      newPin.dispose();
+      confirmPin.dispose();
+    }
+  }
 
   static Future<void> _chooseDuration(
     BuildContext context,

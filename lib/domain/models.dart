@@ -1,12 +1,12 @@
 /// Synchronization lifecycle for locally persisted records.
 enum SyncStatus { synced, pendingCreate, pendingUpdate, pendingDelete }
 
-enum AttendanceSessionStatus { scanning, completed }
+enum AttendanceSessionStatus { scanning, completed, cancelled }
 
 enum AttendanceRecordStatus {
   present,
   absent,
-  unverified,
+  notDetected,
   manualPresent,
   manualAbsent,
 }
@@ -116,7 +116,7 @@ class AttendanceSession {
   final DateTime startedAt;
 
   /// Presentation label retained for the existing screens.
-  final String status;
+  final AttendanceSessionStatus status;
   final DateTime? date;
   final DateTime? endedAt;
   final int scanDurationSeconds;
@@ -175,6 +175,7 @@ class Device {
     required this.lastSeenAt,
     this.deviceModel = '',
     this.registeredAt,
+    this.rssi,
   });
   final String id;
   final DateTime updatedAt;
@@ -188,6 +189,7 @@ class Device {
   final DateTime? lastSeenAt;
   final String deviceModel;
   final DateTime? registeredAt;
+  final int? rssi;
 }
 
 class AppSettings {
@@ -214,8 +216,18 @@ class BleScanUpdate {
     required this.progress,
     required this.discoveredDevices,
     required this.isComplete,
+    required this.unknownDeviceCount,
   });
   final double progress;
   final List<Device> discoveredDevices;
   final bool isComplete;
+  final int unknownDeviceCount;
+}
+
+enum BleAvailability {
+  unknown,
+  ready,
+  poweredOff,
+  permissionDenied,
+  unsupported,
 }

@@ -91,6 +91,13 @@ class _TeacherUnlockScreenState extends ConsumerState<TeacherUnlockScreen> {
             icon: Icons.lock_open_outlined,
             onPressed: _checking ? null : _unlock,
           ),
+          const SizedBox(height: Spacing.md),
+          Center(
+            child: TextButton(
+              onPressed: () => context.goNamed(AppRoutes.studentSetup),
+              child: const Text('Continue as a student'),
+            ),
+          ),
         ],
       ),
     ),

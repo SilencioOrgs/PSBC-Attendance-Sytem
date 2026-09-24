@@ -7,9 +7,12 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/iterable_extensions.dart';
 import '../../../../core/widgets/app_widgets.dart';
 import '../../../../domain/models.dart';
+import '../../../reports/models/report_models.dart';
+import '../../../reports/presentation/providers/report_export_provider.dart';
+import '../../../reports/presentation/widgets/export_report_sheet.dart';
 import '../../../student/presentation/providers/student_provider.dart';
 import '../providers/attendance_provider.dart';
-import '../providers/ble_scan_provider.dart';
+import '../providers/attendance_controller.dart';
 
 /// Full-screen BLE scan flow, outside either bottom navigation shell.
 class BleScannerScreen extends ConsumerStatefulWidget {
@@ -43,7 +46,54 @@ class _BleScannerScreenState extends ConsumerState<BleScannerScreen> {
       ),
     );
     if (confirmed == true && mounted) {
-      await ref.read(bleScanControllerProvider.notifier).stopForReview();
+      try {
+        await ref.read(attendanceControllerProvider.notifier).stopForReview();
+      } catch (_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Unable to stop this scan. Try again.'),
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _cancelAttendance() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancel attendance?'),
+        content: const Text(
+          'This scan will not create finalized attendance records.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Continue scanning'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Cancel attendance'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await ref
+          .read(attendanceControllerProvider.notifier)
+          .cancel(widget.sessionId);
+      if (mounted) context.goNamed(AppRoutes.teacherClasses);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Unable to cancel this attendance session.'),
+          ),
+        );
+      }
     }
   }
 
@@ -51,13 +101,13 @@ class _BleScannerScreenState extends ConsumerState<BleScannerScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(bleScanControllerProvider.notifier).start(widget.sessionId);
+      ref.read(attendanceControllerProvider.notifier).start(widget.sessionId);
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    ref.listen(bleScanControllerProvider, (previous, next) {
+    ref.listen(attendanceControllerProvider, (previous, next) {
       if (previous?.isComplete != true && next.isComplete && mounted) {
         context.goNamed(
           AppRoutes.attendanceResults,
@@ -65,7 +115,7 @@ class _BleScannerScreenState extends ConsumerState<BleScannerScreen> {
         );
       }
     });
-    final scan = ref.watch(bleScanControllerProvider);
+    final scan = ref.watch(attendanceControllerProvider);
     final rosterAsync = ref.watch(attendanceRosterProvider(widget.sessionId));
     return PopScope(
       canPop: false,
@@ -105,6 +155,14 @@ class _BleScannerScreenState extends ConsumerState<BleScannerScreen> {
                     label: 'Devices found',
                     value: '${scan.discoveredDevices.length}',
                     icon: Icons.bluetooth_connected,
+                  ),
+                ),
+                const SizedBox(width: Spacing.sm),
+                Expanded(
+                  child: MetricStatCard(
+                    label: 'Other devices',
+                    value: '${scan.unknownDeviceCount}',
+                    icon: Icons.devices_other_outlined,
                   ),
                 ),
                 const SizedBox(width: Spacing.sm),
@@ -190,9 +248,14 @@ class _BleScannerScreenState extends ConsumerState<BleScannerScreen> {
                   ? null
                   : scan.error != null
                   ? () => ref
-                        .read(bleScanControllerProvider.notifier)
+                        .read(attendanceControllerProvider.notifier)
                         .start(widget.sessionId)
                   : _stopAndReview,
+            ),
+            TextButton.icon(
+              onPressed: scan.isComplete ? null : _cancelAttendance,
+              icon: const Icon(Icons.cancel_outlined),
+              label: const Text('Cancel attendance'),
             ),
             const SizedBox(height: Spacing.sm),
           ],
@@ -241,8 +304,8 @@ class _AttendanceResultsScreenState
     setState(() => _saving = true);
     try {
       await ref
-          .read(attendanceActionControllerProvider.notifier)
-          .complete(widget.sessionId);
+          .read(attendanceControllerProvider.notifier)
+          .finalize(widget.sessionId);
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('Attendance saved.')));
@@ -268,22 +331,53 @@ class _AttendanceResultsScreenState
     return PageScaffold(
       title: 'Attendance results',
       showBack: true,
+      trailing: IconButton(
+        tooltip: 'Export report',
+        onPressed: () => exportReportFlow(
+          context: context,
+          export: (format, action) => ref
+              .read(reportExportControllerProvider.notifier)
+              .export(
+                request: AttendanceSessionRequest(widget.sessionId),
+                format: format,
+                action: action,
+              ),
+        ),
+        icon: const Icon(Icons.ios_share_outlined),
+      ),
       body: recordsAsync.when(
         data: (records) => studentsAsync.when(
           data: (students) {
-            final present = records.where((record) => record.isPresent).length;
+            final present = records
+                .where(
+                  (record) =>
+                      record.recordStatus == AttendanceRecordStatus.present,
+                )
+                .length;
+            final manualPresent = records
+                .where(
+                  (record) =>
+                      record.recordStatus ==
+                      AttendanceRecordStatus.manualPresent,
+                )
+                .length;
+            final manualAbsent = records
+                .where(
+                  (record) =>
+                      record.recordStatus ==
+                      AttendanceRecordStatus.manualAbsent,
+                )
+                .length;
             final notDetected = records
                 .where(
                   (record) =>
-                      record.recordStatus == AttendanceRecordStatus.unverified,
+                      record.recordStatus == AttendanceRecordStatus.notDetected,
                 )
                 .length;
             final absent = records
                 .where(
                   (record) =>
-                      record.recordStatus == AttendanceRecordStatus.absent ||
-                      record.recordStatus ==
-                          AttendanceRecordStatus.manualAbsent,
+                      record.recordStatus == AttendanceRecordStatus.absent,
                 )
                 .length;
             return Column(
@@ -293,35 +387,49 @@ class _AttendanceResultsScreenState
                     top: Spacing.sm,
                     bottom: Spacing.md,
                   ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: MetricStatCard(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      const gap = Spacing.sm;
+                      final cardWidth = (constraints.maxWidth - gap * 2) / 3;
+                      final cards = [
+                        MetricStatCard(
                           label: 'Present',
                           value: '$present',
                           icon: Icons.check_circle_outline,
                           color: AppColors.success,
                         ),
-                      ),
-                      const SizedBox(width: Spacing.sm),
-                      Expanded(
-                        child: MetricStatCard(
-                          label: 'Absent',
-                          value: '$absent',
-                          icon: Icons.person_off_outlined,
-                          color: AppColors.danger,
-                        ),
-                      ),
-                      const SizedBox(width: Spacing.sm),
-                      Expanded(
-                        child: MetricStatCard(
+                        MetricStatCard(
                           label: 'Not detected',
                           value: '$notDetected',
                           icon: Icons.help_outline,
                           color: AppColors.warning,
                         ),
-                      ),
-                    ],
+                        MetricStatCard(
+                          label: 'Absent',
+                          value: '$absent',
+                          icon: Icons.person_off_outlined,
+                          color: AppColors.danger,
+                        ),
+                        MetricStatCard(
+                          label: 'Manual present',
+                          value: '$manualPresent',
+                          icon: Icons.person_add_alt_1_outlined,
+                        ),
+                        MetricStatCard(
+                          label: 'Manual absent',
+                          value: '$manualAbsent',
+                          icon: Icons.person_remove_outlined,
+                        ),
+                      ];
+                      return Wrap(
+                        spacing: gap,
+                        runSpacing: gap,
+                        children: [
+                          for (final card in cards)
+                            SizedBox(width: cardWidth, child: card),
+                        ],
+                      );
+                    },
                   ),
                 ),
                 SectionCard(
@@ -389,14 +497,14 @@ class _AttendanceResultsScreenState
                         status: record.isPresent
                             ? AttendanceStatus.present
                             : record.recordStatus ==
-                                  AttendanceRecordStatus.unverified
+                                  AttendanceRecordStatus.notDetected
                             ? AttendanceStatus.pending
                             : AttendanceStatus.absent,
                         trailing: StatusPill(
                           status: record.isPresent
                               ? AttendanceStatus.present
                               : record.recordStatus ==
-                                    AttendanceRecordStatus.unverified
+                                    AttendanceRecordStatus.notDetected
                               ? AttendanceStatus.pending
                               : AttendanceStatus.absent,
                           label:
@@ -408,7 +516,7 @@ class _AttendanceResultsScreenState
                               : record.isPresent
                               ? 'Present'
                               : record.recordStatus ==
-                                    AttendanceRecordStatus.unverified
+                                    AttendanceRecordStatus.notDetected
                               ? 'Not detected'
                               : 'Absent',
                         ),
@@ -495,7 +603,7 @@ class _HistorySessionCard extends ConsumerWidget {
           final pending = records
               .where(
                 (record) =>
-                    record.recordStatus == AttendanceRecordStatus.unverified,
+                    record.recordStatus == AttendanceRecordStatus.notDetected,
               )
               .length;
           return SectionCard(
@@ -511,12 +619,29 @@ class _HistorySessionCard extends ConsumerWidget {
                       ),
                     ),
                     StatusPill(
-                      status: session.status == 'Completed'
+                      status:
+                          session.status == AttendanceSessionStatus.completed
                           ? AttendanceStatus.registered
                           : AttendanceStatus.pending,
-                      label: session.status == 'Completed'
-                          ? 'Saved'
-                          : 'In progress',
+                      label: switch (session.status) {
+                        AttendanceSessionStatus.completed => 'Saved',
+                        AttendanceSessionStatus.cancelled => 'Cancelled',
+                        AttendanceSessionStatus.scanning => 'In progress',
+                      },
+                    ),
+                    IconButton(
+                      tooltip: 'Export report',
+                      onPressed: () => exportReportFlow(
+                        context: context,
+                        export: (format, action) => ref
+                            .read(reportExportControllerProvider.notifier)
+                            .export(
+                              request: AttendanceSessionRequest(session.id),
+                              format: format,
+                              action: action,
+                            ),
+                      ),
+                      icon: const Icon(Icons.ios_share_outlined),
                     ),
                   ],
                 ),
@@ -659,7 +784,7 @@ class MyAttendanceScreen extends ConsumerWidget {
                             status: record.isPresent
                                 ? AttendanceStatus.present
                                 : record.recordStatus ==
-                                      AttendanceRecordStatus.unverified
+                                      AttendanceRecordStatus.notDetected
                                 ? AttendanceStatus.pending
                                 : AttendanceStatus.absent,
                           );

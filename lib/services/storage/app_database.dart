@@ -29,8 +29,9 @@ class RecordStatusConverter
     extends TypeConverter<domain.AttendanceRecordStatus, String> {
   const RecordStatusConverter();
   @override
-  domain.AttendanceRecordStatus fromSql(String fromDb) =>
-      domain.AttendanceRecordStatus.values.byName(fromDb);
+  domain.AttendanceRecordStatus fromSql(String fromDb) => fromDb == 'unverified'
+      ? domain.AttendanceRecordStatus.notDetected
+      : domain.AttendanceRecordStatus.values.byName(fromDb);
   @override
   String toSql(domain.AttendanceRecordStatus value) => value.name;
 }
@@ -495,9 +496,7 @@ class AttendanceDao extends DatabaseAccessor<AppDatabase>
         classId: row.classSectionId,
         title: row.title,
         startedAt: row.startedAt,
-        status: row.status == domain.AttendanceSessionStatus.scanning
-            ? 'Scanning'
-            : 'Completed',
+        status: row.status,
         date: row.date,
         endedAt: row.endedAt,
         scanDurationSeconds: row.scanDurationSeconds,
@@ -537,7 +536,7 @@ class AttendanceDao extends DatabaseAccessor<AppDatabase>
             ..orderBy([(t) => OrderingTerm.desc(t.startedAt)]))
           .watch()
           .map((rows) => rows.map(_session).toList());
-  Future<domain.AttendanceSession> getLatest() async {
+  Future<domain.AttendanceSession?> getLatest() async {
     final now = DateTime.now();
     final start = DateTime(now.year, now.month, now.day);
     final end = start.add(const Duration(days: 1));
@@ -551,21 +550,20 @@ class AttendanceDao extends DatabaseAccessor<AppDatabase>
               ..orderBy([(row) => OrderingTerm.desc(row.startedAt)]))
             .get()
             .then((items) => items.map(_session).toList());
-    if (rows.isEmpty) throw StateError('No attendance session is available.');
-    return rows.first;
+    return rows.isEmpty ? null : rows.first;
   }
 
-  Stream<domain.AttendanceSession> watchLatest() => watchSessions().map((rows) {
-    final now = DateTime.now();
-    final today = rows.where(
-      (row) =>
-          row.startedAt.year == now.year &&
-          row.startedAt.month == now.month &&
-          row.startedAt.day == now.day,
-    );
-    if (today.isEmpty) throw StateError('No attendance session is available.');
-    return today.first;
-  });
+  Stream<domain.AttendanceSession?> watchLatest() =>
+      watchSessions().map((rows) {
+        final now = DateTime.now();
+        final today = rows.where(
+          (row) =>
+              row.startedAt.year == now.year &&
+              row.startedAt.month == now.month &&
+              row.startedAt.day == now.day,
+        );
+        return today.isEmpty ? null : today.first;
+      });
   Future<List<domain.AttendanceRecord>> getRecords(String id) =>
       (select(attendanceRecords)..where((t) => t.sessionId.equals(id)))
           .get()
@@ -605,29 +603,103 @@ class AttendanceDao extends DatabaseAccessor<AppDatabase>
             syncStatus: domain.SyncStatus.pendingCreate,
             sessionId: session.id.value,
             studentId: student.id,
-            status: domain.AttendanceRecordStatus.unverified,
+            status: domain.AttendanceRecordStatus.notDetected,
           ),
         );
       }
     });
   }
 
-  Future<void> markDetected(String sessionId, String studentId, {int? rssi}) =>
-      updateRecord(
-        sessionId,
-        studentId,
-        domain.AttendanceRecordStatus.present,
-        detectedAt: DateTime.now(),
-        rssi: rssi,
+  Future<void> markDetected(
+    String sessionId,
+    String studentId, {
+    int? rssi,
+  }) async {
+    await transaction(() async {
+      final record =
+          await (select(attendanceRecords)..where(
+                (row) =>
+                    row.sessionId.equals(sessionId) &
+                    row.studentId.equals(studentId),
+              ))
+              .getSingleOrNull();
+      if (record == null ||
+          record.status == domain.AttendanceRecordStatus.manualPresent ||
+          record.status == domain.AttendanceRecordStatus.manualAbsent ||
+          record.status == domain.AttendanceRecordStatus.absent) {
+        return;
+      }
+      final now = DateTime.now();
+      await (update(
+        attendanceRecords,
+      )..where((row) => row.id.equals(record.id))).write(
+        AttendanceRecordsCompanion(
+          status: const Value(domain.AttendanceRecordStatus.present),
+          detectedAt: Value(now),
+          rssi: Value(rssi),
+          updatedAt: Value(now),
+          syncStatus: const Value(domain.SyncStatus.pendingUpdate),
+        ),
       );
+    });
+  }
+
+  Future<void> finishScan(String id) async {
+    final now = DateTime.now();
+    final session = await (select(
+      attendanceSessions,
+    )..where((row) => row.id.equals(id))).getSingleOrNull();
+    if (session == null ||
+        session.status != domain.AttendanceSessionStatus.scanning) {
+      return;
+    }
+    await (update(attendanceSessions)..where((row) => row.id.equals(id))).write(
+      AttendanceSessionsCompanion(
+        endedAt: Value(now),
+        updatedAt: Value(now),
+        syncStatus: const Value(domain.SyncStatus.pendingUpdate),
+      ),
+    );
+  }
+
+  Future<void> cancelSession(String id) async {
+    await transaction(() async {
+      final session = await (select(
+        attendanceSessions,
+      )..where((row) => row.id.equals(id))).getSingleOrNull();
+      if (session == null ||
+          session.status != domain.AttendanceSessionStatus.scanning) {
+        return;
+      }
+      final now = DateTime.now();
+      await (update(
+        attendanceSessions,
+      )..where((row) => row.id.equals(id))).write(
+        AttendanceSessionsCompanion(
+          status: const Value(domain.AttendanceSessionStatus.cancelled),
+          endedAt: Value(now),
+          updatedAt: Value(now),
+          syncStatus: const Value(domain.SyncStatus.pendingUpdate),
+        ),
+      );
+    });
+  }
+
   Future<void> completeSession(String id) async {
     await transaction(() async {
+      final session = await (select(
+        attendanceSessions,
+      )..where((row) => row.id.equals(id))).getSingleOrNull();
+      if (session == null ||
+          session.status != domain.AttendanceSessionStatus.scanning) {
+        throw StateError('This attendance session is not open for review.');
+      }
       final rows = await (select(
         attendanceRecords,
       )..where((row) => row.sessionId.equals(id))).get();
       final now = DateTime.now();
       for (final row in rows.where(
-        (row) => row.status == domain.AttendanceRecordStatus.unverified,
+        (row) => row.status == domain.AttendanceRecordStatus.notDetected,
       )) {
         await (update(
           attendanceRecords,
@@ -644,7 +716,7 @@ class AttendanceDao extends DatabaseAccessor<AppDatabase>
       )..where((row) => row.id.equals(id))).write(
         AttendanceSessionsCompanion(
           status: const Value(domain.AttendanceSessionStatus.completed),
-          endedAt: Value(now),
+          endedAt: Value(session.endedAt ?? now),
           updatedAt: Value(now),
           syncStatus: const Value(domain.SyncStatus.pendingUpdate),
         ),
@@ -672,38 +744,6 @@ class AttendanceDao extends DatabaseAccessor<AppDatabase>
               syncStatus: const Value(domain.SyncStatus.pendingUpdate),
             ),
           );
-  Future<void> completeScan(String id, Set<String> detected) async {
-    await transaction(() async {
-      final rows = await (select(
-        attendanceRecords,
-      )..where((t) => t.sessionId.equals(id))).get();
-      for (final row in rows) {
-        final present = detected.contains(row.studentId);
-        await (update(
-          attendanceRecords,
-        )..where((t) => t.id.equals(row.id))).write(
-          AttendanceRecordsCompanion(
-            status: Value(
-              present
-                  ? domain.AttendanceRecordStatus.present
-                  : domain.AttendanceRecordStatus.absent,
-            ),
-            detectedAt: Value(present ? DateTime.now() : null),
-            updatedAt: Value(DateTime.now()),
-            syncStatus: const Value(domain.SyncStatus.pendingUpdate),
-          ),
-        );
-      }
-      await (update(attendanceSessions)..where((t) => t.id.equals(id))).write(
-        AttendanceSessionsCompanion(
-          status: const Value(domain.AttendanceSessionStatus.completed),
-          endedAt: Value(DateTime.now()),
-          updatedAt: Value(DateTime.now()),
-          syncStatus: const Value(domain.SyncStatus.pendingUpdate),
-        ),
-      );
-    });
-  }
 }
 
 @DriftAccessor(tables: [Devices])

@@ -7,9 +7,13 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/iterable_extensions.dart';
 import '../../../../core/widgets/app_widgets.dart';
 import '../../../attendance/presentation/providers/attendance_provider.dart';
+import '../../../attendance/presentation/providers/attendance_controller.dart';
 import '../providers/class_provider.dart';
 import '../../../../domain/models.dart';
 import '../../../../domain/repositories.dart';
+import '../../../reports/models/report_models.dart';
+import '../../../reports/presentation/providers/report_export_provider.dart';
+import '../../../reports/presentation/widgets/export_report_sheet.dart';
 
 /// Reusable summary card for one class section.
 class ClassSectionCard extends StatelessWidget {
@@ -170,6 +174,20 @@ class ClassDetailsScreen extends ConsumerWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           IconButton(
+            tooltip: 'Export class attendance',
+            onPressed: () => exportReportFlow(
+              context: context,
+              export: (format, action) => ref
+                  .read(reportExportControllerProvider.notifier)
+                  .export(
+                    request: ClassAttendanceRequest(classId),
+                    format: format,
+                    action: action,
+                  ),
+            ),
+            icon: const Icon(Icons.ios_share_outlined),
+          ),
+          IconButton(
             tooltip: 'Edit class',
             onPressed: () => context.pushNamed(
               AppRoutes.teacherClassEdit,
@@ -303,7 +321,7 @@ class ClassDetailsScreen extends ConsumerWidget {
                                     .where(
                                       (record) =>
                                           record.recordStatus ==
-                                          AttendanceRecordStatus.unverified,
+                                          AttendanceRecordStatus.notDetected,
                                     )
                                     .length;
                                 return Row(
@@ -320,18 +338,27 @@ class ClassDetailsScreen extends ConsumerWidget {
                                     Expanded(
                                       child: MetricStatCard(
                                         label:
-                                            classSession.status == 'Completed'
+                                            classSession.status ==
+                                                AttendanceSessionStatus
+                                                    .completed
                                             ? 'Absent'
                                             : 'Not confirmed',
                                         value:
-                                            classSession.status == 'Completed'
+                                            classSession.status ==
+                                                AttendanceSessionStatus
+                                                    .completed
                                             ? '$absentCount'
                                             : '$pendingCount',
-                                        icon: classSession.status == 'Completed'
+                                        icon:
+                                            classSession.status ==
+                                                AttendanceSessionStatus
+                                                    .completed
                                             ? Icons.person_off_outlined
                                             : Icons.help_outline,
                                         color:
-                                            classSession.status == 'Completed'
+                                            classSession.status ==
+                                                AttendanceSessionStatus
+                                                    .completed
                                             ? AppColors.danger
                                             : AppColors.warning,
                                       ),
@@ -383,11 +410,8 @@ class ClassDetailsScreen extends ConsumerWidget {
                               if (accepted != true) return;
                               try {
                                 final created = await ref
-                                    .read(
-                                      attendanceActionControllerProvider
-                                          .notifier,
-                                    )
-                                    .start(classId);
+                                    .read(attendanceControllerProvider.notifier)
+                                    .prepareSession(classId);
                                 if (context.mounted) {
                                   context.pushNamed(
                                     AppRoutes.bleScanner,
@@ -477,6 +501,11 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
               onTap: () => Navigator.pop(context, 'edit'),
             ),
             ListTile(
+              leading: const Icon(Icons.ios_share_outlined),
+              title: const Text('Export student report'),
+              onTap: () => Navigator.pop(context, 'export'),
+            ),
+            ListTile(
               leading: const Icon(Icons.person_remove_outlined),
               title: const Text('Remove from class'),
               onTap: () => Navigator.pop(context, 'remove'),
@@ -490,6 +519,22 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
       await _edit(student);
     }
     if (!mounted) return;
+    if (action == 'export') {
+      await exportReportFlow(
+        context: context,
+        export: (format, destination) => ref
+            .read(reportExportControllerProvider.notifier)
+            .export(
+              request: StudentAttendanceRequest(
+                classId: widget.classId,
+                studentId: student.id,
+              ),
+              format: format,
+              action: destination,
+            ),
+      );
+      return;
+    }
     if (action == 'remove') {
       final confirm = await showDialog<bool>(
         context: context,
@@ -529,10 +574,29 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
   Widget build(BuildContext context) => PageScaffold(
     title: 'Student list',
     showBack: true,
-    trailing: IconButton(
-      tooltip: 'Add student',
-      onPressed: () => _edit(null),
-      icon: const Icon(Icons.person_add_alt_1_outlined),
+    trailing: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          tooltip: 'Export class roster',
+          onPressed: () => exportReportFlow(
+            context: context,
+            export: (format, action) => ref
+                .read(reportExportControllerProvider.notifier)
+                .export(
+                  request: ClassRosterRequest(widget.classId),
+                  format: format,
+                  action: action,
+                ),
+          ),
+          icon: const Icon(Icons.ios_share_outlined),
+        ),
+        IconButton(
+          tooltip: 'Add student',
+          onPressed: () => _edit(null),
+          icon: const Icon(Icons.person_add_alt_1_outlined),
+        ),
+      ],
     ),
     body: ref
         .watch(classRosterProvider(widget.classId))

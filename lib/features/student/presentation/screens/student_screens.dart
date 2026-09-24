@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -194,16 +193,6 @@ class _StudentSetupScreenState extends ConsumerState<StudentSetupScreen> {
               ),
             ),
           ),
-          if (kDebugMode) ...[
-            const SizedBox(height: Spacing.lg),
-            Center(
-              child: TextButton.icon(
-                onPressed: () => context.goNamed(AppRoutes.debugRoles),
-                icon: const Icon(Icons.developer_mode),
-                label: const Text('Open role previews'),
-              ),
-            ),
-          ],
           const SizedBox(height: Spacing.md),
           Center(
             child: TextButton(
@@ -255,9 +244,11 @@ class StudentHomeScreen extends ConsumerWidget {
             sessionAsync.when(
               data: (session) => recordsAsync.when(
                 data: (records) {
-                  final today = records
-                      .where((record) => record.sessionId == session.id)
-                      .firstOrNull;
+                  final today = session == null
+                      ? null
+                      : records
+                            .where((record) => record.sessionId == session.id)
+                            .firstOrNull;
                   return SectionCard(
                     child: Row(
                       children: [
@@ -299,7 +290,7 @@ class StudentHomeScreen extends ConsumerWidget {
                             status: today.isPresent
                                 ? AttendanceStatus.present
                                 : today.recordStatus ==
-                                      AttendanceRecordStatus.unverified
+                                      AttendanceRecordStatus.notDetected
                                 ? AttendanceStatus.pending
                                 : AttendanceStatus.absent,
                           ),
@@ -496,14 +487,6 @@ class StudentProfileScreen extends ConsumerWidget {
                   ],
                 ),
               ),
-              if (kDebugMode) ...[
-                const SizedBox(height: Spacing.md),
-                OutlinedButton.icon(
-                  onPressed: () => context.goNamed(AppRoutes.debugRoles),
-                  icon: const Icon(Icons.developer_mode),
-                  label: const Text('Switch role preview'),
-                ),
-              ],
             ],
           ),
           loading: () => const Center(child: CircularProgressIndicator()),

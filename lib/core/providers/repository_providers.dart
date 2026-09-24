@@ -7,11 +7,13 @@ import '../../features/device/data/drift_device_repository.dart';
 import '../../features/settings/data/drift_settings_repository.dart';
 import '../../features/student/data/drift_student_repository.dart';
 import '../../features/teacher/data/drift_teacher_repository.dart';
+import '../../domain/models.dart';
 import '../../domain/repositories.dart';
+import '../../core/auth/teacher_session.dart';
+import '../../features/authentication/application/teacher_auth_service.dart';
 import '../../services/auth/teacher_pin_service.dart';
 import '../../services/ble/ble_service.dart';
 import '../../services/storage/app_database.dart';
-import '../../services/storage/demo_data_loader.dart';
 
 final appDatabaseProvider = Provider<AppDatabase>((ref) {
   final database = AppDatabase();
@@ -21,6 +23,10 @@ final appDatabaseProvider = Provider<AppDatabase>((ref) {
 
 final teacherPinServiceProvider = Provider<TeacherPinService>(
   (ref) => SecureTeacherPinService(const FlutterSecureStorage()),
+);
+
+final teacherSessionProvider = Provider<TeacherSession>(
+  (ref) => throw StateError('Teacher session was not initialized.'),
 );
 
 /// The app entry point overrides these contracts with the selected data sources.
@@ -51,10 +57,20 @@ final settingsRepositoryProvider = Provider<SettingsRepository>(
   (ref) => DriftSettingsRepository(ref.watch(appDatabaseProvider)),
 );
 
-final demoDataLoaderProvider = Provider<DemoDataLoader>(
-  (ref) => throw StateError('Demo data is available only in debug builds.'),
+final teacherAuthServiceProvider = Provider<TeacherAuthService>(
+  (ref) => TeacherAuthService(
+    ref.watch(teacherSessionProvider),
+    ref.watch(teacherRepositoryProvider),
+    ref.watch(teacherPinServiceProvider),
+    ref.watch(bleServiceProvider),
+    ref.watch(attendanceRepositoryProvider),
+  ),
 );
 
 final bleServiceProvider = Provider<BleService>(
   (ref) => throw UnimplementedError('BleService was not configured.'),
+);
+
+final bleAdapterStateProvider = StreamProvider<BleAvailability>(
+  (ref) => ref.watch(bleServiceProvider).watchAdapterState(),
 );

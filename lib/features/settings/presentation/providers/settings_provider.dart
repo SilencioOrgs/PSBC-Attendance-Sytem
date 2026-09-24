@@ -16,8 +16,35 @@ class SettingsController extends Notifier<bool> {
   bool build() => false;
 
   Future<void> save(AppSettings settings) async {
-    await ref.read(settingsRepositoryProvider).saveSettings(settings);
-    state = !state;
-    ref.invalidate(appSettingsProvider);
+    state = true;
+    try {
+      await ref.read(settingsRepositoryProvider).saveSettings(settings);
+      ref.invalidate(appSettingsProvider);
+    } finally {
+      state = false;
+    }
+  }
+
+  Future<void> changePin({
+    required String currentPin,
+    required String newPin,
+  }) async {
+    state = true;
+    try {
+      await ref
+          .read(teacherAuthServiceProvider)
+          .changePin(currentPin: currentPin, newPin: newPin);
+    } finally {
+      state = false;
+    }
+  }
+
+  Future<void> logout() async {
+    state = true;
+    try {
+      await ref.read(teacherAuthServiceProvider).logout();
+    } finally {
+      state = false;
+    }
   }
 }

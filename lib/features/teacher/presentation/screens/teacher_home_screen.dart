@@ -6,6 +6,7 @@ import '../../../../core/router/route_names.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_widgets.dart';
 import '../../../../core/utils/iterable_extensions.dart';
+import '../../../../domain/models.dart';
 import '../../../attendance/presentation/providers/attendance_provider.dart';
 import '../../../classes/presentation/providers/class_provider.dart';
 import '../../../classes/presentation/screens/class_screens.dart';
@@ -48,7 +49,10 @@ class TeacherHomeScreen extends ConsumerWidget {
               data: (list) {
                 if (list.isEmpty) return const SizedBox.shrink();
                 final completed = list
-                    .where((session) => session.status == 'Completed')
+                    .where(
+                      (session) =>
+                          session.status == AttendanceSessionStatus.completed,
+                    )
                     .toList();
                 if (completed.isEmpty) return const SizedBox.shrink();
                 final session = completed.first;
@@ -151,7 +155,10 @@ class TeacherHomeScreen extends ConsumerWidget {
             classes.when(
               data: (list) {
                 final active = sessions.value
-                    ?.where((session) => session.status == 'Scanning')
+                    ?.where(
+                      (session) =>
+                          session.status == AttendanceSessionStatus.scanning,
+                    )
                     .firstOrNull;
                 final label = active != null
                     ? 'Continue Attendance'

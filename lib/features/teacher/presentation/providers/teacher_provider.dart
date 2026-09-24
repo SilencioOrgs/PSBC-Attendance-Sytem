@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../domain/models.dart';
-import '../../../../core/auth/teacher_session.dart';
 import '../../../../core/providers/repository_providers.dart';
 
 final teacherProvider = StreamProvider<Teacher>(
@@ -16,10 +15,7 @@ class TeacherSetupController extends Notifier<bool> {
   bool build() => false;
 
   Future<void> complete({required String name, required String pin}) async {
-    await ref
-        .read(teacherRepositoryProvider)
-        .setupTeacher(name: name, pin: pin);
-    teacherSessionUnlocked.value = true;
+    await ref.read(teacherAuthServiceProvider).setup(name: name, pin: pin);
     state = true;
     ref.invalidate(teacherProvider);
   }
@@ -35,9 +31,8 @@ class TeacherPinUnlockController extends Notifier<bool> {
   bool build() => false;
 
   Future<bool> unlock(String pin) async {
-    final allowed = await ref.read(teacherPinServiceProvider).verifyPin(pin);
+    final allowed = await ref.read(teacherAuthServiceProvider).unlock(pin);
     state = allowed;
-    if (allowed) teacherSessionUnlocked.value = true;
     return allowed;
   }
 }

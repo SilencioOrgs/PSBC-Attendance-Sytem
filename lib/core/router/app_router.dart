@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -12,192 +11,191 @@ import '../../features/teacher/presentation/screens/teacher_home_screen.dart';
 import '../../features/teacher/presentation/screens/teacher_setup_screen.dart';
 import '../../features/teacher/presentation/screens/teacher_unlock_screen.dart';
 import '../auth/teacher_session.dart';
+import 'route_guards.dart';
 import 'route_names.dart';
 import 'welcome_screen.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 
 /// Creates the two independent stateful role shells and all pre-shell routes.
-GoRouter createAppRouter() => GoRouter(
-  navigatorKey: _rootNavigatorKey,
-  initialLocation: '/welcome',
-  refreshListenable: teacherSessionUnlocked,
-  redirect: (context, state) {
-    final path = state.uri.path;
-    final isTeacherFlow = path.startsWith('/teacher');
-    final isSetupRoute = path == '/teacher/setup' || path == '/teacher/unlock';
-    if (isTeacherFlow && !isSetupRoute && !teacherSessionUnlocked.value) {
-      return '/welcome';
-    }
-    return null;
-  },
-  routes: [
-    GoRoute(
-      path: '/welcome',
-      name: AppRoutes.welcome,
-      builder: (context, state) => const WelcomeScreen(),
-    ),
-    GoRoute(
-      path: '/teacher/setup',
-      name: AppRoutes.teacherSetup,
-      builder: (context, state) => const TeacherSetupScreen(),
-    ),
-    GoRoute(
-      path: '/teacher/unlock',
-      name: AppRoutes.teacherUnlock,
-      builder: (context, state) => const TeacherUnlockScreen(),
-    ),
-    GoRoute(
-      path: '/student/setup',
-      name: AppRoutes.studentSetup,
-      builder: (context, state) => const StudentSetupScreen(),
-    ),
-    StatefulShellRoute.indexedStack(
-      builder: (context, state, navigationShell) => _RoleNavigationShell(
-        navigationShell: navigationShell,
-        isTeacher: true,
-      ),
-      branches: [
-        StatefulShellBranch(
-          routes: [
-            GoRoute(
-              path: '/teacher',
-              name: AppRoutes.teacherHome,
-              builder: (context, state) => const TeacherHomeScreen(),
-            ),
-          ],
-        ),
-        StatefulShellBranch(
-          routes: [
-            GoRoute(
-              path: '/teacher/classes',
-              name: AppRoutes.teacherClasses,
-              builder: (context, state) => const TeacherClassesScreen(),
-              routes: [
-                GoRoute(
-                  path: 'create',
-                  name: AppRoutes.teacherClassCreate,
-                  builder: (context, state) => const ClassCreationScreen(),
-                ),
-                GoRoute(
-                  path: ':classId',
-                  name: AppRoutes.teacherClassDetails,
-                  builder: (context, state) => ClassDetailsScreen(
-                    classId: state.pathParameters['classId'] ?? '',
-                  ),
-                  routes: [
-                    GoRoute(
-                      path: 'students',
-                      name: AppRoutes.teacherStudentList,
-                      builder: (context, state) => StudentListScreen(
-                        classId: state.pathParameters['classId'] ?? '',
-                      ),
-                    ),
-                    GoRoute(
-                      path: 'edit',
-                      name: AppRoutes.teacherClassEdit,
-                      builder: (context, state) => ClassEditLoaderScreen(
-                        classId: state.pathParameters['classId'] ?? '',
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ],
-        ),
-        StatefulShellBranch(
-          routes: [
-            GoRoute(
-              path: '/teacher/attendance',
-              name: AppRoutes.teacherAttendance,
-              builder: (context, state) => const AttendanceHistoryScreen(),
-            ),
-          ],
-        ),
-        StatefulShellBranch(
-          routes: [
-            GoRoute(
-              path: '/teacher/settings',
-              name: AppRoutes.teacherSettings,
-              builder: (context, state) => const TeacherSettingsScreen(),
-              routes: [
-                GoRoute(
-                  path: 'device-status',
-                  name: AppRoutes.teacherDeviceStatus,
-                  builder: (context, state) => const DeviceStatusScreen(),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ],
-    ),
-    StatefulShellRoute.indexedStack(
-      builder: (context, state, navigationShell) => _RoleNavigationShell(
-        navigationShell: navigationShell,
-        isTeacher: false,
-      ),
-      branches: [
-        StatefulShellBranch(
-          routes: [
-            GoRoute(
-              path: '/student',
-              name: AppRoutes.studentHome,
-              builder: (context, state) => const StudentHomeScreen(),
-            ),
-          ],
-        ),
-        StatefulShellBranch(
-          routes: [
-            GoRoute(
-              path: '/student/attendance',
-              name: AppRoutes.studentAttendance,
-              builder: (context, state) => const MyAttendanceScreen(),
-            ),
-          ],
-        ),
-        StatefulShellBranch(
-          routes: [
-            GoRoute(
-              path: '/student/device',
-              name: AppRoutes.studentDevice,
-              builder: (context, state) => const DeviceRegistrationScreen(),
-            ),
-          ],
-        ),
-        StatefulShellBranch(
-          routes: [
-            GoRoute(
-              path: '/student/profile',
-              name: AppRoutes.studentProfile,
-              builder: (context, state) => const StudentProfileScreen(),
-            ),
-          ],
-        ),
-      ],
-    ),
-    GoRoute(
-      path: '/teacher/scanner/:sessionId',
-      name: AppRoutes.bleScanner,
-      builder: (context, state) =>
-          BleScannerScreen(sessionId: state.pathParameters['sessionId'] ?? ''),
-    ),
-    GoRoute(
-      path: '/teacher/results/:sessionId',
-      name: AppRoutes.attendanceResults,
-      builder: (context, state) => AttendanceResultsScreen(
-        sessionId: state.pathParameters['sessionId'] ?? '',
-      ),
-    ),
-    if (kDebugMode)
+GoRouter createAppRouter({TeacherSession? session}) {
+  final teacherSession =
+      session ?? TeacherSession(state: TeacherSessionState.setupRequired);
+  final initialLocation = switch (teacherSession.state) {
+    TeacherSessionState.uninitialized => '/welcome',
+    TeacherSessionState.setupRequired => '/teacher/setup',
+    TeacherSessionState.locked => '/teacher/unlock',
+    TeacherSessionState.authenticated => '/teacher',
+  };
+  return GoRouter(
+    navigatorKey: _rootNavigatorKey,
+    initialLocation: initialLocation,
+    refreshListenable: teacherSession,
+    redirect: (context, state) =>
+        teacherRouteRedirect(teacherSession.state, state.uri.path),
+    routes: [
       GoRoute(
-        path: '/_debug/roles',
-        name: AppRoutes.debugRoles,
-        builder: (context, state) => const _DebugRoleSelector(),
+        path: '/welcome',
+        name: AppRoutes.welcome,
+        builder: (context, state) => const WelcomeScreen(),
       ),
-  ],
-);
+      GoRoute(
+        path: '/teacher/setup',
+        name: AppRoutes.teacherSetup,
+        builder: (context, state) => const TeacherSetupScreen(),
+      ),
+      GoRoute(
+        path: '/teacher/unlock',
+        name: AppRoutes.teacherUnlock,
+        builder: (context, state) => const TeacherUnlockScreen(),
+      ),
+      GoRoute(
+        path: '/student/setup',
+        name: AppRoutes.studentSetup,
+        builder: (context, state) => const StudentSetupScreen(),
+      ),
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) => _RoleNavigationShell(
+          navigationShell: navigationShell,
+          isTeacher: true,
+        ),
+        branches: [
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/teacher',
+                name: AppRoutes.teacherHome,
+                builder: (context, state) => const TeacherHomeScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/teacher/classes',
+                name: AppRoutes.teacherClasses,
+                builder: (context, state) => const TeacherClassesScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'create',
+                    name: AppRoutes.teacherClassCreate,
+                    builder: (context, state) => const ClassCreationScreen(),
+                  ),
+                  GoRoute(
+                    path: ':classId',
+                    name: AppRoutes.teacherClassDetails,
+                    builder: (context, state) => ClassDetailsScreen(
+                      classId: state.pathParameters['classId'] ?? '',
+                    ),
+                    routes: [
+                      GoRoute(
+                        path: 'students',
+                        name: AppRoutes.teacherStudentList,
+                        builder: (context, state) => StudentListScreen(
+                          classId: state.pathParameters['classId'] ?? '',
+                        ),
+                      ),
+                      GoRoute(
+                        path: 'edit',
+                        name: AppRoutes.teacherClassEdit,
+                        builder: (context, state) => ClassEditLoaderScreen(
+                          classId: state.pathParameters['classId'] ?? '',
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/teacher/attendance',
+                name: AppRoutes.teacherAttendance,
+                builder: (context, state) => const AttendanceHistoryScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/teacher/settings',
+                name: AppRoutes.teacherSettings,
+                builder: (context, state) => const TeacherSettingsScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'device-status',
+                    name: AppRoutes.teacherDeviceStatus,
+                    builder: (context, state) => const DeviceStatusScreen(),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) => _RoleNavigationShell(
+          navigationShell: navigationShell,
+          isTeacher: false,
+        ),
+        branches: [
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/student',
+                name: AppRoutes.studentHome,
+                builder: (context, state) => const StudentHomeScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/student/attendance',
+                name: AppRoutes.studentAttendance,
+                builder: (context, state) => const MyAttendanceScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/student/device',
+                name: AppRoutes.studentDevice,
+                builder: (context, state) => const DeviceRegistrationScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/student/profile',
+                name: AppRoutes.studentProfile,
+                builder: (context, state) => const StudentProfileScreen(),
+              ),
+            ],
+          ),
+        ],
+      ),
+      GoRoute(
+        path: '/teacher/scanner/:sessionId',
+        name: AppRoutes.bleScanner,
+        builder: (context, state) => BleScannerScreen(
+          sessionId: state.pathParameters['sessionId'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: '/teacher/results/:sessionId',
+        name: AppRoutes.attendanceResults,
+        builder: (context, state) => AttendanceResultsScreen(
+          sessionId: state.pathParameters['sessionId'] ?? '',
+        ),
+      ),
+    ],
+  );
+}
 
 class _RoleNavigationShell extends StatelessWidget {
   const _RoleNavigationShell({
@@ -267,46 +265,4 @@ class _RoleNavigationShell extends StatelessWidget {
       ),
     );
   }
-}
-
-class _DebugRoleSelector extends StatelessWidget {
-  const _DebugRoleSelector();
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    body: SafeArea(
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 520),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'Developer previews',
-                  style: Theme.of(context).textTheme.headlineMedium,
-                ),
-                const SizedBox(height: 8),
-                const Text('Choose a mock role flow to explore.'),
-                const SizedBox(height: 24),
-                FilledButton.icon(
-                  onPressed: () => context.goNamed(AppRoutes.teacherSetup),
-                  icon: const Icon(Icons.school_outlined),
-                  label: const Text('Teacher flow'),
-                ),
-                const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  onPressed: () => context.goNamed(AppRoutes.studentSetup),
-                  icon: const Icon(Icons.person_outline),
-                  label: const Text('Student flow'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
 }

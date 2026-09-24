@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -159,16 +158,6 @@ class _TeacherSetupScreenState extends ConsumerState<TeacherSetupScreen> {
               ),
             ),
           ),
-          if (kDebugMode) ...[
-            const SizedBox(height: Spacing.lg),
-            Center(
-              child: TextButton.icon(
-                onPressed: () => context.goNamed(AppRoutes.debugRoles),
-                icon: const Icon(Icons.developer_mode),
-                label: const Text('Open role previews'),
-              ),
-            ),
-          ],
           const SizedBox(height: Spacing.md),
           Center(
             child: TextButton(

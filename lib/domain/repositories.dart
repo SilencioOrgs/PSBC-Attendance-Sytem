@@ -1,6 +1,6 @@
 import 'models.dart';
 
-/// User-facing repository validation failures shared by mock and Drift stores.
+/// User-facing repository validation failures shared across feature workflows.
 sealed class RepositoryException implements Exception {
   const RepositoryException(this.message);
   final String message;
@@ -112,8 +112,8 @@ abstract interface class StudentRepository {
 
 abstract interface class AttendanceRepository {
   Future<AttendanceSession> startSession(String classId);
-  Future<AttendanceSession> getTodaySession();
-  Stream<AttendanceSession> watchTodaySession();
+  Future<AttendanceSession?> getTodaySession();
+  Stream<AttendanceSession?> watchTodaySession();
   Future<List<AttendanceSession>> getSessions();
   Stream<List<AttendanceSession>> watchSessions();
   Future<AttendanceSession?> getSession(String sessionId);
@@ -124,6 +124,8 @@ abstract interface class AttendanceRepository {
   Stream<List<AttendanceRecord>> watchStudentRecords(String studentId);
   Future<AttendanceRecord> toggleStatus(String sessionId, String studentId);
   Future<void> markDetected(String sessionId, String studentId, {int? rssi});
+  Future<void> finishScan(String sessionId);
+  Future<void> cancelSession(String sessionId);
   Future<void> completeSession(String sessionId);
 }
 

@@ -32,7 +32,7 @@ class DeviceRegistrationController extends Notifier<bool> {
     String? bleUuid,
   }) async {
     final ble = ref.read(bleServiceProvider);
-    await ble.requestAccess();
+    await ble.requestAdvertisingAccess();
     await ref
         .read(deviceRepositoryProvider)
         .registerDevice(studentId, deviceName, bleUuid: bleUuid);
@@ -45,6 +45,14 @@ class DeviceRegistrationController extends Notifier<bool> {
     ref.invalidate(deviceListProvider);
   }
 
-  Future<void> startBeacon(String serviceUuid) =>
-      ref.read(bleServiceProvider).startAdvertising(serviceUuid);
+  Future<void> startBeacon(String serviceUuid) async {
+    if (state) return;
+    await ref.read(bleServiceProvider).startAdvertising(serviceUuid);
+    state = true;
+  }
+
+  Future<void> stopBeacon() async {
+    await ref.read(bleServiceProvider).stopAdvertising();
+    state = false;
+  }
 }

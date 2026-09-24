@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -60,6 +62,25 @@ class _DeviceRegistrationScreenState
   Widget build(BuildContext context) {
     final studentAsync = ref.watch(currentStudentProvider);
     final deviceAsync = ref.watch(myDeviceProvider);
+    final isAdvertising = ref.watch(deviceRegistrationControllerProvider);
+    ref.listen(myDeviceProvider, (previous, next) {
+      final device = next.asData?.value;
+      if (device == null || isAdvertising) return;
+      unawaited(
+        ref
+            .read(deviceRegistrationControllerProvider.notifier)
+            .startBeacon(device.address)
+            .catchError((Object error) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Could not start your attendance beacon.'),
+                  ),
+                );
+              }
+            }),
+      );
+    });
     return PageScaffold(
       title: 'Device',
       body: studentAsync.when(
@@ -150,9 +171,11 @@ class _DeviceRegistrationScreenState
                       children: [
                         _DeviceLine(label: 'Device', value: device.name),
                         const Divider(height: Spacing.lg),
-                        const _DeviceLine(
+                        _DeviceLine(
                           label: 'Attendance beacon',
-                          value: 'Ready to advertise',
+                          value: isAdvertising
+                              ? 'Advertising this device'
+                              : 'Not active',
                         ),
                         const Divider(height: Spacing.lg),
                         Row(
@@ -210,30 +233,37 @@ class _DeviceRegistrationScreenState
                   ),
                   const SizedBox(height: Spacing.md),
                   PrimaryActionButton(
-                    label: 'Enable attendance beacon',
+                    label: isAdvertising
+                        ? 'Attendance beacon is active'
+                        : 'Enable attendance beacon',
                     icon: Icons.bluetooth_searching,
-                    onPressed: () async {
-                      try {
-                        await ref
-                            .read(deviceRegistrationControllerProvider.notifier)
-                            .startBeacon(device.address);
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Your device is ready to be detected.',
-                              ),
-                            ),
-                          );
-                        }
-                      } catch (_) {
-                        if (context.mounted) {
-                          setState(
-                            () => _deviceError = 'Bluetooth permission is required. Turn on Bluetooth and try again.',
-                          );
-                        }
-                      }
-                    },
+                    onPressed: isAdvertising
+                        ? null
+                        : () async {
+                            try {
+                              await ref
+                                  .read(
+                                    deviceRegistrationControllerProvider
+                                        .notifier,
+                                  )
+                                  .startBeacon(device.address);
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Your device is ready to be detected.',
+                                    ),
+                                  ),
+                                );
+                              }
+                            } catch (_) {
+                              if (context.mounted) {
+                                setState(
+                                  () => _deviceError = 'Bluetooth permission is required. Turn on Bluetooth and try again.',
+                                );
+                              }
+                            }
+                          },
                   ),
                 ],
                 const SizedBox(height: Spacing.lg),
@@ -279,8 +309,8 @@ class DeviceStatusScreen extends ConsumerWidget {
       body: devicesAsync.when(
         data: (devices) => studentsAsync.when(
           data: (students) {
-            final connected = devices
-                .where((device) => device.isConnected)
+            final notRegistered = students
+                .where((student) => !student.deviceRegistered)
                 .length;
             return Column(
               children: [
@@ -301,10 +331,12 @@ class DeviceStatusScreen extends ConsumerWidget {
                       const SizedBox(width: Spacing.sm),
                       Expanded(
                         child: MetricStatCard(
-                          label: 'Connected',
-                          value: '$connected',
-                          icon: Icons.bluetooth_connected,
-                          color: AppColors.success,
+                          label: 'Not registered',
+                          value: '$notRegistered',
+                          icon: Icons.bluetooth_disabled,
+                          color: notRegistered == 0
+                              ? AppColors.success
+                              : AppColors.warning,
                         ),
                       ),
                     ],
@@ -325,15 +357,11 @@ class DeviceStatusScreen extends ConsumerWidget {
                           .firstOrNull;
                       return PersonListTile(
                         name: owner?.name ?? device.name,
-                        subtitle: '${device.name} · ${device.address}',
-                        status: device.isConnected
-                            ? AttendanceStatus.detected
-                            : AttendanceStatus.pending,
+                        subtitle: device.name,
+                        status: AttendanceStatus.registered,
                         trailing: StatusPill(
-                          status: device.isConnected
-                              ? AttendanceStatus.detected
-                              : AttendanceStatus.pending,
-                          label: device.isConnected ? 'Connected' : 'Inactive',
+                          status: AttendanceStatus.registered,
+                          label: 'Registered',
                         ),
                       );
                     },

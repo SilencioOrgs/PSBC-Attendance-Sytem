@@ -10,8 +10,6 @@ import 'package:attendance_system_paete/features/classes/presentation/providers/
 import 'package:attendance_system_paete/features/device/data/drift_device_repository.dart';
 import 'package:attendance_system_paete/features/student/data/drift_student_repository.dart';
 import 'package:attendance_system_paete/services/storage/app_database.dart';
-import 'package:attendance_system_paete/mock/drift_demo_data_loader.dart';
-import 'package:attendance_system_paete/services/auth/teacher_pin_service.dart';
 import 'package:drift/native.dart';
 import 'package:drift/drift.dart' show Value, driftRuntimeOptions;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -221,7 +219,7 @@ void main() {
       final session = await repository.startSession(_classId);
       final initial = await repository.getRecords(session.id);
       expect(initial, hasLength(1));
-      expect(initial.single.recordStatus, AttendanceRecordStatus.unverified);
+      expect(initial.single.recordStatus, AttendanceRecordStatus.notDetected);
 
       await repository.markDetected(session.id, _studentId, rssi: -48);
       expect(
@@ -229,7 +227,10 @@ void main() {
         isTrue,
       );
       await repository.completeSession(session.id);
-      expect((await repository.getSession(session.id))?.status, 'Completed');
+      expect(
+        (await repository.getSession(session.id))?.status,
+        AttendanceSessionStatus.completed,
+      );
       expect(
         (await repository.getRecords(session.id)).single.recordStatus,
         AttendanceRecordStatus.present,
@@ -313,24 +314,14 @@ void main() {
     },
   );
 
-  test('debug loader inserts repeatable fixture data through Drift', () async {
-    final demoDatabase = AppDatabase(NativeDatabase.memory());
-    addTearDown(demoDatabase.close);
-    final pinService = _MemoryPinService();
-    final loader = DriftDemoDataLoader(demoDatabase, pinService);
-    await loader.load();
-    await loader.load();
+  test('fresh database starts without preloaded classroom data', () async {
+    final cleanDatabase = AppDatabase(NativeDatabase.memory());
+    addTearDown(cleanDatabase.close);
 
-    final classes = await demoDatabase.classDao.getClasses();
-    expect(classes, hasLength(3));
-    final stemA = classes.singleWhere(
-      (section) => section.sectionCode == 'GRADE12-STEM A',
-    );
-    expect(await demoDatabase.classDao.getStudents(stemA.id), hasLength(35));
-    expect(await demoDatabase.attendanceDao.getSessions(), hasLength(3));
-    expect(await demoDatabase.deviceDao.getAll(), hasLength(32));
-    expect(await demoDatabase.settingsDao.getSettings(), isNotNull);
-    expect(pinService.pin, '2468');
+    expect(await cleanDatabase.classDao.getClasses(), isEmpty);
+    expect(await cleanDatabase.studentDao.getAll(), isEmpty);
+    expect(await cleanDatabase.attendanceDao.getSessions(), isEmpty);
+    expect(await cleanDatabase.deviceDao.getAll(), isEmpty);
   });
 }
 
@@ -338,17 +329,4 @@ void main() {
 /// named subclass keeps the test constructor type readable.
 class DriftAttendanceRepositoryForTest extends DriftAttendanceRepository {
   DriftAttendanceRepositoryForTest(super.db);
-}
-
-class _MemoryPinService implements TeacherPinService {
-  String? pin;
-  @override
-  Future<bool> hasPin() async => pin != null;
-  @override
-  Future<void> savePin(String pin) async {
-    this.pin = pin;
-  }
-
-  @override
-  Future<bool> verifyPin(String pin) async => this.pin == pin;
 }

@@ -1,31 +1,30 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import 'core/auth/teacher_session.dart';
 import 'core/providers/repository_providers.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
-import 'mock/drift_demo_data_loader.dart';
 import 'services/ble/production_ble_service.dart';
 import 'services/auth/teacher_pin_service.dart';
 import 'services/storage/app_database.dart';
 
-void main() {
-  final router = createAppRouter();
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   final database = AppDatabase();
   const secureStorage = FlutterSecureStorage();
   final pinService = SecureTeacherPinService(secureStorage);
+  final teacherSession = TeacherSession();
+  await teacherSession.initialize(pinService);
+  final router = createAppRouter(session: teacherSession);
   runApp(
     ProviderScope(
       overrides: [
         appDatabaseProvider.overrideWithValue(database),
         teacherPinServiceProvider.overrideWithValue(pinService),
+        teacherSessionProvider.overrideWithValue(teacherSession),
         bleServiceProvider.overrideWithValue(ProductionBleService()),
-        if (kDebugMode)
-          demoDataLoaderProvider.overrideWithValue(
-            DriftDemoDataLoader(database, pinService),
-          ),
       ],
       child: MyApp(router: router),
     ),

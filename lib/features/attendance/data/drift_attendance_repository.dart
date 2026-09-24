@@ -26,13 +26,17 @@ class DriftAttendanceRepository implements AttendanceRepository {
       status: AttendanceSessionStatus.scanning,
     );
     await _db.attendanceDao.startSession(session: session, roster: roster);
-    return (await _db.attendanceDao.getSession(id))!;
+    final created = await _db.attendanceDao.getSession(id);
+    if (created == null) {
+      throw StateError('The attendance session was not created.');
+    }
+    return created;
   }
 
   @override
-  Future<AttendanceSession> getTodaySession() => _db.attendanceDao.getLatest();
+  Future<AttendanceSession?> getTodaySession() => _db.attendanceDao.getLatest();
   @override
-  Stream<AttendanceSession> watchTodaySession() =>
+  Stream<AttendanceSession?> watchTodaySession() =>
       _db.attendanceDao.watchLatest();
   @override
   Future<List<AttendanceSession>> getSessions() =>
@@ -85,6 +89,14 @@ class DriftAttendanceRepository implements AttendanceRepository {
   @override
   Future<void> markDetected(String sessionId, String studentId, {int? rssi}) =>
       _db.attendanceDao.markDetected(sessionId, studentId, rssi: rssi);
+
+  @override
+  Future<void> finishScan(String sessionId) =>
+      _db.attendanceDao.finishScan(sessionId);
+
+  @override
+  Future<void> cancelSession(String sessionId) =>
+      _db.attendanceDao.cancelSession(sessionId);
 
   @override
   Future<void> completeSession(String sessionId) =>

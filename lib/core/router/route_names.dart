@@ -19,5 +19,4 @@ abstract final class AppRoutes {
   static const studentAttendance = 'studentAttendance';
   static const studentDevice = 'studentDevice';
   static const studentProfile = 'studentProfile';
-  static const debugRoles = 'debugRoles';
 }
