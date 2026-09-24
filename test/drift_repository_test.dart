@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:attendance_system_paete/core/providers/repository_providers.dart';
 import 'package:attendance_system_paete/domain/models.dart';
@@ -204,10 +205,14 @@ void main() {
     await devices.registerDevice(
       firstStudent.id,
       'Band',
-      bleUuid: 'ble-shared',
+      bleUuid: '8f3f5d3e-54e2-4e15-9b2c-810859f38d33',
     );
     await expectLater(
-      devices.registerDevice(secondStudent.id, 'Band', bleUuid: 'ble-shared'),
+      devices.registerDevice(
+        secondStudent.id,
+        'Band',
+        bleUuid: '8f3f5d3e-54e2-4e15-9b2c-810859f38d33',
+      ),
       throwsA(isA<DuplicateBleUuidException>()),
     );
   });
@@ -226,6 +231,7 @@ void main() {
         (await repository.getRecords(session.id)).single.isPresent,
         isTrue,
       );
+      await repository.finishScan(session.id);
       await repository.completeSession(session.id);
       expect(
         (await repository.getSession(session.id))?.status,
@@ -234,6 +240,47 @@ void main() {
       expect(
         (await repository.getRecords(session.id)).single.recordStatus,
         AttendanceRecordStatus.present,
+      );
+    },
+  );
+
+  test(
+    'attendance finalization rolls back when a critical write fails',
+    () async {
+      final repository = DriftAttendanceRepository(database);
+      final session = await repository.startSession(_classId);
+      await repository.finishScan(session.id);
+      expect(
+        (await repository.getSession(session.id))?.status,
+        AttendanceSessionStatus.review,
+      );
+
+      await database.customStatement('''
+      CREATE TRIGGER fail_session_completion
+      BEFORE UPDATE ON attendance_sessions
+      WHEN NEW.status = 'completed'
+      BEGIN
+        SELECT RAISE(ABORT, 'simulated session write failure');
+      END
+    ''');
+      await expectLater(
+        repository.completeSession(session.id),
+        throwsA(anything),
+      );
+      expect(
+        (await repository.getSession(session.id))?.status,
+        AttendanceSessionStatus.review,
+      );
+      expect(
+        (await repository.getRecords(session.id)).single.recordStatus,
+        AttendanceRecordStatus.notDetected,
+      );
+
+      await database.customStatement('DROP TRIGGER fail_session_completion');
+      await repository.completeSession(session.id);
+      expect(
+        (await repository.getRecords(session.id)).single.recordStatus,
+        AttendanceRecordStatus.absent,
       );
     },
   );
@@ -306,11 +353,21 @@ void main() {
         studentNumber: 'T-004',
       );
       expect((await classes.getStudents(created.id)).single.name, 'Juan Cruz');
+      final session = await DriftAttendanceRepository(database)
+          .startSession(created.id);
       await students.removeStudentFromClass(
         studentId: added.id,
         classId: created.id,
       );
       expect(await classes.getStudents(created.id), isEmpty);
+
+      await classes.deleteClass(created.id);
+      expect(await classes.getClass(created.id), isNull);
+      expect(await classes.getStudents(created.id), isEmpty);
+      expect(
+        await DriftAttendanceRepository(database).getSession(session.id),
+        isNull,
+      );
     },
   );
 
@@ -323,6 +380,111 @@ void main() {
     expect(await cleanDatabase.attendanceDao.getSessions(), isEmpty);
     expect(await cleanDatabase.deviceDao.getAll(), isEmpty);
   });
+
+  test('student-only setup stores its declared section without creating teacher or class rows', () async {
+    final cleanDatabase = AppDatabase(NativeDatabase.memory());
+    addTearDown(cleanDatabase.close);
+    final repository = DriftStudentRepository(cleanDatabase);
+    final student = await repository.registerStudent(
+      name: 'Maria Santos',
+      studentNumber: 'S-001',
+      sectionCode: 'GRADE12-STEM A',
+    );
+
+    expect(student.classId, isEmpty);
+    expect(student.sectionCode, 'GRADE12-STEM A');
+    expect(await cleanDatabase.teacherDao.getTeacherOrNull(), isNull);
+    expect(await cleanDatabase.classDao.getClasses(), isEmpty);
+    expect(
+      await cleanDatabase.select(cleanDatabase.enrollments).get(),
+      isEmpty,
+    );
+    expect(await cleanDatabase.attendanceDao.getSessions(), isEmpty);
+    expect(await cleanDatabase.deviceDao.getAll(), isEmpty);
+    expect(
+      (await repository.getCurrentStudent())?.sectionCode,
+      'GRADE12-STEM A',
+    );
+  });
+
+  test(
+    'version 1 synthetic student classes migrate to declared section data',
+    () async {
+      final file = File(
+        '${Directory.systemTemp.path}${Platform.pathSeparator}'
+        'classattend-migration-${DateTime.now().microsecondsSinceEpoch}.sqlite',
+      );
+      var database = AppDatabase(NativeDatabase(file));
+      final now = DateTime(2026, 9, 24, 8);
+      await database.teacherDao.save(
+        TeachersCompanion.insert(
+          id: 'local-teacher',
+          updatedAt: now,
+          syncStatus: SyncStatus.pendingCreate,
+          name: 'Local enrollment metadata',
+        ),
+      );
+      await database.classDao.insert(
+        ClassSectionsCompanion.insert(
+          id: 'local-class',
+          updatedAt: now,
+          syncStatus: SyncStatus.pendingCreate,
+          gradeLevel: 12,
+          sectionLabel: 'STEM A',
+          sectionCode: 'GRADE12-STEM A',
+          subject: const Value('Awaiting teacher details'),
+          room: 'Not provided',
+          scheduleStart: DateTime(2000),
+          scheduleEnd: DateTime(2000),
+          bleBeaconId: '',
+          teacherId: 'local-teacher',
+        ),
+      );
+      await database.studentDao.insert(
+        StudentsCompanion.insert(
+          id: 'local-student',
+          updatedAt: now,
+          syncStatus: SyncStatus.pendingCreate,
+          studentNumber: 'S-MIGRATE',
+          fullName: 'Maria Santos',
+          isCurrent: const Value(true),
+        ),
+      );
+      await database.enrollmentDao.insert(
+        EnrollmentsCompanion.insert(
+          id: 'local-enrollment',
+          updatedAt: now,
+          syncStatus: SyncStatus.pendingCreate,
+          studentId: 'local-student',
+          classSectionId: 'local-class',
+        ),
+      );
+      await database.close();
+
+      database = AppDatabase(
+        NativeDatabase(
+          file,
+          setup: (sqlite) {
+            sqlite.execute(
+              'ALTER TABLE students DROP COLUMN declared_section_code',
+            );
+            sqlite.execute('PRAGMA user_version = 1');
+          },
+        ),
+      );
+      addTearDown(() async {
+        await database.close();
+        if (await file.exists()) await file.delete();
+      });
+
+      final migratedStudent = await database.studentDao.getCurrent();
+      expect(migratedStudent?.sectionCode, 'GRADE12-STEM A');
+      expect(migratedStudent?.classId, isEmpty);
+      expect(await database.classDao.getClasses(), isEmpty);
+      expect(await database.teacherDao.getTeacherOrNull(), isNull);
+      expect(await database.select(database.enrollments).get(), isEmpty);
+    },
+  );
 }
 
 /// The actual concrete repository is the public Drift implementation; this

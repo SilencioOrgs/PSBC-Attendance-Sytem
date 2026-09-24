@@ -9,6 +9,16 @@ class DriftAttendanceRepository implements AttendanceRepository {
   final AppDatabase _db;
   @override
   Future<AttendanceSession> startSession(String classId) async {
+    final activeSession = (await _db.attendanceDao.getSessions())
+        .where(
+          (session) =>
+              session.status == AttendanceSessionStatus.scanning ||
+              session.status == AttendanceSessionStatus.review,
+        )
+        .firstOrNull;
+    if (activeSession != null) {
+      throw ActiveAttendanceSessionException(activeSession.id);
+    }
     final section = await _db.classDao.getClass(classId);
     if (section == null) throw const ClassSectionNotFoundException();
     final roster = await _db.classDao.getStudents(classId);
@@ -93,6 +103,10 @@ class DriftAttendanceRepository implements AttendanceRepository {
   @override
   Future<void> finishScan(String sessionId) =>
       _db.attendanceDao.finishScan(sessionId);
+
+  @override
+  Future<void> resumeScan(String sessionId) =>
+      _db.attendanceDao.resumeScan(sessionId);
 
   @override
   Future<void> cancelSession(String sessionId) =>

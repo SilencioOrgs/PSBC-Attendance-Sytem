@@ -4,6 +4,7 @@ import '../../domain/models.dart';
 abstract interface class BleService {
   BleAvailability get adapterAvailability;
   Stream<BleAvailability> watchAdapterState();
+  Stream<BleAdvertisingState> watchAdvertisingState();
   Stream<BleScanUpdate> scan(
     List<Student> roster, {
     List<Device> registeredDevices = const [],

@@ -83,7 +83,7 @@ Future<void> exportReportFlow({
         content: Text(
           result.wasSaved
               ? 'Report saved: ${result.fileName}'
-              : 'Report is ready to share.',
+              : 'Report shared: ${result.fileName}',
         ),
       ),
     );

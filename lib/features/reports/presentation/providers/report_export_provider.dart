@@ -8,14 +8,31 @@ import '../../application/report_data_service.dart';
 import '../../application/report_export_service.dart';
 import '../../models/report_models.dart';
 
-final reportExportServiceProvider = Provider<ReportExportService>((ref) {
-  final data = ReportDataService(
+final reportDataServiceProvider = Provider<ReportDataService>(
+  (ref) => ReportDataService(
     ref.watch(teacherRepositoryProvider),
     ref.watch(classRepositoryProvider),
+    ref.watch(studentRepositoryProvider),
     ref.watch(attendanceRepositoryProvider),
-  );
+  ),
+);
+
+final studentAttendanceReportProvider =
+    FutureProvider.family<
+      StudentAttendanceReport,
+      ({String classId, String studentId})
+    >((ref, request) {
+      return ref
+          .watch(reportDataServiceProvider)
+          .studentAttendance(
+            classId: request.classId,
+            studentId: request.studentId,
+          );
+    });
+
+final reportExportServiceProvider = Provider<ReportExportService>((ref) {
   return ReportExportService(
-    data,
+    ref.watch(reportDataServiceProvider),
     PdfReportGenerator(),
     CsvReportGenerator(),
     FileExportService(),
@@ -34,6 +51,7 @@ class ReportExportController extends Notifier<bool> {
     required ReportFormat format,
     required ReportExportAction action,
   }) async {
+    if (state) throw StateError('A report export is already in progress.');
     state = true;
     try {
       return await ref

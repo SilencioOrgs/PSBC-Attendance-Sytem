@@ -18,6 +18,19 @@ final attendanceSessionByIdProvider =
           ref.watch(attendanceRepositoryProvider).watchSession(sessionId),
     );
 
+final attendanceRecordStudentsProvider =
+    FutureProvider.family<List<Student>, String>((ref, sessionId) async {
+      final attendance = ref.watch(attendanceRepositoryProvider);
+      final students = ref.watch(studentRepositoryProvider);
+      final records = await attendance.getRecords(sessionId);
+      final resolved = <Student>[];
+      for (final record in records) {
+        final student = await students.getStudent(record.studentId);
+        if (student != null) resolved.add(student);
+      }
+      return resolved;
+    });
+
 final attendanceRosterProvider = StreamProvider.family<List<Student>, String>((
   ref,
   sessionId,

@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/iterable_extensions.dart';
 import '../../../../core/widgets/app_widgets.dart';
+import '../../../../domain/models.dart';
 import '../../../../domain/repositories.dart';
 import '../../../student/presentation/providers/student_provider.dart';
 import '../providers/device_provider.dart';
@@ -50,7 +49,7 @@ class _DeviceRegistrationScreenState
     } catch (_) {
       if (mounted) {
         setState(
-          () => _deviceError = 'Bluetooth access is unavailable. Turn on Bluetooth and try again.',
+          () => _deviceError = 'Could not register this device. Try again.',
         );
       }
     } finally {
@@ -62,25 +61,10 @@ class _DeviceRegistrationScreenState
   Widget build(BuildContext context) {
     final studentAsync = ref.watch(currentStudentProvider);
     final deviceAsync = ref.watch(myDeviceProvider);
-    final isAdvertising = ref.watch(deviceRegistrationControllerProvider);
-    ref.listen(myDeviceProvider, (previous, next) {
-      final device = next.asData?.value;
-      if (device == null || isAdvertising) return;
-      unawaited(
-        ref
-            .read(deviceRegistrationControllerProvider.notifier)
-            .startBeacon(device.address)
-            .catchError((Object error) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Could not start your attendance beacon.'),
-                  ),
-                );
-              }
-            }),
-      );
-    });
+    final isBusy = ref.watch(deviceRegistrationControllerProvider);
+    final beaconStateAsync = ref.watch(bleAdvertisingStateProvider);
+    final beaconState = beaconStateAsync.asData?.value;
+    final isAdvertising = beaconState == BleAdvertisingState.active;
     return PageScaffold(
       title: 'Device',
       body: studentAsync.when(
@@ -160,7 +144,7 @@ class _DeviceRegistrationScreenState
                     label: _isRegistering
                         ? 'Registering device...'
                         : 'Register this device',
-                    icon: Icons.bluetooth_connected,
+                    icon: Icons.bluetooth_outlined,
                     onPressed: student == null || _isRegistering
                         ? null
                         : () => _register(student.id),
@@ -173,9 +157,15 @@ class _DeviceRegistrationScreenState
                         const Divider(height: Spacing.lg),
                         _DeviceLine(
                           label: 'Attendance beacon',
-                          value: isAdvertising
-                              ? 'Advertising this device'
-                              : 'Not active',
+                          value: beaconStateAsync.isLoading
+                              ? 'Checking beacon status'
+                              : _beaconLabel(beaconState),
+                        ),
+                        const Divider(height: Spacing.lg),
+                        Text(
+                          'The beacon stops when ClassAttend is backgrounded or Bluetooth turns off. Keep the app open and start it again if needed.',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: AppColors.muted),
                         ),
                         const Divider(height: Spacing.lg),
                         Row(
@@ -193,7 +183,7 @@ class _DeviceRegistrationScreenState
                                   ),
                                   const SizedBox(height: Spacing.xs),
                                   SelectableText(
-                                    device.address,
+                                    device.bleUuid,
                                     style: Theme.of(context)
                                         .textTheme
                                         .bodySmall,
@@ -205,7 +195,7 @@ class _DeviceRegistrationScreenState
                               tooltip: 'Copy device sharing code',
                               onPressed: () async {
                                 await Clipboard.setData(
-                                  ClipboardData(text: device.address),
+                                  ClipboardData(text: device.bleUuid),
                                 );
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
@@ -221,37 +211,40 @@ class _DeviceRegistrationScreenState
                             ),
                           ],
                         ),
-                        const Divider(height: Spacing.lg),
-                        _DeviceLine(
-                          label: 'Last seen',
-                          value: device.lastSeenAt == null
-                              ? 'Not available'
-                              : 'Today, ${_formatTime(device.lastSeenAt!)}',
-                        ),
                       ],
                     ),
                   ),
                   const SizedBox(height: Spacing.md),
                   PrimaryActionButton(
-                    label: isAdvertising
-                        ? 'Attendance beacon is active'
-                        : 'Enable attendance beacon',
-                    icon: Icons.bluetooth_searching,
-                    onPressed: isAdvertising
+                    label: isBusy
+                        ? (isAdvertising
+                              ? 'Stopping beacon...'
+                              : 'Starting beacon...')
+                        : isAdvertising
+                        ? 'Stop attendance beacon'
+                        : 'Start attendance beacon',
+                    icon: isAdvertising
+                        ? Icons.bluetooth_disabled
+                        : Icons.bluetooth_searching,
+                    onPressed: isBusy
                         ? null
                         : () async {
                             try {
-                              await ref
-                                  .read(
-                                    deviceRegistrationControllerProvider
-                                        .notifier,
-                                  )
-                                  .startBeacon(device.address);
+                              final controller = ref.read(
+                                deviceRegistrationControllerProvider.notifier,
+                              );
+                              if (isAdvertising) {
+                                await controller.stopBeacon();
+                              } else {
+                                await controller.startBeacon(device.bleUuid);
+                              }
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
+                                  SnackBar(
                                     content: Text(
-                                      'Your device is ready to be detected.',
+                                      isAdvertising
+                                          ? 'Attendance beacon stopped.'
+                                          : 'Attendance beacon is active.',
                                     ),
                                   ),
                                 );
@@ -259,12 +252,23 @@ class _DeviceRegistrationScreenState
                             } catch (_) {
                               if (context.mounted) {
                                 setState(
-                                  () => _deviceError = 'Bluetooth permission is required. Turn on Bluetooth and try again.',
+                                  () => _deviceError = _bleErrorMessage(
+                                    beaconState,
+                                  ),
                                 );
                               }
                             }
                           },
                   ),
+                  if (_deviceError != null) ...[
+                    const SizedBox(height: Spacing.sm),
+                    Text(
+                      _deviceError!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ],
                 ],
                 const SizedBox(height: Spacing.lg),
                 SectionCard(
@@ -275,7 +279,7 @@ class _DeviceRegistrationScreenState
                       const SizedBox(width: Spacing.sm),
                       Expanded(
                         child: Text(
-                          'Share your device code with your teacher so they can add it to your class roster. Keep Bluetooth enabled and carry this device during class.',
+                          'Share your device code with your teacher so they can register it to your class roster. Keep Bluetooth enabled and the beacon active during attendance.',
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ),
@@ -343,29 +347,36 @@ class DeviceStatusScreen extends ConsumerWidget {
                   ),
                 ),
                 Expanded(
-                  child: ListView.separated(
-                    padding: const EdgeInsets.only(bottom: Spacing.lg),
-                    itemCount: devices.length,
-                    separatorBuilder: (context, index) =>
-                        const Divider(height: 1),
-                    itemBuilder: (context, index) {
-                      final device = devices[index];
-                      final owner = students
-                          .where(
-                            (student) => student.id == device.ownerStudentId,
-                          )
-                          .firstOrNull;
-                      return PersonListTile(
-                        name: owner?.name ?? device.name,
-                        subtitle: device.name,
-                        status: AttendanceStatus.registered,
-                        trailing: StatusPill(
-                          status: AttendanceStatus.registered,
-                          label: 'Registered',
+                  child: devices.isEmpty
+                      ? const HelpfulEmptyState(
+                          title: 'No device registered',
+                          message:
+                              'Registered student devices will appear here.',
+                        )
+                      : ListView.separated(
+                          padding: const EdgeInsets.only(bottom: Spacing.lg),
+                          itemCount: devices.length,
+                          separatorBuilder: (context, index) =>
+                              const Divider(height: 1),
+                          itemBuilder: (context, index) {
+                            final device = devices[index];
+                            final owner = students
+                                .where(
+                                  (student) =>
+                                      student.id == device.ownerStudentId,
+                                )
+                                .firstOrNull;
+                            return PersonListTile(
+                              name: owner?.name ?? device.name,
+                              subtitle: device.name,
+                              status: AttendanceStatus.registered,
+                              trailing: StatusPill(
+                                status: AttendanceStatus.registered,
+                                label: 'Registered',
+                              ),
+                            );
+                          },
                         ),
-                      );
-                    },
-                  ),
                 ),
               ],
             );
@@ -418,8 +429,22 @@ class _DeviceError extends StatelessWidget {
   );
 }
 
-String _formatTime(DateTime dateTime) {
-  final hour = dateTime.hour % 12 == 0 ? 12 : dateTime.hour % 12;
-  final minute = dateTime.minute.toString().padLeft(2, '0');
-  return '$hour:$minute ${dateTime.hour >= 12 ? 'PM' : 'AM'}';
-}
+String _beaconLabel(BleAdvertisingState? state) => switch (state) {
+  BleAdvertisingState.active => 'Beacon Active',
+  BleAdvertisingState.stopped => 'Beacon Stopped',
+  BleAdvertisingState.bluetoothOff => 'Bluetooth Off',
+  BleAdvertisingState.permissionRequired => 'Permission Required',
+  BleAdvertisingState.unsupported => 'Unsupported',
+  BleAdvertisingState.unknown || null => 'Unknown',
+};
+
+String _bleErrorMessage(BleAdvertisingState? state) => switch (state) {
+  BleAdvertisingState.bluetoothOff =>
+    'Bluetooth is off. Turn it on and try again.',
+  BleAdvertisingState.permissionRequired => 'Bluetooth permission is required. Grant access in app settings and try again.',
+  BleAdvertisingState.unsupported =>
+    'This phone does not support BLE advertising.',
+  BleAdvertisingState.unknown || null => 'We could not determine the Bluetooth state. Check Bluetooth and try again.',
+  BleAdvertisingState.active || BleAdvertisingState.stopped =>
+    'We could not start or stop the beacon. Try again.',
+};

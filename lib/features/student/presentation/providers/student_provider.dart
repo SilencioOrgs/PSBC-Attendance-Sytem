@@ -17,7 +17,9 @@ final currentStudentClassProvider = StreamProvider<ClassSection?>((ref) {
   return studentRepository.watchCurrentStudent().asyncExpand(
     (student) => student == null
         ? Stream.value(null)
-        : classRepository.watchClass(student.classId),
+        : student.classId.isNotEmpty
+        ? classRepository.watchClass(student.classId)
+        : classRepository.watchClassByCode(student.sectionCode),
   );
 });
 

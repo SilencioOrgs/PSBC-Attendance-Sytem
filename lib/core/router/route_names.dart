@@ -9,6 +9,7 @@ abstract final class AppRoutes {
   static const teacherClassDetails = 'teacherClassDetails';
   static const teacherClassEdit = 'teacherClassEdit';
   static const teacherStudentList = 'teacherStudentList';
+  static const teacherStudentDetails = 'teacherStudentDetails';
   static const teacherAttendance = 'teacherAttendance';
   static const teacherSettings = 'teacherSettings';
   static const teacherDeviceStatus = 'teacherDeviceStatus';

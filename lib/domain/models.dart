@@ -1,7 +1,7 @@
 /// Synchronization lifecycle for locally persisted records.
 enum SyncStatus { synced, pendingCreate, pendingUpdate, pendingDelete }
 
-enum AttendanceSessionStatus { scanning, completed, cancelled }
+enum AttendanceSessionStatus { scanning, review, completed, cancelled }
 
 enum AttendanceRecordStatus {
   present,
@@ -34,6 +34,7 @@ class Student {
     required this.classId,
     required this.gradeLevel,
     required this.deviceRegistered,
+    this.sectionCode = '',
   });
   final String id;
   final DateTime updatedAt;
@@ -43,6 +44,7 @@ class Student {
   final String classId;
   final String gradeLevel;
   final bool deviceRegistered;
+  final String sectionCode;
 }
 
 class ClassSection {
@@ -169,10 +171,8 @@ class Device {
     required this.updatedAt,
     required this.syncStatus,
     required this.name,
-    required this.address,
+    required this.bleUuid,
     required this.ownerStudentId,
-    required this.isConnected,
-    required this.lastSeenAt,
     this.deviceModel = '',
     this.registeredAt,
     this.rssi,
@@ -182,11 +182,9 @@ class Device {
   final SyncStatus syncStatus;
   final String name;
 
-  /// BLE UUID; kept under the legacy field name used by the existing UI.
-  final String address;
+  /// The UUID placed in the device's BLE service UUID advertisement.
+  final String bleUuid;
   final String? ownerStudentId;
-  final bool isConnected;
-  final DateTime? lastSeenAt;
   final String deviceModel;
   final DateTime? registeredAt;
   final int? rssi;
@@ -229,5 +227,15 @@ enum BleAvailability {
   ready,
   poweredOff,
   permissionDenied,
+  unsupported,
+}
+
+/// Runtime state of the student attendance advertisement.
+enum BleAdvertisingState {
+  unknown,
+  stopped,
+  active,
+  bluetoothOff,
+  permissionRequired,
   unsupported,
 }

@@ -1,5 +1,6 @@
 import 'package:attendance_system_paete/core/auth/teacher_session.dart';
 import 'package:attendance_system_paete/domain/models.dart';
+import 'package:attendance_system_paete/domain/repositories.dart';
 import 'package:attendance_system_paete/features/attendance/data/drift_attendance_repository.dart';
 import 'package:attendance_system_paete/features/authentication/application/teacher_auth_service.dart';
 import 'package:attendance_system_paete/features/classes/data/drift_class_repository.dart';
@@ -13,6 +14,34 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../helpers/mock_ble_service.dart';
 
 void main() {
+  test(
+    'incorrect PIN stays locked and the correct PIN unlocks the session',
+    () async {
+      final database = AppDatabase(NativeDatabase.memory());
+      addTearDown(database.close);
+      final pins = _MemoryPinService().._pin = '2468';
+      final session = TeacherSession();
+      await session.initialize(pins);
+      final ble = MockBleService();
+      addTearDown(ble.dispose);
+      final auth = TeacherAuthService(
+        session,
+        DriftTeacherRepository(database, pins),
+        pins,
+        ble,
+        DriftAttendanceRepository(database),
+      );
+
+      expect(session.state, TeacherSessionState.locked);
+      expect(await auth.unlock('1111'), isFalse);
+      expect(session.state, TeacherSessionState.locked);
+      expect(await auth.unlock('2468'), isTrue);
+      expect(session.state, TeacherSessionState.authenticated);
+      await auth.logout();
+      expect(session.state, TeacherSessionState.locked);
+    },
+  );
+
   test('setup, PIN change, lock, and logout preserve local records', () async {
     final database = AppDatabase(NativeDatabase.memory());
     addTearDown(database.close);
@@ -50,9 +79,21 @@ void main() {
     );
     final activeSession = await attendance.startSession(section.id);
 
+    await expectLater(
+      auth.logout(),
+      throwsA(isA<ActiveAttendanceSessionException>()),
+    );
+    expect(session.state, TeacherSessionState.authenticated);
+    expect(
+      (await attendance.getSession(activeSession.id))?.status,
+      AttendanceSessionStatus.review,
+    );
+    expect(await attendance.getRecords(activeSession.id), hasLength(1));
+
+    await attendance.cancelSession(activeSession.id);
     await auth.logout();
 
-    expect(ble.stopScanCount, 1);
+    expect(ble.stopScanCount, 2);
     expect(session.state, TeacherSessionState.locked);
     expect((await teachers.getTeacher()).name, 'Ana Reyes');
     expect(await pins.verifyPin('5678'), isTrue);

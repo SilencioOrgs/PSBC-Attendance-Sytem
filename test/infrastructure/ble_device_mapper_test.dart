@@ -12,10 +12,8 @@ void main() {
       updatedAt: DateTime(2026),
       syncStatus: SyncStatus.synced,
       name: 'Student phone',
-      address: registeredUuid,
+      bleUuid: registeredUuid,
       ownerStudentId: studentId,
-      isConnected: false,
-      lastSeenAt: null,
     );
     final match = BleDeviceMapper.matchAdvertisement(
       serviceUuids: [registeredUuid.toUpperCase()],
@@ -27,7 +25,7 @@ void main() {
 
     expect(match?.ownerStudentId, studentId);
     expect(match?.rssi, -47);
-    expect(match?.lastSeenAt, DateTime(2026, 9, 24, 8));
+    expect(match?.updatedAt, DateTime(2026, 9, 24, 8));
   });
 
   test(
@@ -38,10 +36,8 @@ void main() {
         updatedAt: DateTime(2026),
         syncStatus: SyncStatus.synced,
         name: 'Student phone',
-        address: registeredUuid,
+        bleUuid: registeredUuid,
         ownerStudentId: studentId,
-        isConnected: false,
-        lastSeenAt: null,
       );
       final targets = BleDeviceMapper.targets([known]);
 
@@ -72,10 +68,8 @@ void main() {
             updatedAt: DateTime(2026),
             syncStatus: SyncStatus.synced,
             name: 'bad',
-            address: 'random-not-a-ble-uuid',
+            bleUuid: 'random-not-a-ble-uuid',
             ownerStudentId: studentId,
-            isConnected: false,
-            lastSeenAt: null,
           ),
         ]),
         isEmpty,

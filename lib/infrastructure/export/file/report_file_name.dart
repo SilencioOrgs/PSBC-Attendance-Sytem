@@ -23,6 +23,8 @@ class ReportFileName {
         .toLowerCase()
         .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
         .replaceAll(RegExp(r'^_+|_+$'), '');
-    return slug.isEmpty ? 'report' : slug;
+    if (slug.isEmpty) return 'report';
+    if (slug.length <= 64) return slug;
+    return slug.substring(0, 64).replaceAll(RegExp(r'_+$'), '');
   }
 }

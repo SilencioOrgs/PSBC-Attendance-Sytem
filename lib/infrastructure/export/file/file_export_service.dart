@@ -32,9 +32,12 @@ class FileExportService {
         fileNameOverrides: [file.fileName],
       ),
     );
-    if (result.status == ShareResultStatus.dismissed) {
-      return const ReportExportResult.cancelled();
-    }
-    return ReportExportResult.shared(file.fileName);
+    return switch (result.status) {
+      ShareResultStatus.success => ReportExportResult.shared(file.fileName),
+      ShareResultStatus.dismissed => const ReportExportResult.cancelled(),
+      ShareResultStatus.unavailable => throw StateError(
+        'Sharing is unavailable on this device.',
+      ),
+    };
   }
 }

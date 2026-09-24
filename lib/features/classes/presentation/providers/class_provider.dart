@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/providers/repository_providers.dart';
 import '../../../../domain/models.dart';
+import '../../../device/presentation/providers/device_provider.dart';
+import '../../../student/presentation/providers/student_provider.dart';
 
 final classListProvider = StreamProvider<List<ClassSection>>(
   (ref) => ref.watch(classRepositoryProvider).watchClasses(),
@@ -146,5 +148,56 @@ class StudentManagementController extends Notifier<bool> {
       ref.invalidate(classRosterProvider(classId));
       ref.invalidate(classByIdProvider(classId));
     }
+  }
+
+  Future<void> registerDevice(
+    String classId,
+    String studentId, {
+    required String deviceName,
+    required String bleUuid,
+  }) async {
+    state = true;
+    try {
+      await ref
+          .read(deviceRepositoryProvider)
+          .registerDevice(studentId, deviceName, bleUuid: bleUuid);
+    } finally {
+      state = false;
+      _refreshStudent(classId, studentId);
+    }
+  }
+
+  Future<void> replaceDevice(
+    String classId,
+    String studentId, {
+    required String deviceName,
+    required String bleUuid,
+  }) async {
+    state = true;
+    try {
+      await ref
+          .read(deviceRepositoryProvider)
+          .replaceDevice(studentId, deviceName, bleUuid: bleUuid);
+    } finally {
+      state = false;
+      _refreshStudent(classId, studentId);
+    }
+  }
+
+  Future<void> removeDevice(String classId, String studentId) async {
+    state = true;
+    try {
+      await ref.read(deviceRepositoryProvider).removeDevice(studentId);
+    } finally {
+      state = false;
+      _refreshStudent(classId, studentId);
+    }
+  }
+
+  void _refreshStudent(String classId, String studentId) {
+    ref.invalidate(classRosterProvider(classId));
+    ref.invalidate(classByIdProvider(classId));
+    ref.invalidate(allStudentsProvider);
+    ref.invalidate(deviceListProvider);
   }
 }

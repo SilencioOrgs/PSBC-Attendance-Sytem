@@ -4,38 +4,54 @@ import '../models/report_models.dart';
 
 /// Loads typed report inputs from repository contracts, never from widgets.
 class ReportDataService {
-  const ReportDataService(this._teachers, this._classes, this._attendance);
+  const ReportDataService(
+    this._teachers,
+    this._classes,
+    this._students,
+    this._attendance,
+  );
 
   final TeacherRepository _teachers;
   final ClassRepository _classes;
+  final StudentRepository _students;
   final AttendanceRepository _attendance;
 
   Future<AttendanceSessionReport> attendanceSession(String sessionId) async {
     final session = await _requiredSession(sessionId);
     final section = await _requiredClass(session.classId);
     final teacher = await _teachers.getTeacher();
-    final roster = await _classes.getStudents(section.id);
     final records = await _attendance.getRecords(sessionId);
+    final rows = <AttendanceReportRow>[];
+    for (final record in records) {
+      final student = await _students.getStudent(record.studentId);
+      if (student != null) {
+        rows.add(
+          AttendanceReportRow(
+            student: student,
+            record: record,
+            session: session,
+          ),
+        );
+      }
+    }
+    rows.sort(
+      (a, b) => a.student.studentNumber.compareTo(b.student.studentNumber),
+    );
     return AttendanceSessionReport(
       teacher: teacher,
       section: section,
       session: session,
-      rows: [
-        for (final student in roster)
-          if (_recordFor(records, student.id) case final record?)
-            AttendanceReportRow(
-              student: student,
-              record: record,
-              session: session,
-            ),
-      ],
+      rows: rows,
     );
   }
 
   Future<ClassAttendanceReport> classAttendance(String classId) async {
     final section = await _requiredClass(classId);
     final teacher = await _teachers.getTeacher();
-    final students = await _classes.getStudents(classId);
+    final studentsById = {
+      for (final student in await _classes.getStudents(classId))
+        student.id: student,
+    };
     final sessions =
         (await _attendance.getSessions())
             .where(
@@ -49,6 +65,15 @@ class ReportDataService {
       for (final session in sessions)
         session.id: await _attendance.getRecords(session.id),
     };
+    for (final records in recordsBySession.values) {
+      for (final record in records) {
+        if (studentsById.containsKey(record.studentId)) continue;
+        final student = await _students.getStudent(record.studentId);
+        if (student != null) studentsById[student.id] = student;
+      }
+    }
+    final students = studentsById.values.toList()
+      ..sort((a, b) => a.studentNumber.compareTo(b.studentNumber));
     return ClassAttendanceReport(
       teacher: teacher,
       section: section,

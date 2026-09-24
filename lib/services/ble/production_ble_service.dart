@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:bluetooth_low_energy/bluetooth_low_energy.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 
 import '../../domain/models.dart';
 import 'ble_device_mapper.dart';
@@ -12,10 +13,19 @@ import 'ble_service.dart';
 /// Student devices advertise a generated 128 bit service UUID. A teacher stores
 /// that same UUID after the student shares their device code. Device names and
 /// platform addresses are never used for attendance matching.
-class ProductionBleService implements BleService {
+class ProductionBleService with WidgetsBindingObserver implements BleService {
   ProductionBleService({CentralManager? central, PeripheralManager? peripheral})
     : _central = central ?? CentralManager(),
-      _peripheral = peripheral ?? PeripheralManager();
+      _peripheral = peripheral ?? PeripheralManager() {
+    WidgetsBinding.instance.addObserver(this);
+    _peripheralStateSubscription = _peripheral.stateChanged.listen((event) {
+      if (event.state != BluetoothLowEnergyState.poweredOn) {
+        _advertising = false;
+        _advertisingKnown = true;
+      }
+      _emitAdvertisingState();
+    });
+  }
 
   final CentralManager _central;
   final PeripheralManager _peripheral;
@@ -23,6 +33,10 @@ class ProductionBleService implements BleService {
   StreamSubscription<DiscoveredEventArgs>? _discoverySubscription;
   StreamSubscription<BluetoothLowEnergyStateChangedEventArgs>?
   _adapterSubscription;
+  late final StreamSubscription<BluetoothLowEnergyStateChangedEventArgs>
+  _peripheralStateSubscription;
+  final StreamController<BleAdvertisingState> _advertisingStateChanges =
+      StreamController<BleAdvertisingState>.broadcast();
   Timer? _tick;
   Timer? _timeout;
   DateTime? _scanStartedAt;
@@ -31,9 +45,29 @@ class ProductionBleService implements BleService {
   int _unknownDeviceCount = 0;
   int _scanSeconds = 30;
   bool _scanning = false;
+  bool _advertising = false;
+  bool _advertisingKnown = true;
 
   @override
   BleAvailability get adapterAvailability => _availability(_central.state);
+
+  BleAdvertisingState get advertisingState {
+    switch (_availability(_peripheral.state)) {
+      case BleAvailability.poweredOff:
+        return BleAdvertisingState.bluetoothOff;
+      case BleAvailability.permissionDenied:
+        return BleAdvertisingState.permissionRequired;
+      case BleAvailability.unsupported:
+        return BleAdvertisingState.unsupported;
+      case BleAvailability.unknown:
+        return BleAdvertisingState.unknown;
+      case BleAvailability.ready:
+        if (!_advertisingKnown) return BleAdvertisingState.unknown;
+        return _advertising
+            ? BleAdvertisingState.active
+            : BleAdvertisingState.stopped;
+    }
+  }
 
   @override
   Stream<BleAvailability> watchAdapterState() =>
@@ -49,6 +83,32 @@ class ProductionBleService implements BleService {
         });
         controller.onCancel = subscription.cancel;
       });
+
+  @override
+  Stream<BleAdvertisingState> watchAdvertisingState() =>
+      Stream<BleAdvertisingState>.multi((controller) {
+        controller.add(advertisingState);
+        final subscription = _advertisingStateChanges.stream.listen(
+          controller.add,
+          onError: controller.addError,
+        );
+        controller.onCancel = subscription.cancel;
+      });
+
+  void _emitAdvertisingState() {
+    if (!_advertisingStateChanges.isClosed) {
+      _advertisingStateChanges.add(advertisingState);
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.detached) {
+      unawaited(stopAdvertising());
+    }
+  }
 
   BleAvailability _availability(BluetoothLowEnergyState state) =>
       switch (state) {
@@ -215,12 +275,48 @@ class ProductionBleService implements BleService {
   @override
   Future<void> startAdvertising(String serviceUuid) async {
     await requestAdvertisingAccess();
-    await _peripheral.removeAllServices();
-    await _peripheral.startAdvertising(
-      Advertisement(serviceUUIDs: [UUID.fromString(serviceUuid)]),
-    );
+    _advertisingKnown = false;
+    _emitAdvertisingState();
+    try {
+      await _peripheral.removeAllServices();
+      await _peripheral.startAdvertising(
+        Advertisement(serviceUUIDs: [UUID.fromString(serviceUuid)]),
+      );
+      _advertising = true;
+      _advertisingKnown = true;
+      _emitAdvertisingState();
+    } catch (_) {
+      _advertising = false;
+      _advertisingKnown = false;
+      _emitAdvertisingState();
+      rethrow;
+    }
   }
 
   @override
-  Future<void> stopAdvertising() => _peripheral.stopAdvertising();
+  Future<void> stopAdvertising() async {
+    try {
+      await _peripheral.stopAdvertising();
+      _advertising = false;
+      _advertisingKnown = true;
+    } catch (_) {
+      _advertising = false;
+      _advertisingKnown = false;
+      rethrow;
+    } finally {
+      _emitAdvertisingState();
+    }
+  }
+
+  Future<void> dispose() async {
+    WidgetsBinding.instance.removeObserver(this);
+    await _peripheralStateSubscription.cancel();
+    await _advertisingStateChanges.close();
+    await stopScan();
+    try {
+      await stopAdvertising();
+    } catch (_) {
+      // The platform may already have released its adapter.
+    }
+  }
 }

@@ -91,7 +91,20 @@ class AttendanceController extends Notifier<AttendanceWorkflow> {
       final session = await ref
           .read(attendanceRepositoryProvider)
           .getSession(sessionId);
-      if (session == null ||
+      if (session == null) {
+        throw const NoActiveAttendanceSessionException();
+      }
+      if (session.status == AttendanceSessionStatus.scanning &&
+          session.endedAt != null) {
+        await ref.read(attendanceRepositoryProvider).finishScan(sessionId);
+        state = AttendanceWorkflow(
+          state: AttendanceWorkflowState.review,
+          sessionId: sessionId,
+        );
+        return;
+      }
+      final isReviewSession = session.status == AttendanceSessionStatus.review;
+      if (!isReviewSession &&
           session.status != AttendanceSessionStatus.scanning) {
         throw StateError('This attendance session is not open for scanning.');
       }
@@ -103,6 +116,9 @@ class AttendanceController extends Notifier<AttendanceWorkflow> {
       }
       final devices = await ref.read(deviceRepositoryProvider).getDevices();
       final settings = await ref.read(settingsRepositoryProvider).getSettings();
+      if (isReviewSession) {
+        await ref.read(attendanceRepositoryProvider).resumeScan(sessionId);
+      }
       _persistedDetections.clear();
       state = AttendanceWorkflow(
         state: AttendanceWorkflowState.scanning,
@@ -148,6 +164,7 @@ class AttendanceController extends Notifier<AttendanceWorkflow> {
       progress: update.progress,
       discoveredDevices: update.discoveredDevices,
       unknownDeviceCount: update.unknownDeviceCount,
+      error: state.error,
     );
     for (final device in update.discoveredDevices) {
       final studentId = device.ownerStudentId;
@@ -175,6 +192,7 @@ class AttendanceController extends Notifier<AttendanceWorkflow> {
     final sessionId = state.sessionId;
     if (sessionId == null || _finishing) return;
     if (state.state == AttendanceWorkflowState.review) return;
+    final scanError = state.error;
     _finishing = true;
     try {
       await ref.read(bleServiceProvider).stopScan();
@@ -187,6 +205,7 @@ class AttendanceController extends Notifier<AttendanceWorkflow> {
         progress: state.progress,
         discoveredDevices: state.discoveredDevices,
         unknownDeviceCount: state.unknownDeviceCount,
+        error: scanError,
       );
     } catch (error) {
       state = AttendanceWorkflow(
@@ -201,8 +220,10 @@ class AttendanceController extends Notifier<AttendanceWorkflow> {
   }
 
   Future<void> finalize(String sessionId) async {
-    if (state.sessionId != sessionId ||
-        state.state != AttendanceWorkflowState.review) {
+    final session = await ref
+        .read(attendanceRepositoryProvider)
+        .getSession(sessionId);
+    if (session?.status != AttendanceSessionStatus.review) {
       throw StateError('Attendance must be reviewed before it is finalized.');
     }
     state = AttendanceWorkflow(
@@ -247,6 +268,9 @@ class AttendanceController extends Notifier<AttendanceWorkflow> {
     }
     if (text.contains('off')) {
       return 'Bluetooth is off. Turn on Bluetooth and try again.';
+    }
+    if (text.contains('unsupported')) {
+      return 'Bluetooth Low Energy is unavailable on this device.';
     }
     return 'We could not start Bluetooth scanning. Check Bluetooth and try again.';
   }

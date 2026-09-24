@@ -94,6 +94,17 @@ GoRouter createAppRouter({TeacherSession? session}) {
                         builder: (context, state) => StudentListScreen(
                           classId: state.pathParameters['classId'] ?? '',
                         ),
+                        routes: [
+                          GoRoute(
+                            path: ':studentId',
+                            name: AppRoutes.teacherStudentDetails,
+                            builder: (context, state) => StudentDetailsScreen(
+                              classId: state.pathParameters['classId'] ?? '',
+                              studentId:
+                                  state.pathParameters['studentId'] ?? '',
+                            ),
+                          ),
+                        ],
                       ),
                       GoRoute(
                         path: 'edit',

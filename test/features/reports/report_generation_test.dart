@@ -109,10 +109,20 @@ void main() {
       students: [student],
     );
 
+    final classCsv = utf8.decode(csv.classAttendance(classReport));
     expect(
-      utf8.decode(csv.classAttendance(classReport)),
-      contains('"T-001","Ana ""María"",\nSantos","2026-09-24"'),
+      classCsv,
+      contains('"Student Number","Student Name","Class","Subject","Section"'),
     );
+    expect(
+      classCsv,
+      contains('"GRADE12-STEM A","Filipino, Language","STEM A","2026-09-24"'),
+    );
+    expect(classCsv.split('\r\n'), hasLength(3));
+    expect(classReport.students.single.presentCount, 1);
+    expect(classReport.students.single.attendancePercent, 100);
+    expect(studentReport.present, 1);
+    expect(studentReport.attendancePercent, 100);
     expect(
       utf8.decode(csv.studentAttendance(studentReport)),
       contains('"Attendance Percentage"'),
@@ -139,7 +149,9 @@ void main() {
             id: 'student-$index',
             updatedAt: now,
             syncStatus: SyncStatus.synced,
-            name: 'Student $index',
+            name: index == 0
+                ? 'María ${List.filled(12, 'Dela Cruz').join(' ')}'
+                : 'Student $index',
             studentNumber: 'T-${index.toString().padLeft(3, '0')}',
             classId: section.id,
             gradeLevel: 'Grade 12',
@@ -251,7 +263,7 @@ void main() {
     expect(String.fromCharCodes(rosterBytes.take(5)), '%PDF-');
   });
 
-  test('report filenames are readable and omit database identifiers', () {
+  test('report filenames sanitize separators and long or empty names', () {
     final name = ReportFileName.create(
       reportType: 'class attendance',
       subject: 'GRADE12-STEM A',
@@ -260,5 +272,36 @@ void main() {
     );
     expect(name, 'classattend_class_attendance_grade12_stem_a_20260924.csv');
     expect(name, isNot(contains('internal-id')));
+
+    final specialCharacters = ReportFileName.create(
+      reportType: 'student/attendance',
+      subject: 'Grade 12: STEM / Filipinoñ',
+      date: now,
+      format: ReportFormat.pdf,
+    );
+    expect(
+      specialCharacters,
+      'classattend_student_attendance_grade_12_stem_filipino_20260924.pdf',
+    );
+    expect(specialCharacters, isNot(contains('/')));
+    expect(specialCharacters, isNot(contains(':')));
+
+    final longName = ReportFileName.create(
+      reportType: 'session',
+      subject: List.filled(400, 'Very long class name ').join(),
+      date: now,
+      format: ReportFormat.pdf,
+    );
+    expect(longName.length, lessThan(255));
+
+    expect(
+      ReportFileName.create(
+        reportType: '',
+        subject: '',
+        date: now,
+        format: ReportFormat.pdf,
+      ),
+      'classattend_report_report_20260924.pdf',
+    );
   });
 }

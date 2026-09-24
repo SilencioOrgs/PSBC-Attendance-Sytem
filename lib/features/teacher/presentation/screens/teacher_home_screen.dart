@@ -157,11 +157,16 @@ class TeacherHomeScreen extends ConsumerWidget {
                 final active = sessions.value
                     ?.where(
                       (session) =>
-                          session.status == AttendanceSessionStatus.scanning,
+                          session.status == AttendanceSessionStatus.scanning ||
+                          session.status == AttendanceSessionStatus.review,
                     )
                     .firstOrNull;
+                final needsReview =
+                    active?.status == AttendanceSessionStatus.review;
                 final label = active != null
-                    ? 'Continue Attendance'
+                    ? needsReview
+                          ? 'Review Attendance'
+                          : 'Continue Attendance'
                     : list.isEmpty
                     ? 'Create Class'
                     : 'Start Attendance';
@@ -179,7 +184,9 @@ class TeacherHomeScreen extends ConsumerWidget {
                           children: [
                             Text(
                               active != null
-                                  ? 'Attendance is in progress'
+                                  ? needsReview
+                                        ? 'Attendance needs review'
+                                        : 'Attendance is in progress'
                                   : list.isEmpty
                                   ? 'Create a class to begin'
                                   : 'Ready to take attendance?',
@@ -201,7 +208,9 @@ class TeacherHomeScreen extends ConsumerWidget {
                         onPressed: () {
                           if (active != null) {
                             context.pushNamed(
-                              AppRoutes.bleScanner,
+                              needsReview
+                                  ? AppRoutes.attendanceResults
+                                  : AppRoutes.bleScanner,
                               pathParameters: {'sessionId': active.id},
                             );
                           } else if (list.isEmpty) {

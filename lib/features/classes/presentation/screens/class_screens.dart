@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/router/route_names.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/ble_identity.dart';
 import '../../../../core/utils/iterable_extensions.dart';
 import '../../../../core/widgets/app_widgets.dart';
 import '../../../attendance/presentation/providers/attendance_provider.dart';
@@ -167,6 +168,13 @@ class ClassDetailsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final sessionsAsync = ref.watch(attendanceHistoryProvider);
+    final hasCompletedSessions =
+        sessionsAsync.asData?.value.any(
+          (item) =>
+              item.classId == classId &&
+              item.status == AttendanceSessionStatus.completed,
+        ) ==
+        true;
     return PageScaffold(
       title: 'Class details',
       showBack: true,
@@ -175,16 +183,18 @@ class ClassDetailsScreen extends ConsumerWidget {
         children: [
           IconButton(
             tooltip: 'Export class attendance',
-            onPressed: () => exportReportFlow(
-              context: context,
-              export: (format, action) => ref
-                  .read(reportExportControllerProvider.notifier)
-                  .export(
-                    request: ClassAttendanceRequest(classId),
-                    format: format,
-                    action: action,
-                  ),
-            ),
+            onPressed: hasCompletedSessions
+                ? () => exportReportFlow(
+                    context: context,
+                    export: (format, action) => ref
+                        .read(reportExportControllerProvider.notifier)
+                        .export(
+                          request: ClassAttendanceRequest(classId),
+                          format: format,
+                          action: action,
+                        ),
+                  )
+                : null,
             icon: const Icon(Icons.ios_share_outlined),
           ),
           IconButton(
@@ -202,7 +212,9 @@ class ClassDetailsScreen extends ConsumerWidget {
                 context: context,
                 builder: (context) => AlertDialog(
                   title: const Text('Delete class?'),
-                  content: const Text('This action cannot be undone.'),
+                  content: const Text(
+                    'Deleting this class removes its enrollments and all of its attendance sessions and records from this device. This cannot be undone.',
+                  ),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(context, false),
@@ -293,11 +305,17 @@ class ClassDetailsScreen extends ConsumerWidget {
                     sessionsAsync.when(
                       data: (sessions) {
                         final classSession = sessions
-                            .where((item) => item.classId == classId)
+                            .where(
+                              (item) =>
+                                  item.classId == classId &&
+                                  item.status ==
+                                      AttendanceSessionStatus.completed,
+                            )
                             .firstOrNull;
                         if (classSession == null) {
-                          return const _ClassError(
-                            message: 'No attendance session has been recorded for this class.',
+                          return const HelpfulEmptyState(
+                            title: 'No attendance data',
+                            message: 'There are no completed attendance sessions for this class yet.',
                           );
                         }
                         return ref
@@ -466,6 +484,182 @@ class ClassDetailsScreen extends ConsumerWidget {
   }
 }
 
+/// Teacher view of a student's attendance history and summary.
+class StudentDetailsScreen extends ConsumerWidget {
+  const StudentDetailsScreen({
+    super.key,
+    required this.classId,
+    required this.studentId,
+  });
+
+  final String classId;
+  final String studentId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final reportAsync = ref.watch(
+      studentAttendanceReportProvider((classId: classId, studentId: studentId)),
+    );
+    final report = reportAsync.asData?.value;
+    return PageScaffold(
+      title: 'Student details',
+      showBack: true,
+      trailing: IconButton(
+        tooltip: report?.rows.isNotEmpty == true
+            ? 'Export student attendance'
+            : 'No attendance records to export',
+        onPressed: report?.rows.isNotEmpty == true
+            ? () => exportReportFlow(
+                context: context,
+                export: (format, action) => ref
+                    .read(reportExportControllerProvider.notifier)
+                    .export(
+                      request: StudentAttendanceRequest(
+                        classId: classId,
+                        studentId: studentId,
+                      ),
+                      format: format,
+                      action: action,
+                    ),
+              )
+            : null,
+        icon: const Icon(Icons.ios_share_outlined),
+      ),
+      body: reportAsync.when(
+        data: (value) => Column(
+          children: [
+            const SizedBox(height: Spacing.sm),
+            SectionCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    value.student.name,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: Spacing.xs),
+                  Text(value.student.studentNumber),
+                  Text(
+                    '${value.section.name} · ${value.section.subject}',
+                    style: Theme.of(context).textTheme.bodySmall
+                        ?.copyWith(color: AppColors.muted),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: Spacing.md),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                const gap = Spacing.sm;
+                final width = (constraints.maxWidth - gap) / 2;
+                return Wrap(
+                  spacing: gap,
+                  runSpacing: gap,
+                  children: [
+                    SizedBox(
+                      width: width,
+                      child: MetricStatCard(
+                        label: 'Total sessions',
+                        value: '${value.totalSessions}',
+                        icon: Icons.event_note_outlined,
+                      ),
+                    ),
+                    SizedBox(
+                      width: width,
+                      child: MetricStatCard(
+                        label: 'Attendance',
+                        value: '${value.attendancePercent.toStringAsFixed(1)}%',
+                        icon: Icons.percent,
+                      ),
+                    ),
+                    SizedBox(
+                      width: width,
+                      child: MetricStatCard(
+                        label: 'Present',
+                        value: '${value.present}',
+                        icon: Icons.check_circle_outline,
+                        color: AppColors.success,
+                      ),
+                    ),
+                    SizedBox(
+                      width: width,
+                      child: MetricStatCard(
+                        label: 'Absent',
+                        value: '${value.absent}',
+                        icon: Icons.person_off_outlined,
+                        color: AppColors.danger,
+                      ),
+                    ),
+                    SizedBox(
+                      width: width,
+                      child: MetricStatCard(
+                        label: 'Not detected',
+                        value: '${value.notDetected}',
+                        icon: Icons.help_outline,
+                        color: AppColors.warning,
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: Spacing.lg),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Attendance history',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+            ),
+            const SizedBox(height: Spacing.sm),
+            Expanded(
+              child: value.rows.isEmpty
+                  ? const HelpfulEmptyState(
+                      title: 'No attendance records',
+                      message: 'This student has no completed attendance records for this class.',
+                    )
+                  : ListView.separated(
+                      itemCount: value.rows.length,
+                      separatorBuilder: (context, index) =>
+                          const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        final row = value.rows[index];
+                        final attendance = row.session?.startedAt;
+                        final status = switch (row.status) {
+                          AttendanceRecordStatus.present ||
+                          AttendanceRecordStatus.manualPresent =>
+                            AttendanceStatus.present,
+                          AttendanceRecordStatus.absent ||
+                          AttendanceRecordStatus.manualAbsent =>
+                            AttendanceStatus.absent,
+                          AttendanceRecordStatus.notDetected =>
+                            AttendanceStatus.pending,
+                        };
+                        return PersonListTile(
+                          name: value.section.name,
+                          subtitle: attendance == null
+                              ? 'Session date unavailable'
+                              : '${attendance.day}/${attendance.month}/${attendance.year}',
+                          status: status,
+                          trailing: StatusPill(
+                            status: status,
+                            label: row.statusLabel,
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, stack) => const _ClassError(
+          message: 'Student attendance could not be loaded.',
+        ),
+      ),
+    );
+  }
+}
+
 /// Class roster with registration status for each student.
 class StudentListScreen extends ConsumerStatefulWidget {
   const StudentListScreen({super.key, required this.classId});
@@ -501,10 +695,22 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
               onTap: () => Navigator.pop(context, 'edit'),
             ),
             ListTile(
-              leading: const Icon(Icons.ios_share_outlined),
-              title: const Text('Export student report'),
-              onTap: () => Navigator.pop(context, 'export'),
+              leading: Icon(
+                student.deviceRegistered
+                    ? Icons.phonelink_setup_outlined
+                    : Icons.bluetooth_outlined,
+              ),
+              title: Text(
+                student.deviceRegistered ? 'Replace device' : 'Register device',
+              ),
+              onTap: () => Navigator.pop(context, 'device'),
             ),
+            if (student.deviceRegistered)
+              ListTile(
+                leading: const Icon(Icons.bluetooth_disabled),
+                title: const Text('Remove device'),
+                onTap: () => Navigator.pop(context, 'remove-device'),
+              ),
             ListTile(
               leading: const Icon(Icons.person_remove_outlined),
               title: const Text('Remove from class'),
@@ -519,20 +725,12 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
       await _edit(student);
     }
     if (!mounted) return;
-    if (action == 'export') {
-      await exportReportFlow(
-        context: context,
-        export: (format, destination) => ref
-            .read(reportExportControllerProvider.notifier)
-            .export(
-              request: StudentAttendanceRequest(
-                classId: widget.classId,
-                studentId: student.id,
-              ),
-              format: format,
-              action: destination,
-            ),
-      );
+    if (action == 'device') {
+      await _registerDevice(student);
+      return;
+    }
+    if (action == 'remove-device') {
+      await _removeDevice(student);
       return;
     }
     if (action == 'remove') {
@@ -570,6 +768,163 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
     }
   }
 
+  Future<void> _registerDevice(Student student) async {
+    if (student.deviceRegistered) {
+      final replace = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Replace registered device?'),
+          content: const Text(
+            'The old device will no longer be accepted for attendance.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Continue'),
+            ),
+          ],
+        ),
+      );
+      if (replace != true || !mounted) return;
+    }
+
+    final code = TextEditingController();
+    final name = TextEditingController(text: 'Student phone');
+    String? error;
+    try {
+      final values = await showDialog<List<String>>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: Text(
+              student.deviceRegistered
+                  ? 'Register replacement device'
+                  : 'Register student device',
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: code,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  decoration: InputDecoration(
+                    labelText: 'Device sharing code',
+                    helperText: 'Enter the UUID shown on the student device.',
+                    errorText: error,
+                  ),
+                ),
+                const SizedBox(height: Spacing.sm),
+                TextField(
+                  controller: name,
+                  decoration: const InputDecoration(labelText: 'Device name'),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  if (normalizeBleIdentity(code.text) == null) {
+                    setDialogState(
+                      () => error = 'Enter a valid device sharing code.',
+                    );
+                    return;
+                  }
+                  Navigator.pop(dialogContext, [code.text, name.text]);
+                },
+                child: const Text('Save device'),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (values == null || !mounted) return;
+      final controller = ref.read(studentManagementControllerProvider.notifier);
+      if (student.deviceRegistered) {
+        await controller.replaceDevice(
+          widget.classId,
+          student.id,
+          deviceName: values[1],
+          bleUuid: values[0],
+        );
+      } else {
+        await controller.registerDevice(
+          widget.classId,
+          student.id,
+          deviceName: values[1],
+          bleUuid: values[0],
+        );
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              student.deviceRegistered
+                  ? 'Student device replaced.'
+                  : 'Student device registered.',
+            ),
+          ),
+        );
+      }
+    } on RepositoryException catch (exception) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(exception.message)));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to register this device.')),
+        );
+      }
+    } finally {
+      code.dispose();
+      name.dispose();
+    }
+  }
+
+  Future<void> _removeDevice(Student student) async {
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove registered device?'),
+        content: const Text(
+          'This device will no longer be accepted for attendance.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Remove device'),
+          ),
+        ],
+      ),
+    );
+    if (accepted != true || !mounted) return;
+    try {
+      await ref
+          .read(studentManagementControllerProvider.notifier)
+          .removeDevice(widget.classId, student.id);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to remove this device.')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) => PageScaffold(
     title: 'Student list',
@@ -578,17 +933,33 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
       mainAxisSize: MainAxisSize.min,
       children: [
         IconButton(
-          tooltip: 'Export class roster',
-          onPressed: () => exportReportFlow(
-            context: context,
-            export: (format, action) => ref
-                .read(reportExportControllerProvider.notifier)
-                .export(
-                  request: ClassRosterRequest(widget.classId),
-                  format: format,
-                  action: action,
-                ),
-          ),
+          tooltip:
+              ref
+                      .watch(classRosterProvider(widget.classId))
+                      .asData
+                      ?.value
+                      .isNotEmpty ==
+                  true
+              ? 'Export class roster'
+              : 'No students enrolled',
+          onPressed:
+              ref
+                      .watch(classRosterProvider(widget.classId))
+                      .asData
+                      ?.value
+                      .isNotEmpty ==
+                  true
+              ? () => exportReportFlow(
+                  context: context,
+                  export: (format, action) => ref
+                      .read(reportExportControllerProvider.notifier)
+                      .export(
+                        request: ClassRosterRequest(widget.classId),
+                        format: format,
+                        action: action,
+                      ),
+                )
+              : null,
           icon: const Icon(Icons.ios_share_outlined),
         ),
         IconButton(
@@ -687,7 +1058,13 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
                               status: student.deviceRegistered
                                   ? AttendanceStatus.registered
                                   : AttendanceStatus.unverified,
-                              onTap: () => _actions(student),
+                              onTap: () => context.pushNamed(
+                                AppRoutes.teacherStudentDetails,
+                                pathParameters: {
+                                  'classId': widget.classId,
+                                  'studentId': student.id,
+                                },
+                              ),
                               trailing: IconButton(
                                 tooltip: 'Student actions',
                                 onPressed: () => _actions(student),

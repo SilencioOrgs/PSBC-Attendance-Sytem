@@ -1,14 +1,20 @@
 import '../../domain/models.dart';
+import '../../core/utils/ble_identity.dart';
 
 /// Matches advertised BLE service identifiers to teacher-registered students.
 class BleDeviceMapper {
   const BleDeviceMapper._();
 
-  static Map<String, Device> targets(Iterable<Device> devices) => {
-    for (final device in devices)
-      if (device.ownerStudentId != null && _isUuid(device.address))
-        device.address.toLowerCase(): device,
-  };
+  static Map<String, Device> targets(Iterable<Device> devices) {
+    final targets = <String, Device>{};
+    for (final device in devices) {
+      final identity = normalizeBleIdentity(device.bleUuid);
+      if (device.ownerStudentId != null && identity != null) {
+        targets[identity] = device;
+      }
+    }
+    return targets;
+  }
 
   static Device? matchAdvertisement({
     required Iterable<String> serviceUuids,
@@ -18,7 +24,9 @@ class BleDeviceMapper {
     required DateTime detectedAt,
   }) {
     for (final serviceUuid in serviceUuids) {
-      final device = targets[serviceUuid.toLowerCase()];
+      final identity = normalizeBleIdentity(serviceUuid);
+      if (identity == null) continue;
+      final device = targets[identity];
       final studentId = device?.ownerStudentId;
       if (device == null ||
           studentId == null ||
@@ -30,10 +38,8 @@ class BleDeviceMapper {
         updatedAt: detectedAt,
         syncStatus: device.syncStatus,
         name: device.name,
-        address: device.address,
+        bleUuid: device.bleUuid,
         ownerStudentId: studentId,
-        isConnected: true,
-        lastSeenAt: detectedAt,
         deviceModel: device.deviceModel,
         registeredAt: device.registeredAt,
         rssi: rssi,
@@ -41,8 +47,4 @@ class BleDeviceMapper {
     }
     return null;
   }
-
-  static bool _isUuid(String value) => RegExp(
-    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
-  ).hasMatch(value);
 }

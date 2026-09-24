@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import '../../../core/utils/section_code.dart';
+import '../../../core/utils/ble_identity.dart';
 import '../../../domain/models.dart';
 import '../../../domain/repositories.dart';
 import '../../../services/storage/app_database.dart';
@@ -39,47 +40,7 @@ class DriftStudentRepository implements StudentRepository {
       throw const DuplicateStudentNumberException();
     }
 
-    var section = await _db.classDao.getByCode(normalizedCode);
-    if (section == null) {
-      // Separate student and teacher phones have independent offline databases.
-      // Keep the student's declared section locally; the teacher confirms the
-      // code when adding the student to their own roster.
-      final teacher = await _db.teacherDao.getTeacherOrNull();
-      final teacherId = teacher?.id ?? newDatabaseId();
-      final sectionId = newDatabaseId();
-      final now = DateTime.now();
-      if (teacher == null) {
-        await _db.teacherDao.save(
-          TeachersCompanion.insert(
-            id: teacherId,
-            updatedAt: now,
-            syncStatus: SyncStatus.pendingCreate,
-            name: 'Local enrollment metadata',
-          ),
-        );
-      }
-      await _db.classDao.insert(
-        ClassSectionsCompanion.insert(
-          id: sectionId,
-          updatedAt: now,
-          syncStatus: SyncStatus.pendingCreate,
-          gradeLevel: parsed.gradeLevel,
-          sectionLabel: parsed.sectionLabel,
-          sectionCode: normalizedCode,
-          subject: const Value('Awaiting teacher details'),
-          room: 'Not provided',
-          scheduleStart: DateTime(2000),
-          scheduleEnd: DateTime(2000),
-          bleBeaconId: '',
-          teacherId: teacherId,
-        ),
-      );
-      section = await _db.classDao.getClass(sectionId);
-    }
-    final registeredSection = section;
-    if (registeredSection == null) {
-      throw const ClassSectionNotFoundException();
-    }
+    final section = await _db.classDao.getByCode(normalizedCode);
 
     final id = newDatabaseId();
     final enrollmentId = newDatabaseId();
@@ -95,17 +56,20 @@ class DriftStudentRepository implements StudentRepository {
             studentNumber: studentNumber.trim(),
             fullName: name.trim(),
             isCurrent: const Value(true),
+            declaredSectionCode: Value(normalizedCode),
           ),
         );
-        await _db.enrollmentDao.insert(
-          EnrollmentsCompanion.insert(
-            id: enrollmentId,
-            updatedAt: now,
-            syncStatus: SyncStatus.pendingCreate,
-            studentId: id,
-            classSectionId: registeredSection.id,
-          ),
-        );
+        if (section != null) {
+          await _db.enrollmentDao.insert(
+            EnrollmentsCompanion.insert(
+              id: enrollmentId,
+              updatedAt: now,
+              syncStatus: SyncStatus.pendingCreate,
+              studentId: id,
+              classSectionId: section.id,
+            ),
+          );
+        }
       });
     } catch (error) {
       if (error.toString().contains(
@@ -121,9 +85,10 @@ class DriftStudentRepository implements StudentRepository {
       syncStatus: SyncStatus.pendingCreate,
       name: name.trim(),
       studentNumber: studentNumber.trim(),
-      classId: registeredSection.id,
+      classId: section?.id ?? '',
       gradeLevel: 'Grade ${parsed.gradeLevel}',
       deviceRegistered: false,
+      sectionCode: normalizedCode,
     );
   }
 
@@ -140,7 +105,10 @@ class DriftStudentRepository implements StudentRepository {
     if (await _db.studentDao.byNumber(studentNumber.trim()) != null) {
       throw const DuplicateStudentNumberException();
     }
-    if (bleUuid?.trim().isNotEmpty == true && !_isUuid(bleUuid!.trim())) {
+    final normalizedBleUuid = bleUuid?.trim().isNotEmpty == true
+        ? normalizeBleIdentity(bleUuid!)
+        : null;
+    if (bleUuid?.trim().isNotEmpty == true && normalizedBleUuid == null) {
       throw const InvalidBleUuidException();
     }
     final section = await _db.classDao.getClass(classId);
@@ -175,7 +143,7 @@ class DriftStudentRepository implements StudentRepository {
               updatedAt: now,
               syncStatus: SyncStatus.pendingCreate,
               studentId: id,
-              bleUuid: bleUuid!.trim(),
+              bleUuid: normalizedBleUuid!,
               deviceModel: 'Student device',
               registeredAt: now,
             ),
@@ -197,10 +165,6 @@ class DriftStudentRepository implements StudentRepository {
     final student = (await _db.studentDao.getOne(id))!;
     return student;
   }
-
-  bool _isUuid(String value) => RegExp(
-    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
-  ).hasMatch(value);
 
   @override
   Future<Student> updateStudent({

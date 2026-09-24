@@ -41,18 +41,41 @@ class CsvReportGenerator {
     const [
       'Student Number',
       'Student Name',
+      'Class',
+      'Subject',
+      'Section',
       'Session Date',
+      'Session Start',
+      'Session End',
       'Status',
       'Detection Method',
+      'Detected At',
+      'Manual Override',
     ],
     for (final student in report.students)
       for (var index = 0; index < report.sessions.length; index++)
         [
           student.student.studentNumber,
           student.student.name,
+          report.section.name,
+          report.section.subject,
+          report.section.sectionLabel,
           _date(report.sessions[index].startedAt),
+          _time(report.sessions[index].startedAt),
+          report.sessions[index].endedAt == null
+              ? ''
+              : _time(report.sessions[index].endedAt!),
           _status(student.records[index]?.recordStatus),
           _method(student.records[index]?.recordStatus),
+          student.records[index]?.detectedAt == null
+              ? ''
+              : _dateTime(student.records[index]!.detectedAt!),
+          student.records[index]?.recordStatus ==
+                      AttendanceRecordStatus.manualPresent ||
+                  student.records[index]?.recordStatus ==
+                      AttendanceRecordStatus.manualAbsent
+              ? 'Yes'
+              : 'No',
         ],
   ]);
 

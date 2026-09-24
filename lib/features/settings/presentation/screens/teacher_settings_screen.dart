@@ -9,6 +9,7 @@ import '../../../../core/utils/input_formatters.dart';
 import '../../../../core/utils/teacher_pin.dart';
 import '../../../../core/widgets/app_widgets.dart';
 import '../../../../domain/models.dart';
+import '../../../../domain/repositories.dart';
 import '../../../authentication/application/teacher_auth_service.dart';
 import '../../../device/presentation/providers/device_provider.dart';
 import '../../../teacher/presentation/providers/teacher_provider.dart';
@@ -303,6 +304,23 @@ class TeacherSettingsScreen extends ConsumerWidget {
     if (accepted != true) return;
     try {
       await ref.read(settingsControllerProvider.notifier).logout();
+    } on ActiveAttendanceSessionException catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              'Attendance is still active. Review or cancel it before logging out.',
+            ),
+            action: SnackBarAction(
+              label: 'Review',
+              onPressed: () => context.pushNamed(
+                AppRoutes.attendanceResults,
+                pathParameters: {'sessionId': error.sessionId},
+              ),
+            ),
+          ),
+        );
+      }
     } catch (_) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

@@ -2,7 +2,9 @@ import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/utils/section_code.dart';
 import '../../domain/models.dart' as domain;
+import '../../domain/repositories.dart' as domain_repositories;
 
 part 'app_database.g.dart';
 
@@ -60,6 +62,7 @@ class Students extends Table {
   TextColumn get studentNumber => text().unique()();
   TextColumn get fullName => text()();
   BoolColumn get isCurrent => boolean().withDefault(const Constant(false))();
+  TextColumn get declaredSectionCode => text().nullable()();
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -192,13 +195,46 @@ class AppDatabase extends _$AppDatabase {
     : super(executor ?? driftDatabase(name: 'classattend'));
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (m) async => m.createAll(),
     onUpgrade: (m, from, to) async {
-      // Add one additive migration block per future schema version.
+      if (from < 2) {
+        await m.addColumn(students, students.declaredSectionCode);
+        await customStatement('''
+          UPDATE students
+          SET declared_section_code = (
+            SELECT class_sections.section_code
+            FROM enrollments
+            INNER JOIN class_sections
+              ON class_sections.id = enrollments.class_section_id
+            WHERE enrollments.student_id = students.id
+            LIMIT 1
+          )
+          WHERE declared_section_code IS NULL
+        ''');
+        await customStatement('''
+          DELETE FROM enrollments
+          WHERE class_section_id IN (
+            SELECT id FROM class_sections
+            WHERE subject = 'Awaiting teacher details'
+          )
+        ''');
+        await customStatement('''
+          DELETE FROM class_sections
+          WHERE subject = 'Awaiting teacher details'
+        ''');
+        await customStatement('''
+          DELETE FROM teachers
+          WHERE name = 'Local enrollment metadata'
+            AND NOT EXISTS (
+              SELECT 1 FROM class_sections
+              WHERE class_sections.teacher_id = teachers.id
+            )
+        ''');
+      }
     },
     beforeOpen: (details) async => customStatement('PRAGMA foreign_keys = ON'),
   );
@@ -249,6 +285,7 @@ class StudentDao extends DatabaseAccessor<AppDatabase> with _$StudentDaoMixin {
       classId: section.id,
       gradeLevel: 'Grade ${section.gradeLevel}',
       deviceRegistered: device != null,
+      sectionCode: section.sectionCode,
     );
   }
 
@@ -261,17 +298,50 @@ class StudentDao extends DatabaseAccessor<AppDatabase> with _$StudentDaoMixin {
           .watch()
           .map((rows) => rows.isEmpty ? null : _map(rows.first));
   Future<domain.Student?> getOne(String id) async {
-    final rows = await _joined(studentId: id).get();
-    return rows.isEmpty ? null : _map(rows.first);
+    final query = select(students).join([
+      leftOuterJoin(enrollments, enrollments.studentId.equalsExp(students.id)),
+      leftOuterJoin(
+        classSections,
+        classSections.id.equalsExp(enrollments.classSectionId),
+      ),
+      leftOuterJoin(devices, devices.studentId.equalsExp(students.id)),
+    ])..where(students.id.equals(id));
+    final rows = await query.get();
+    if (rows.isEmpty) return null;
+    final row = rows.first;
+    final student = row.readTable(students);
+    final section = row.readTableOrNull(classSections);
+    final sectionCode =
+        section?.sectionCode ?? student.declaredSectionCode ?? '';
+    final parsedSection = parseSectionCode(sectionCode);
+    return domain.Student(
+      id: student.id,
+      updatedAt: student.updatedAt,
+      syncStatus: student.syncStatus,
+      name: student.fullName,
+      studentNumber: student.studentNumber,
+      classId: section?.id ?? '',
+      gradeLevel: section != null
+          ? 'Grade ${section.gradeLevel}'
+          : parsedSection == null
+          ? ''
+          : 'Grade ${parsedSection.gradeLevel}',
+      deviceRegistered: row.readTableOrNull(devices) != null,
+      sectionCode: sectionCode,
+    );
   }
 
   Stream<domain.Student?> watchCurrent() =>
-      _joined(currentOnly: true)
-          .watch()
-          .map((rows) => rows.isEmpty ? null : _map(rows.first));
+      (select(
+        students,
+      )..where((row) => row.isCurrent.equals(true))).watch().asyncMap(
+        (rows) async => rows.isEmpty ? null : getOne(rows.first.id),
+      );
   Future<domain.Student?> getCurrent() async {
-    final rows = await _joined(currentOnly: true).get();
-    return rows.isEmpty ? null : _map(rows.first);
+    final row = await (select(
+      students,
+    )..where((student) => student.isCurrent.equals(true))).getSingleOrNull();
+    return row == null ? null : getOne(row.id);
   }
 
   Future<domain.Student?> byNumber(String number) async {
@@ -394,6 +464,18 @@ class ClassDao extends DatabaseAccessor<AppDatabase> with _$ClassDaoMixin {
       classSections,
     )..where((t) => t.sectionCode.equals(code))).getSingleOrNull();
     return row == null ? null : getClass(row.id);
+  }
+
+  Stream<domain.ClassSection?> watchByCode(String code) {
+    final query = _classCountQuery()
+      ..where(classSections.sectionCode.equals(code));
+    return query.watch().map((rows) {
+      if (rows.isEmpty) return null;
+      return _map(
+        rows.first.readTable(classSections),
+        rows.where((row) => row.readTableOrNull(enrollments) != null).length,
+      );
+    });
   }
 
   Stream<List<domain.Student>> watchStudents(String classId) =>
@@ -645,21 +727,47 @@ class AttendanceDao extends DatabaseAccessor<AppDatabase>
   }
 
   Future<void> finishScan(String id) async {
+    await transaction(() async {
+      final session = await (select(
+        attendanceSessions,
+      )..where((row) => row.id.equals(id))).getSingleOrNull();
+      if (session == null ||
+          session.status != domain.AttendanceSessionStatus.scanning) {
+        return;
+      }
+      final now = DateTime.now();
+      await (update(
+        attendanceSessions,
+      )..where((row) => row.id.equals(id))).write(
+        AttendanceSessionsCompanion(
+          status: const Value(domain.AttendanceSessionStatus.review),
+          endedAt: Value(session.endedAt ?? now),
+          updatedAt: Value(now),
+          syncStatus: const Value(domain.SyncStatus.pendingUpdate),
+        ),
+      );
+    });
+  }
+
+  Future<void> resumeScan(String id) async {
     final now = DateTime.now();
-    final session = await (select(
-      attendanceSessions,
-    )..where((row) => row.id.equals(id))).getSingleOrNull();
-    if (session == null ||
-        session.status != domain.AttendanceSessionStatus.scanning) {
-      return;
+    final changed =
+        await (update(attendanceSessions)..where(
+              (row) =>
+                  row.id.equals(id) &
+                  row.status.equals(domain.AttendanceSessionStatus.review.name),
+            ))
+            .write(
+              AttendanceSessionsCompanion(
+                status: const Value(domain.AttendanceSessionStatus.scanning),
+                endedAt: const Value(null),
+                updatedAt: Value(now),
+                syncStatus: const Value(domain.SyncStatus.pendingUpdate),
+              ),
+            );
+    if (changed == 0) {
+      throw const domain_repositories.NoActiveAttendanceSessionException();
     }
-    await (update(attendanceSessions)..where((row) => row.id.equals(id))).write(
-      AttendanceSessionsCompanion(
-        endedAt: Value(now),
-        updatedAt: Value(now),
-        syncStatus: const Value(domain.SyncStatus.pendingUpdate),
-      ),
-    );
   }
 
   Future<void> cancelSession(String id) async {
@@ -668,7 +776,8 @@ class AttendanceDao extends DatabaseAccessor<AppDatabase>
         attendanceSessions,
       )..where((row) => row.id.equals(id))).getSingleOrNull();
       if (session == null ||
-          session.status != domain.AttendanceSessionStatus.scanning) {
+          session.status != domain.AttendanceSessionStatus.scanning &&
+              session.status != domain.AttendanceSessionStatus.review) {
         return;
       }
       final now = DateTime.now();
@@ -691,7 +800,7 @@ class AttendanceDao extends DatabaseAccessor<AppDatabase>
         attendanceSessions,
       )..where((row) => row.id.equals(id))).getSingleOrNull();
       if (session == null ||
-          session.status != domain.AttendanceSessionStatus.scanning) {
+          session.status != domain.AttendanceSessionStatus.review) {
         throw StateError('This attendance session is not open for review.');
       }
       final rows = await (select(
@@ -755,10 +864,8 @@ class DeviceDao extends DatabaseAccessor<AppDatabase> with _$DeviceDaoMixin {
     syncStatus: row.syncStatus,
     name: row.deviceModel,
     deviceModel: row.deviceModel,
-    address: row.bleUuid,
+    bleUuid: row.bleUuid,
     ownerStudentId: row.studentId,
-    isConnected: false,
-    lastSeenAt: null,
     registeredAt: row.registeredAt,
   );
   Future<List<domain.Device>> getAll() =>
@@ -779,6 +886,8 @@ class DeviceDao extends DatabaseAccessor<AppDatabase> with _$DeviceDaoMixin {
   Future<void> insert(DevicesCompanion row) => into(devices).insert(row);
   Future<void> upsert(DevicesCompanion row) =>
       into(devices).insertOnConflictUpdate(row);
+  Future<void> deleteStudentDevice(String studentId) async =>
+      (delete(devices)..where((row) => row.studentId.equals(studentId))).go();
 }
 
 @DriftAccessor(tables: [AppSettingsRows])

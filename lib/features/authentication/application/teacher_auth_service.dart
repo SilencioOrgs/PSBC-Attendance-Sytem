@@ -42,25 +42,22 @@ class TeacherAuthService {
   }
 
   Future<void> logout() async {
-    Object? scanError;
-    try {
+    final activeSessions = (await _attendance.getSessions()).where(
+      (item) =>
+          item.status == AttendanceSessionStatus.scanning ||
+          item.status == AttendanceSessionStatus.review,
+    );
+    if (activeSessions.isNotEmpty) {
       await _ble.stopScan();
-    } catch (error) {
-      scanError = error;
-    }
-
-    try {
-      final sessions = await _attendance.getSessions();
-      for (final session in sessions.where(
+      for (final session in activeSessions.where(
         (item) => item.status == AttendanceSessionStatus.scanning,
       )) {
-        await _attendance.cancelSession(session.id);
+        await _attendance.finishScan(session.id);
       }
-    } finally {
-      _session.lock();
+      throw ActiveAttendanceSessionException(activeSessions.first.id);
     }
-
-    if (scanError != null) throw scanError;
+    await _ble.stopScan();
+    _session.lock();
   }
 }
 

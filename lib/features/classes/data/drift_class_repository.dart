@@ -22,6 +22,9 @@ class DriftClassRepository implements ClassRepository {
   Future<ClassSection?> getClassByCode(String sectionCode) =>
       _db.classDao.getByCode(sectionCode);
   @override
+  Stream<ClassSection?> watchClassByCode(String sectionCode) =>
+      _db.classDao.watchByCode(sectionCode);
+  @override
   Future<List<Student>> getStudents(String classId) =>
       _db.classDao.getStudents(classId);
   @override

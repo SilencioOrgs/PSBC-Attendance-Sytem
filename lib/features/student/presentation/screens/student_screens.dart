@@ -30,6 +30,7 @@ class _StudentSetupScreenState extends ConsumerState<StudentSetupScreen> {
   String? _sectionError;
   String? _studentNumberError;
   bool _isSubmitting = false;
+  bool _registrationSubmitted = false;
 
   @override
   void initState() {
@@ -37,7 +38,9 @@ class _StudentSetupScreenState extends ConsumerState<StudentSetupScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       try {
         final student = await ref.read(currentStudentProvider.future);
-        if (student != null && mounted) context.goNamed(AppRoutes.studentHome);
+        if (student != null && mounted && !_registrationSubmitted) {
+          context.goNamed(AppRoutes.studentHome);
+        }
       } catch (_) {
         // No saved student profile yet.
       }
@@ -59,6 +62,7 @@ class _StudentSetupScreenState extends ConsumerState<StudentSetupScreen> {
       text: normalizedSection,
       selection: TextSelection.collapsed(offset: normalizedSection.length),
     );
+    _registrationSubmitted = true;
     setState(() => _isSubmitting = true);
     try {
       await ref
@@ -319,56 +323,63 @@ class StudentHomeScreen extends ConsumerWidget {
             ),
             const SizedBox(height: Spacing.sm),
             classListAsync.when(
-              data: (section) => section == null
-                  ? const HelpfulEmptyState(
-                      title: 'No classes yet',
-                      message: 'Your enrolled classes will appear here.',
-                    )
-                  : SectionCard(
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.menu_book_outlined,
-                            color: AppColors.primary,
+              data: (section) {
+                if (section == null) {
+                  return studentAsync.when(
+                    data: (student) =>
+                        student == null || student.sectionCode.isEmpty
+                        ? const HelpfulEmptyState(
+                            title: 'No classes yet',
+                            message:
+                                'Your declared class section will appear here.',
+                          )
+                        : _DeclaredSectionCard(
+                            sectionCode: student.sectionCode,
                           ),
-                          const SizedBox(width: Spacing.md),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  section.name,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .titleMedium,
-                                ),
-                                Text(
-                                  section.subject == 'Awaiting teacher details'
-                                      ? 'Section saved locally'
-                                      : section.subject,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context).textTheme.bodySmall
-                                      ?.copyWith(color: AppColors.muted),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: Spacing.sm),
-                          Flexible(
-                            child: Text(
-                              section.subject == 'Awaiting teacher details'
-                                  ? 'Teacher details pending'
-                                  : section.schedule,
-                              textAlign: TextAlign.end,
-                              style: Theme.of(context).textTheme.labelSmall,
-                            ),
-                          ),
-                        ],
+                    loading: () => const LinearProgressIndicator(),
+                    error: (error, stack) => const _StudentError(),
+                  );
+                }
+                return SectionCard(
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.menu_book_outlined,
+                        color: AppColors.primary,
                       ),
-                    ),
+                      const SizedBox(width: Spacing.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              section.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            Text(
+                              section.subject,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(color: AppColors.muted),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: Spacing.sm),
+                      Flexible(
+                        child: Text(
+                          section.schedule,
+                          textAlign: TextAlign.end,
+                          style: Theme.of(context).textTheme.labelSmall,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
               loading: () => const LinearProgressIndicator(),
               error: (error, stack) => const _StudentError(),
             ),
@@ -382,7 +393,7 @@ class StudentHomeScreen extends ConsumerWidget {
                         Icon(
                           device == null
                               ? Icons.bluetooth_disabled
-                              : Icons.bluetooth_connected,
+                              : Icons.bluetooth,
                           color: device == null
                               ? AppColors.warning
                               : AppColors.success,
@@ -397,8 +408,9 @@ class StudentHomeScreen extends ConsumerWidget {
                                 style: Theme.of(context).textTheme.titleMedium,
                               ),
                               Text(
-                                device?.address ??
-                                    'Register your device for BLE attendance.',
+                                device == null
+                                    ? 'Register your device for BLE attendance.'
+                                    : 'Registered for BLE attendance',
                                 style: Theme.of(context).textTheme.bodySmall
                                     ?.copyWith(color: AppColors.muted),
                               ),
@@ -482,6 +494,7 @@ class StudentProfileScreen extends ConsumerWidget {
                       label: 'Class section',
                       value:
                           ref.watch(currentStudentClassProvider).value?.name ??
+                          student?.sectionCode ??
                           'Not set',
                     ),
                   ],
@@ -536,5 +549,34 @@ class _StudentError extends StatelessWidget {
   @override
   Widget build(BuildContext context) => const Center(
     child: SectionCard(child: Text('Student information is unavailable.')),
+  );
+}
+
+class _DeclaredSectionCard extends StatelessWidget {
+  const _DeclaredSectionCard({required this.sectionCode});
+
+  final String sectionCode;
+
+  @override
+  Widget build(BuildContext context) => SectionCard(
+    child: Row(
+      children: [
+        const Icon(Icons.menu_book_outlined, color: AppColors.primary),
+        const SizedBox(width: Spacing.md),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(sectionCode, style: Theme.of(context).textTheme.titleMedium),
+              Text(
+                'Class details are stored on the teacher’s device.',
+                style: Theme.of(context).textTheme.bodySmall
+                    ?.copyWith(color: AppColors.muted),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
   );
 }

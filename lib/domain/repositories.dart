@@ -40,6 +40,20 @@ class StudentAlreadyHasDeviceException extends RepositoryException {
     : super('A device is already registered for this student.');
 }
 
+class NoActiveAttendanceSessionException extends RepositoryException {
+  const NoActiveAttendanceSessionException()
+    : super('There is no attendance session to resume.');
+}
+
+class ActiveAttendanceSessionException extends RepositoryException {
+  const ActiveAttendanceSessionException(this.sessionId)
+    : super(
+        'Finish or cancel the active attendance session before continuing.',
+      );
+
+  final String sessionId;
+}
+
 class EmptyClassRosterException extends RepositoryException {
   const EmptyClassRosterException()
     : super('Add students to this class before starting attendance.');
@@ -67,6 +81,7 @@ abstract interface class ClassRepository {
   Future<ClassSection?> getClass(String classId);
   Stream<ClassSection?> watchClass(String classId);
   Future<ClassSection?> getClassByCode(String sectionCode);
+  Stream<ClassSection?> watchClassByCode(String sectionCode);
   Future<List<Student>> getStudents(String classId);
   Stream<List<Student>> watchStudents(String classId);
   Future<ClassSection> createClass({
@@ -125,6 +140,7 @@ abstract interface class AttendanceRepository {
   Future<AttendanceRecord> toggleStatus(String sessionId, String studentId);
   Future<void> markDetected(String sessionId, String studentId, {int? rssi});
   Future<void> finishScan(String sessionId);
+  Future<void> resumeScan(String sessionId);
   Future<void> cancelSession(String sessionId);
   Future<void> completeSession(String sessionId);
 }
@@ -139,6 +155,12 @@ abstract interface class DeviceRepository {
     String deviceName, {
     String? bleUuid,
   });
+  Future<Device> replaceDevice(
+    String studentId,
+    String deviceName, {
+    required String bleUuid,
+  });
+  Future<void> removeDevice(String studentId);
 }
 
 abstract interface class SettingsRepository {

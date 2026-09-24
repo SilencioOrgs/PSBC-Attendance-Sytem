@@ -387,6 +387,17 @@ class $StudentsTable extends Students
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _declaredSectionCodeMeta =
+      const VerificationMeta('declaredSectionCode');
+  @override
+  late final GeneratedColumn<String> declaredSectionCode =
+      GeneratedColumn<String>(
+        'declared_section_code',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -395,6 +406,7 @@ class $StudentsTable extends Students
     studentNumber,
     fullName,
     isCurrent,
+    declaredSectionCode,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -446,6 +458,15 @@ class $StudentsTable extends Students
         isCurrent.isAcceptableOrUnknown(data['is_current']!, _isCurrentMeta),
       );
     }
+    if (data.containsKey('declared_section_code')) {
+      context.handle(
+        _declaredSectionCodeMeta,
+        declaredSectionCode.isAcceptableOrUnknown(
+          data['declared_section_code']!,
+          _declaredSectionCodeMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -481,6 +502,10 @@ class $StudentsTable extends Students
         DriftSqlType.bool,
         data['${effectivePrefix}is_current'],
       )!,
+      declaredSectionCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}declared_section_code'],
+      ),
     );
   }
 
@@ -500,6 +525,7 @@ class StudentRow extends DataClass implements Insertable<StudentRow> {
   final String studentNumber;
   final String fullName;
   final bool isCurrent;
+  final String? declaredSectionCode;
   const StudentRow({
     required this.id,
     required this.updatedAt,
@@ -507,6 +533,7 @@ class StudentRow extends DataClass implements Insertable<StudentRow> {
     required this.studentNumber,
     required this.fullName,
     required this.isCurrent,
+    this.declaredSectionCode,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -521,6 +548,9 @@ class StudentRow extends DataClass implements Insertable<StudentRow> {
     map['student_number'] = Variable<String>(studentNumber);
     map['full_name'] = Variable<String>(fullName);
     map['is_current'] = Variable<bool>(isCurrent);
+    if (!nullToAbsent || declaredSectionCode != null) {
+      map['declared_section_code'] = Variable<String>(declaredSectionCode);
+    }
     return map;
   }
 
@@ -532,6 +562,9 @@ class StudentRow extends DataClass implements Insertable<StudentRow> {
       studentNumber: Value(studentNumber),
       fullName: Value(fullName),
       isCurrent: Value(isCurrent),
+      declaredSectionCode: declaredSectionCode == null && nullToAbsent
+          ? const Value.absent()
+          : Value(declaredSectionCode),
     );
   }
 
@@ -547,6 +580,9 @@ class StudentRow extends DataClass implements Insertable<StudentRow> {
       studentNumber: serializer.fromJson<String>(json['studentNumber']),
       fullName: serializer.fromJson<String>(json['fullName']),
       isCurrent: serializer.fromJson<bool>(json['isCurrent']),
+      declaredSectionCode: serializer.fromJson<String?>(
+        json['declaredSectionCode'],
+      ),
     );
   }
   @override
@@ -559,6 +595,7 @@ class StudentRow extends DataClass implements Insertable<StudentRow> {
       'studentNumber': serializer.toJson<String>(studentNumber),
       'fullName': serializer.toJson<String>(fullName),
       'isCurrent': serializer.toJson<bool>(isCurrent),
+      'declaredSectionCode': serializer.toJson<String?>(declaredSectionCode),
     };
   }
 
@@ -569,6 +606,7 @@ class StudentRow extends DataClass implements Insertable<StudentRow> {
     String? studentNumber,
     String? fullName,
     bool? isCurrent,
+    Value<String?> declaredSectionCode = const Value.absent(),
   }) => StudentRow(
     id: id ?? this.id,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -576,6 +614,9 @@ class StudentRow extends DataClass implements Insertable<StudentRow> {
     studentNumber: studentNumber ?? this.studentNumber,
     fullName: fullName ?? this.fullName,
     isCurrent: isCurrent ?? this.isCurrent,
+    declaredSectionCode: declaredSectionCode.present
+        ? declaredSectionCode.value
+        : this.declaredSectionCode,
   );
   StudentRow copyWithCompanion(StudentsCompanion data) {
     return StudentRow(
@@ -589,6 +630,9 @@ class StudentRow extends DataClass implements Insertable<StudentRow> {
           : this.studentNumber,
       fullName: data.fullName.present ? data.fullName.value : this.fullName,
       isCurrent: data.isCurrent.present ? data.isCurrent.value : this.isCurrent,
+      declaredSectionCode: data.declaredSectionCode.present
+          ? data.declaredSectionCode.value
+          : this.declaredSectionCode,
     );
   }
 
@@ -600,7 +644,8 @@ class StudentRow extends DataClass implements Insertable<StudentRow> {
           ..write('syncStatus: $syncStatus, ')
           ..write('studentNumber: $studentNumber, ')
           ..write('fullName: $fullName, ')
-          ..write('isCurrent: $isCurrent')
+          ..write('isCurrent: $isCurrent, ')
+          ..write('declaredSectionCode: $declaredSectionCode')
           ..write(')'))
         .toString();
   }
@@ -613,6 +658,7 @@ class StudentRow extends DataClass implements Insertable<StudentRow> {
     studentNumber,
     fullName,
     isCurrent,
+    declaredSectionCode,
   );
   @override
   bool operator ==(Object other) =>
@@ -623,7 +669,8 @@ class StudentRow extends DataClass implements Insertable<StudentRow> {
           other.syncStatus == this.syncStatus &&
           other.studentNumber == this.studentNumber &&
           other.fullName == this.fullName &&
-          other.isCurrent == this.isCurrent);
+          other.isCurrent == this.isCurrent &&
+          other.declaredSectionCode == this.declaredSectionCode);
 }
 
 class StudentsCompanion extends UpdateCompanion<StudentRow> {
@@ -633,6 +680,7 @@ class StudentsCompanion extends UpdateCompanion<StudentRow> {
   final Value<String> studentNumber;
   final Value<String> fullName;
   final Value<bool> isCurrent;
+  final Value<String?> declaredSectionCode;
   final Value<int> rowid;
   const StudentsCompanion({
     this.id = const Value.absent(),
@@ -641,6 +689,7 @@ class StudentsCompanion extends UpdateCompanion<StudentRow> {
     this.studentNumber = const Value.absent(),
     this.fullName = const Value.absent(),
     this.isCurrent = const Value.absent(),
+    this.declaredSectionCode = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   StudentsCompanion.insert({
@@ -650,6 +699,7 @@ class StudentsCompanion extends UpdateCompanion<StudentRow> {
     required String studentNumber,
     required String fullName,
     this.isCurrent = const Value.absent(),
+    this.declaredSectionCode = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        updatedAt = Value(updatedAt),
@@ -663,6 +713,7 @@ class StudentsCompanion extends UpdateCompanion<StudentRow> {
     Expression<String>? studentNumber,
     Expression<String>? fullName,
     Expression<bool>? isCurrent,
+    Expression<String>? declaredSectionCode,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -672,6 +723,8 @@ class StudentsCompanion extends UpdateCompanion<StudentRow> {
       if (studentNumber != null) 'student_number': studentNumber,
       if (fullName != null) 'full_name': fullName,
       if (isCurrent != null) 'is_current': isCurrent,
+      if (declaredSectionCode != null)
+        'declared_section_code': declaredSectionCode,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -683,6 +736,7 @@ class StudentsCompanion extends UpdateCompanion<StudentRow> {
     Value<String>? studentNumber,
     Value<String>? fullName,
     Value<bool>? isCurrent,
+    Value<String?>? declaredSectionCode,
     Value<int>? rowid,
   }) {
     return StudentsCompanion(
@@ -692,6 +746,7 @@ class StudentsCompanion extends UpdateCompanion<StudentRow> {
       studentNumber: studentNumber ?? this.studentNumber,
       fullName: fullName ?? this.fullName,
       isCurrent: isCurrent ?? this.isCurrent,
+      declaredSectionCode: declaredSectionCode ?? this.declaredSectionCode,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -719,6 +774,11 @@ class StudentsCompanion extends UpdateCompanion<StudentRow> {
     if (isCurrent.present) {
       map['is_current'] = Variable<bool>(isCurrent.value);
     }
+    if (declaredSectionCode.present) {
+      map['declared_section_code'] = Variable<String>(
+        declaredSectionCode.value,
+      );
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -734,6 +794,7 @@ class StudentsCompanion extends UpdateCompanion<StudentRow> {
           ..write('studentNumber: $studentNumber, ')
           ..write('fullName: $fullName, ')
           ..write('isCurrent: $isCurrent, ')
+          ..write('declaredSectionCode: $declaredSectionCode, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -4388,6 +4449,7 @@ typedef $$StudentsTableCreateCompanionBuilder = StudentsCompanion Function({
   required String studentNumber,
   required String fullName,
   Value<bool> isCurrent,
+  Value<String?> declaredSectionCode,
   Value<int> rowid,
 });
 typedef $$StudentsTableUpdateCompanionBuilder = StudentsCompanion Function({
@@ -4397,6 +4459,7 @@ typedef $$StudentsTableUpdateCompanionBuilder = StudentsCompanion Function({
   Value<String> studentNumber,
   Value<String> fullName,
   Value<bool> isCurrent,
+  Value<String?> declaredSectionCode,
   Value<int> rowid,
 });
 
@@ -4500,6 +4563,11 @@ class $$StudentsTableFilterComposer
 
   ColumnFilters<bool> get isCurrent => $composableBuilder(
     column: $table.isCurrent,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get declaredSectionCode => $composableBuilder(
+    column: $table.declaredSectionCode,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4617,6 +4685,11 @@ class $$StudentsTableOrderingComposer
     column: $table.isCurrent,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get declaredSectionCode => $composableBuilder(
+    column: $table.declaredSectionCode,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$StudentsTableAnnotationComposer
@@ -4650,6 +4723,11 @@ class $$StudentsTableAnnotationComposer
 
   GeneratedColumn<bool> get isCurrent =>
       $composableBuilder(column: $table.isCurrent, builder: (column) => column);
+
+  GeneratedColumn<String> get declaredSectionCode => $composableBuilder(
+    column: $table.declaredSectionCode,
+    builder: (column) => column,
+  );
 
   Expression<T> enrollmentsRefs<T extends Object>(
     Expression<T> Function($$EnrollmentsTableAnnotationComposer a) f,
@@ -4766,6 +4844,7 @@ class $$StudentsTableTableManager
                 Value<String> studentNumber = const Value.absent(),
                 Value<String> fullName = const Value.absent(),
                 Value<bool> isCurrent = const Value.absent(),
+                Value<String?> declaredSectionCode = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => StudentsCompanion(
                 id: id,
@@ -4774,6 +4853,7 @@ class $$StudentsTableTableManager
                 studentNumber: studentNumber,
                 fullName: fullName,
                 isCurrent: isCurrent,
+                declaredSectionCode: declaredSectionCode,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -4784,6 +4864,7 @@ class $$StudentsTableTableManager
                 required String studentNumber,
                 required String fullName,
                 Value<bool> isCurrent = const Value.absent(),
+                Value<String?> declaredSectionCode = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => StudentsCompanion.insert(
                 id: id,
@@ -4792,6 +4873,7 @@ class $$StudentsTableTableManager
                 studentNumber: studentNumber,
                 fullName: fullName,
                 isCurrent: isCurrent,
+                declaredSectionCode: declaredSectionCode,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
