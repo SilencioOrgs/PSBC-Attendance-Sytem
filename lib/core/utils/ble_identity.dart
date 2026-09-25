@@ -1,3 +1,5 @@
+import 'package:uuid/uuid.dart';
+
 /// Canonical UUID validation shared by student and teacher device flows.
 String? normalizeBleIdentity(String value) {
   final normalized = value.trim().toLowerCase();
@@ -7,3 +9,8 @@ String? normalizeBleIdentity(String value) {
   }
   return normalized;
 }
+
+/// Creates a BLE attendance identity for a newly registered physical device.
+///
+/// Keep this distinct from [newDatabaseId], which identifies local DB rows.
+String newBleServiceUuid() => const Uuid().v4();

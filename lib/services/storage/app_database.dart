@@ -886,6 +886,14 @@ class DeviceDao extends DatabaseAccessor<AppDatabase> with _$DeviceDaoMixin {
   Future<void> insert(DevicesCompanion row) => into(devices).insert(row);
   Future<void> upsert(DevicesCompanion row) =>
       into(devices).insertOnConflictUpdate(row);
+  Future<void> updateStudentBleUuid(String studentId, String bleUuid) async =>
+      (update(devices)..where((row) => row.studentId.equals(studentId))).write(
+        DevicesCompanion(
+          bleUuid: Value(bleUuid),
+          updatedAt: Value(DateTime.now()),
+          syncStatus: const Value(domain.SyncStatus.pendingUpdate),
+        ),
+      );
   Future<void> deleteStudentDevice(String studentId) async =>
       (delete(devices)..where((row) => row.studentId.equals(studentId))).go();
 }

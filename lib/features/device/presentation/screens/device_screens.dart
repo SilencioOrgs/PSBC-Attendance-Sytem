@@ -175,7 +175,7 @@ class _DeviceRegistrationScreenState
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Device sharing code',
+                                    'BLE Service UUID',
                                     style: Theme.of(context)
                                         .textTheme
                                         .bodyMedium
@@ -192,7 +192,7 @@ class _DeviceRegistrationScreenState
                               ),
                             ),
                             IconButton(
-                              tooltip: 'Copy device sharing code',
+                              tooltip: 'Copy BLE Service UUID',
                               onPressed: () async {
                                 await Clipboard.setData(
                                   ClipboardData(text: device.bleUuid),
@@ -200,9 +200,7 @@ class _DeviceRegistrationScreenState
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                      content: Text(
-                                        'Device sharing code copied.',
-                                      ),
+                                      content: Text('BLE Service UUID copied.'),
                                     ),
                                   );
                                 }
@@ -279,7 +277,7 @@ class _DeviceRegistrationScreenState
                       const SizedBox(width: Spacing.sm),
                       Expanded(
                         child: Text(
-                          'Share your device code with your teacher so they can register it to your class roster. Keep Bluetooth enabled and the beacon active during attendance.',
+                          'Share this BLE Service UUID with your teacher so they can register it to your class roster. Keep Bluetooth enabled and the beacon active during attendance.',
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ),

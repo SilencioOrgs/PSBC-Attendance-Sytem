@@ -813,7 +813,7 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
                   autocorrect: false,
                   enableSuggestions: false,
                   decoration: InputDecoration(
-                    labelText: 'Device sharing code',
+                    labelText: 'BLE Service UUID',
                     helperText: 'Enter the UUID shown on the student device.',
                     errorText: error,
                   ),
@@ -834,7 +834,7 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
                 onPressed: () {
                   if (normalizeBleIdentity(code.text) == null) {
                     setDialogState(
-                      () => error = 'Enter a valid device sharing code.',
+                      () => error = 'Enter a valid BLE Service UUID.',
                     );
                     return;
                   }
@@ -1181,7 +1181,7 @@ class _StudentEditorSheetState extends ConsumerState<_StudentEditorSheet> {
             autocorrect: false,
             enableSuggestions: false,
             decoration: const InputDecoration(
-              labelText: 'Student device sharing code (optional)',
+              labelText: 'Student BLE Service UUID (optional)',
               helperText: 'Enter the code shown on the student’s Device tab.',
               prefixIcon: Icon(Icons.bluetooth_outlined),
             ),

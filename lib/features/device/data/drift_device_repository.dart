@@ -11,25 +11,62 @@ class DriftDeviceRepository implements DeviceRepository {
   @override
   Stream<List<Device>> watchDevices() => _db.deviceDao.watchAll();
   @override
-  Future<Device?> getStudentDevice(String studentId) =>
-      _db.deviceDao.getStudent(studentId);
+  Future<Device?> getStudentDevice(String studentId) async {
+    final device = await _db.deviceDao.getStudent(studentId);
+    if (device == null) return null;
+    return _db.transaction(() => _ensureDeviceIdentity(device));
+  }
+
   @override
   Stream<Device?> watchStudentDevice(String studentId) =>
-      _db.deviceDao.watchStudent(studentId);
+      _db.deviceDao.watchStudent(studentId).asyncMap((device) async {
+        if (device == null) return null;
+        return _db.transaction(() => _ensureDeviceIdentity(device));
+      });
   @override
   Future<Device> registerDevice(
     String studentId,
     String deviceName, {
     String? bleUuid,
   }) async {
-    if (await _db.deviceDao.getStudent(studentId) != null) {
-      throw const StudentAlreadyHasDeviceException();
+    try {
+      return await _db.transaction(() async {
+        final existing = await _db.deviceDao.getStudent(studentId);
+        if (existing != null) {
+          // Registration can be retried safely. Existing physical identity is
+          // authoritative; a retry must never replace it with a new value.
+          return _ensureDeviceIdentity(existing);
+        }
+
+        final requestedUuid = bleUuid?.trim().isNotEmpty == true
+            ? normalizeBleIdentity(bleUuid!)
+            : null;
+        if (bleUuid?.trim().isNotEmpty == true && requestedUuid == null) {
+          throw const InvalidBleUuidException();
+        }
+
+        final id = newDatabaseId();
+        final now = DateTime.now();
+        for (var attempt = 0; attempt < 5; attempt++) {
+          final uuid = requestedUuid ?? newBleServiceUuid();
+          try {
+            await _db.deviceDao.insert(
+              _deviceRow(id, studentId, deviceName, uuid, now),
+            );
+            return _device(id, studentId, deviceName, uuid, now);
+          } catch (error) {
+            if (requestedUuid == null && _isDuplicateBleUuid(error)) {
+              continue;
+            }
+            rethrow;
+          }
+        }
+        throw const DuplicateBleUuidException();
+      });
+    } catch (error) {
+      if (error is RepositoryException) rethrow;
+      _rethrowDeviceConflict(error);
     }
-    final uuid = bleUuid == null || bleUuid.trim().isEmpty
-        ? newDatabaseId()
-        : normalizeBleIdentity(bleUuid);
-    if (uuid == null) throw const InvalidBleUuidException();
-    return _saveDevice(studentId, deviceName, uuid);
   }
 
   @override
@@ -59,21 +96,32 @@ class DriftDeviceRepository implements DeviceRepository {
   Future<void> removeDevice(String studentId) =>
       _db.deviceDao.deleteStudentDevice(studentId);
 
-  Future<Device> _saveDevice(
-    String studentId,
-    String deviceName,
-    String uuid,
-  ) async {
-    final id = newDatabaseId();
-    final now = DateTime.now();
-    try {
-      await _db.deviceDao.insert(
-        _deviceRow(id, studentId, deviceName, uuid, now),
+  Future<Device> _ensureDeviceIdentity(Device device) async {
+    // Re-read inside the transaction: a concurrent registration/repair may
+    // already have persisted the canonical UUID.
+    final current = await _db.deviceDao.getStudent(device.ownerStudentId!);
+    if (current == null) return device;
+    final normalized = normalizeBleIdentity(current.bleUuid);
+    if (normalized == current.bleUuid) return current;
+
+    if (normalized != null) {
+      await _db.deviceDao.updateStudentBleUuid(
+        current.ownerStudentId!,
+        normalized,
       );
-    } catch (error) {
-      _rethrowDeviceConflict(error);
+      return (await _db.deviceDao.getStudent(current.ownerStudentId!))!;
     }
-    return _device(id, studentId, deviceName, uuid, now);
+
+    for (var attempt = 0; attempt < 5; attempt++) {
+      final uuid = newBleServiceUuid();
+      try {
+        await _db.deviceDao.updateStudentBleUuid(current.ownerStudentId!, uuid);
+        return (await _db.deviceDao.getStudent(current.ownerStudentId!))!;
+      } catch (error) {
+        if (!_isDuplicateBleUuid(error)) rethrow;
+      }
+    }
+    throw const DuplicateBleUuidException();
   }
 
   DevicesCompanion _deviceRow(
@@ -114,13 +162,14 @@ class DriftDeviceRepository implements DeviceRepository {
   );
 
   Never _rethrowDeviceConflict(Object error) {
+    if (_isDuplicateBleUuid(error)) throw const DuplicateBleUuidException();
     final message = error.toString();
-    if (message.contains('devices.ble_uuid')) {
-      throw const DuplicateBleUuidException();
-    }
     if (message.contains('devices.student_id')) {
       throw const StudentAlreadyHasDeviceException();
     }
     Error.throwWithStackTrace(error, StackTrace.current);
   }
+
+  bool _isDuplicateBleUuid(Object error) =>
+      error.toString().contains('devices.ble_uuid');
 }
