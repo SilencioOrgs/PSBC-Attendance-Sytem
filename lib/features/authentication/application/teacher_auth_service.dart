@@ -1,4 +1,5 @@
 import '../../../core/auth/teacher_session.dart';
+import '../../../core/auth/application_session.dart';
 import '../../../domain/models.dart';
 import '../../../domain/repositories.dart';
 import '../../../services/auth/teacher_pin_service.dart';
@@ -11,23 +12,29 @@ class TeacherAuthService {
     this._teachers,
     this._pins,
     this._ble,
-    this._attendance,
-  );
+    this._attendance, {
+    this.applicationSession,
+  });
 
   final TeacherSession _session;
   final TeacherRepository _teachers;
   final TeacherPinService _pins;
   final BleService _ble;
   final AttendanceRepository _attendance;
+  final ApplicationSession? applicationSession;
 
   Future<void> setup({required String name, required String pin}) async {
     await _teachers.setupTeacher(name: name, pin: pin);
     _session.authenticate();
+    await applicationSession?.selectTeacher();
   }
 
   Future<bool> unlock(String pin) async {
     final matches = await _pins.verifyPin(pin);
-    if (matches) _session.authenticate();
+    if (matches) {
+      _session.authenticate();
+      await applicationSession?.selectTeacher();
+    }
     return matches;
   }
 

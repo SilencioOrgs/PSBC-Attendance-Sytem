@@ -9,6 +9,7 @@ import 'package:attendance_system_paete/features/attendance/data/drift_attendanc
 import 'package:attendance_system_paete/features/classes/data/drift_class_repository.dart';
 import 'package:attendance_system_paete/features/classes/presentation/providers/class_provider.dart';
 import 'package:attendance_system_paete/features/device/data/drift_device_repository.dart';
+import 'package:attendance_system_paete/services/ble/ble_device_mapper.dart';
 import 'package:attendance_system_paete/features/student/data/drift_student_repository.dart';
 import 'package:attendance_system_paete/services/storage/app_database.dart';
 import 'package:drift/native.dart';
@@ -177,7 +178,10 @@ void main() {
         studentNumber: 'T-003',
         sectionCode: ' grade 12   stem a ',
       );
-      expect(first.classId, _classId);
+      expect(
+        await DriftClassRepository(database).getStudentOfferings(first.id),
+        isEmpty,
+      );
       await expectLater(
         repository.registerStudent(
           name: 'Another Student',
@@ -216,6 +220,106 @@ void main() {
       throwsA(isA<DuplicateBleUuidException>()),
     );
   });
+
+  test(
+    'one student and BLE device can enroll in multiple subjects in one section',
+    () async {
+      final classes = DriftClassRepository(database);
+      final start = DateTime(2000, 1, 1, 9, 30);
+      final end = DateTime(2000, 1, 1, 10, 30);
+      final firstOffering = await classes.createClass(
+        gradeLevel: 12,
+        sectionLabel: 'STEM A',
+        subject: 'CPE1',
+        room: '301',
+        scheduleStart: start,
+        scheduleEnd: end,
+        scheduleDays: {Weekday.monday},
+      );
+      final secondOffering = await classes.createClass(
+        gradeLevel: 12,
+        sectionLabel: 'STEM A',
+        subject: 'Database Systems',
+        room: '302',
+        scheduleStart: DateTime(2000, 1, 1, 13),
+        scheduleEnd: DateTime(2000, 1, 1, 14),
+        scheduleDays: {Weekday.tuesday},
+      );
+      expect(firstOffering.sectionCode, secondOffering.sectionCode);
+      expect(secondOffering.subject, 'Database Systems');
+      expect(secondOffering.scheduleDays, {Weekday.tuesday});
+
+      final students = DriftStudentRepository(database);
+      final firstEnrollment = await students.addStudentToClass(
+        name: 'Maria Santos',
+        studentNumber: 'T-001',
+        classId: firstOffering.id,
+      );
+      await DriftDeviceRepository(database).registerDevice(
+        firstEnrollment.id,
+        'Maria phone',
+        bleUuid: '12345678-1234-4234-8234-123456789abc',
+      );
+      final secondEnrollment = await students.addStudentToClass(
+        name: 'Maria Santos',
+        studentNumber: 'T-001',
+        classId: secondOffering.id,
+      );
+      expect(secondEnrollment.id, firstEnrollment.id);
+      await expectLater(
+        students.addStudentToClass(
+          name: 'Maria Santos',
+          studentNumber: 'T-001',
+          classId: secondOffering.id,
+        ),
+        throwsA(isA<DuplicateEnrollmentException>()),
+      );
+      expect(
+        (await classes.getStudents(firstOffering.id)).single.id,
+        firstEnrollment.id,
+      );
+      expect(
+        (await classes.getStudents(secondOffering.id)).single.id,
+        firstEnrollment.id,
+      );
+      expect((await classes.getStudentOfferings(firstEnrollment.id)).length, 3);
+
+      final device = (await DriftDeviceRepository(
+        database,
+      ).getDevices()).single;
+      final target = BleDeviceMapper.targets([device]);
+      expect(
+        BleDeviceMapper.matchAdvertisement(
+          serviceUuids: [device.bleUuid],
+          targets: target,
+          rosterStudentIds: {firstEnrollment.id},
+          rssi: -50,
+          detectedAt: DateTime.now(),
+        )?.ownerStudentId,
+        firstEnrollment.id,
+      );
+      expect(
+        BleDeviceMapper.matchAdvertisement(
+          serviceUuids: [device.bleUuid],
+          targets: target,
+          rosterStudentIds: {'not-enrolled-in-current-offering'},
+          rssi: -50,
+          detectedAt: DateTime.now(),
+        ),
+        isNull,
+      );
+      final overrideSession = await DriftAttendanceRepository(database)
+          .startSession(firstOffering.id, manualOverride: true);
+      expect(overrideSession.classOfferingId, firstOffering.id);
+      expect(overrideSession.manualOverride, isTrue);
+      expect(
+        (await DriftAttendanceRepository(database)
+                .getRecords(overrideSession.id))
+            .map((record) => record.studentId),
+        [firstEnrollment.id],
+      );
+    },
+  );
 
   test(
     'attendance review keeps undetected students unconfirmed until save',
@@ -321,7 +425,7 @@ void main() {
         classes.createClass(
           gradeLevel: 11,
           sectionLabel: 'humss a',
-          subject: 'English',
+          subject: 'English 2',
           room: 'Room 2',
           scheduleStart: DateTime(2000, 1, 1, 10),
           scheduleEnd: DateTime(2000, 1, 1, 11),
@@ -345,7 +449,7 @@ void main() {
           studentNumber: 'T-004',
           classId: created.id,
         ),
-        throwsA(isA<DuplicateStudentNumberException>()),
+        throwsA(isA<DuplicateEnrollmentException>()),
       );
       await students.updateStudent(
         studentId: added.id,
@@ -381,31 +485,30 @@ void main() {
     expect(await cleanDatabase.deviceDao.getAll(), isEmpty);
   });
 
-  test('student-only setup stores its declared section without creating teacher or class rows', () async {
-    final cleanDatabase = AppDatabase(NativeDatabase.memory());
-    addTearDown(cleanDatabase.close);
-    final repository = DriftStudentRepository(cleanDatabase);
-    final student = await repository.registerStudent(
-      name: 'Maria Santos',
-      studentNumber: 'S-001',
-      sectionCode: 'GRADE12-STEM A',
-    );
+  test(
+    'student-only setup persists a profile without assuming an offering',
+    () async {
+      final cleanDatabase = AppDatabase(NativeDatabase.memory());
+      addTearDown(cleanDatabase.close);
+      final repository = DriftStudentRepository(cleanDatabase);
+      final student = await repository.registerStudent(
+        name: 'Maria Santos',
+        studentNumber: 'S-001',
+        sectionCode: 'GRADE12-STEM A',
+      );
 
-    expect(student.classId, isEmpty);
-    expect(student.sectionCode, 'GRADE12-STEM A');
-    expect(await cleanDatabase.teacherDao.getTeacherOrNull(), isNull);
-    expect(await cleanDatabase.classDao.getClasses(), isEmpty);
-    expect(
-      await cleanDatabase.select(cleanDatabase.enrollments).get(),
-      isEmpty,
-    );
-    expect(await cleanDatabase.attendanceDao.getSessions(), isEmpty);
-    expect(await cleanDatabase.deviceDao.getAll(), isEmpty);
-    expect(
-      (await repository.getCurrentStudent())?.sectionCode,
-      'GRADE12-STEM A',
-    );
-  });
+      expect(student.id, isNotEmpty);
+      expect(await cleanDatabase.teacherDao.getTeacherOrNull(), isNull);
+      expect(await cleanDatabase.classDao.getClasses(), isEmpty);
+      expect(
+        await cleanDatabase.select(cleanDatabase.enrollments).get(),
+        isEmpty,
+      );
+      expect(await cleanDatabase.attendanceDao.getSessions(), isEmpty);
+      expect(await cleanDatabase.deviceDao.getAll(), isEmpty);
+      expect((await repository.getCurrentStudent())?.id, student.id);
+    },
+  );
 
   test(
     'version 1 synthetic student classes migrate to declared section data',
@@ -465,6 +568,21 @@ void main() {
         NativeDatabase(
           file,
           setup: (sqlite) {
+            sqlite.execute('DROP INDEX class_offering_identity_unique');
+            sqlite.execute(
+              'ALTER TABLE class_sections DROP COLUMN schedule_days',
+            );
+            sqlite.execute(
+              'ALTER TABLE class_sections DROP COLUMN start_minutes_of_day',
+            );
+            sqlite.execute(
+              'ALTER TABLE class_sections DROP COLUMN end_minutes_of_day',
+            );
+            sqlite.execute('ALTER TABLE teachers DROP COLUMN is_local');
+            sqlite.execute(
+              'ALTER TABLE attendance_sessions DROP COLUMN manual_override',
+            );
+            sqlite.execute('DROP TABLE app_session_preferences');
             sqlite.execute(
               'ALTER TABLE students DROP COLUMN declared_section_code',
             );
@@ -478,8 +596,7 @@ void main() {
       });
 
       final migratedStudent = await database.studentDao.getCurrent();
-      expect(migratedStudent?.sectionCode, 'GRADE12-STEM A');
-      expect(migratedStudent?.classId, isEmpty);
+      expect(migratedStudent?.name, 'Maria Santos');
       expect(await database.classDao.getClasses(), isEmpty);
       expect(await database.teacherDao.getTeacherOrNull(), isNull);
       expect(await database.select(database.enrollments).get(), isEmpty);

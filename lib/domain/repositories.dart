@@ -1,4 +1,5 @@
 import 'models.dart';
+import 'subject_invitation.dart';
 
 /// User-facing repository validation failures shared across feature workflows.
 sealed class RepositoryException implements Exception {
@@ -66,7 +67,14 @@ class ClassValidationException extends RepositoryException {
 
 class DuplicateClassException extends RepositoryException {
   const DuplicateClassException()
-    : super('A class with this grade and section already exists.');
+    : super(
+        'This subject already exists for the selected teacher and section.',
+      );
+}
+
+class DuplicateEnrollmentException extends RepositoryException {
+  const DuplicateEnrollmentException()
+    : super('This student is already enrolled in that subject.');
 }
 
 abstract interface class TeacherRepository {
@@ -82,6 +90,8 @@ abstract interface class ClassRepository {
   Stream<ClassSection?> watchClass(String classId);
   Future<ClassSection?> getClassByCode(String sectionCode);
   Stream<ClassSection?> watchClassByCode(String sectionCode);
+  Future<List<ClassSection>> getStudentOfferings(String studentId);
+  Stream<List<ClassSection>> watchStudentOfferings(String studentId);
   Future<List<Student>> getStudents(String classId);
   Stream<List<Student>> watchStudents(String classId);
   Future<ClassSection> createClass({
@@ -91,6 +101,7 @@ abstract interface class ClassRepository {
     required String room,
     required DateTime scheduleStart,
     required DateTime scheduleEnd,
+    Set<Weekday> scheduleDays = const {},
   });
   Future<ClassSection> updateClass(ClassSection section);
   Future<void> deleteClass(String classId);
@@ -106,7 +117,7 @@ abstract interface class StudentRepository {
   Future<Student> registerStudent({
     required String name,
     required String studentNumber,
-    required String sectionCode,
+    String? sectionCode,
   });
   Future<Student> addStudentToClass({
     required String name,
@@ -125,8 +136,19 @@ abstract interface class StudentRepository {
   });
 }
 
+abstract interface class EnrollmentRepository {
+  Future<int> addFromInvitation({
+    required String studentId,
+    required SubjectInvitation invitation,
+    required Set<String> selectedOfferingIds,
+  });
+}
+
 abstract interface class AttendanceRepository {
-  Future<AttendanceSession> startSession(String classId);
+  Future<AttendanceSession> startSession(
+    String classOfferingId, {
+    bool manualOverride = false,
+  });
   Future<AttendanceSession?> getTodaySession();
   Stream<AttendanceSession?> watchTodaySession();
   Future<List<AttendanceSession>> getSessions();

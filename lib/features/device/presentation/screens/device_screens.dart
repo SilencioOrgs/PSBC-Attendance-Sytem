@@ -7,6 +7,7 @@ import '../../../../core/utils/iterable_extensions.dart';
 import '../../../../core/widgets/app_widgets.dart';
 import '../../../../domain/models.dart';
 import '../../../../domain/repositories.dart';
+import '../../../../services/ble/background_attendance_service.dart';
 import '../../../student/presentation/providers/student_provider.dart';
 import '../providers/device_provider.dart';
 
@@ -65,6 +66,10 @@ class _DeviceRegistrationScreenState
     final beaconStateAsync = ref.watch(bleAdvertisingStateProvider);
     final beaconState = beaconStateAsync.asData?.value;
     final isAdvertising = beaconState == BleAdvertisingState.active;
+    final backgroundAsync = ref.watch(backgroundAttendanceStateProvider);
+    final backgroundState = backgroundAsync.asData?.value;
+    final backgroundActive =
+        backgroundState?.status == BackgroundAttendanceStatus.active;
     return PageScaffold(
       title: 'Device',
       body: studentAsync.when(
@@ -152,6 +157,71 @@ class _DeviceRegistrationScreenState
                 ] else ...[
                   SectionCard(
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Background attendance',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: Spacing.xs),
+                        Text(
+                          backgroundAsync.isLoading
+                              ? 'Checking background attendance status.'
+                              : _backgroundAttendanceMessage(backgroundState),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: AppColors.muted),
+                        ),
+                        const SizedBox(height: Spacing.md),
+                        PrimaryActionButton(
+                          label: isBusy
+                              ? 'Updating background attendance...'
+                              : backgroundActive
+                              ? 'Stop Background Attendance'
+                              : 'Enable Background Attendance',
+                          icon: backgroundActive
+                              ? Icons.stop_circle_outlined
+                              : Icons.bluetooth_searching,
+                          onPressed: isBusy
+                              ? null
+                              : () async {
+                                  try {
+                                    final controller = ref.read(
+                                      deviceRegistrationControllerProvider
+                                          .notifier,
+                                    );
+                                    if (backgroundActive) {
+                                      await controller
+                                          .stopBackgroundAttendance();
+                                    } else {
+                                      await controller
+                                          .enableBackgroundAttendance(
+                                            device.bleUuid,
+                                          );
+                                    }
+                                    ref.invalidate(
+                                      backgroundAttendanceStateProvider,
+                                    );
+                                  } catch (_) {
+                                    if (context.mounted) {
+                                      setState(
+                                        () => _deviceError = 'Background attendance could not start. Check Bluetooth permissions and try again.',
+                                      );
+                                    }
+                                  }
+                                },
+                        ),
+                        const SizedBox(height: Spacing.xs),
+                        Text(
+                          'Android shows an ongoing notification while active. Force Stop and some manufacturer battery controls can still stop advertising.',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: AppColors.muted),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: Spacing.md),
+                  SectionCard(
+                    child: Column(
                       children: [
                         _DeviceLine(label: 'Device', value: device.name),
                         const Divider(height: Spacing.lg),
@@ -159,11 +229,15 @@ class _DeviceRegistrationScreenState
                           label: 'Attendance beacon',
                           value: beaconStateAsync.isLoading
                               ? 'Checking beacon status'
+                              : backgroundActive
+                              ? 'Active (Android foreground service)'
                               : _beaconLabel(beaconState),
                         ),
                         const Divider(height: Spacing.lg),
                         Text(
-                          'The beacon stops when ClassAttend is backgrounded or Bluetooth turns off. Keep the app open and start it again if needed.',
+                          backgroundActive
+                              ? 'Android foreground service keeps the beacon active while the app is minimized or the screen is locked. Bluetooth turning off, Force Stop, or manufacturer battery controls can stop advertising.'
+                              : 'The foreground beacon may stop when ClassAttend is backgrounded. Enable Background Attendance for minimized or locked-screen use. Bluetooth must remain on.',
                           style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(color: AppColors.muted),
                         ),
@@ -214,7 +288,9 @@ class _DeviceRegistrationScreenState
                   ),
                   const SizedBox(height: Spacing.md),
                   PrimaryActionButton(
-                    label: isBusy
+                    label: backgroundActive
+                        ? 'Background Attendance Active'
+                        : isBusy
                         ? (isAdvertising
                               ? 'Stopping beacon...'
                               : 'Starting beacon...')
@@ -224,7 +300,7 @@ class _DeviceRegistrationScreenState
                     icon: isAdvertising
                         ? Icons.bluetooth_disabled
                         : Icons.bluetooth_searching,
-                    onPressed: isBusy
+                    onPressed: isBusy || backgroundActive
                         ? null
                         : () async {
                             try {
@@ -435,6 +511,20 @@ String _beaconLabel(BleAdvertisingState? state) => switch (state) {
   BleAdvertisingState.unsupported => 'Unsupported',
   BleAdvertisingState.unknown || null => 'Unknown',
 };
+
+String _backgroundAttendanceMessage(BackgroundAttendanceState? state) =>
+    switch (state?.status) {
+      BackgroundAttendanceStatus.active => 'Background attendance is active. Your teacher can detect this phone while the app is minimized or the screen is locked.',
+      BackgroundAttendanceStatus.bluetoothOff => 'Bluetooth is off.',
+      BackgroundAttendanceStatus.permissionRequired =>
+        'Bluetooth permission is required.',
+      BackgroundAttendanceStatus.unsupported =>
+        'Background BLE advertising is unavailable on this device.',
+      BackgroundAttendanceStatus.error =>
+        state?.error ?? 'Background attendance could not start.',
+      BackgroundAttendanceStatus.inactive || null =>
+        'Your phone is not currently available for background attendance.',
+    };
 
 String _bleErrorMessage(BleAdvertisingState? state) => switch (state) {
   BleAdvertisingState.bluetoothOff =>

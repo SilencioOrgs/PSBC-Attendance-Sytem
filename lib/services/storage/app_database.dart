@@ -2,11 +2,18 @@ import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../core/utils/section_code.dart';
 import '../../domain/models.dart' as domain;
 import '../../domain/repositories.dart' as domain_repositories;
 
 part 'app_database.g.dart';
+
+Set<domain.Weekday> weekdaysFromMask(int mask) => {
+  for (final day in domain.Weekday.values)
+    if ((mask & (1 << day.index)) != 0) day,
+};
+
+int weekdayMask(Iterable<domain.Weekday> days) =>
+    days.fold(0, (mask, day) => mask | (1 << day.index));
 
 class SyncStatusConverter extends TypeConverter<domain.SyncStatus, String> {
   const SyncStatusConverter();
@@ -50,6 +57,7 @@ class Teachers extends Table {
   DateTimeColumn get updatedAt => dateTime()();
   TextColumn get syncStatus => text().map(const SyncStatusConverter())();
   TextColumn get name => text()();
+  BoolColumn get isLocal => boolean().withDefault(const Constant(true))();
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -67,6 +75,10 @@ class Students extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+@TableIndex.sql(
+  'CREATE UNIQUE INDEX class_offering_identity_unique '
+  'ON class_sections (teacher_id, section_code, lower(subject))',
+)
 @DataClassName('ClassSectionRow')
 class ClassSections extends Table {
   TextColumn get id => text()();
@@ -74,11 +86,15 @@ class ClassSections extends Table {
   TextColumn get syncStatus => text().map(const SyncStatusConverter())();
   IntColumn get gradeLevel => integer()();
   TextColumn get sectionLabel => text()();
-  TextColumn get sectionCode => text().unique()();
+  TextColumn get sectionCode => text()();
   TextColumn get subject => text().withDefault(const Constant('General'))();
   TextColumn get room => text()();
   DateTimeColumn get scheduleStart => dateTime()();
   DateTimeColumn get scheduleEnd => dateTime()();
+  IntColumn get scheduleDays => integer().withDefault(const Constant(0))();
+  IntColumn get startMinutesOfDay =>
+      integer().withDefault(const Constant(480))();
+  IntColumn get endMinutesOfDay => integer().withDefault(const Constant(540))();
   TextColumn get bleBeaconId => text()();
   TextColumn get teacherId => text().references(Teachers, #id)();
   @override
@@ -115,6 +131,8 @@ class AttendanceSessions extends Table {
   IntColumn get scanDurationSeconds =>
       integer().withDefault(const Constant(0))();
   TextColumn get status => text().map(const SessionStatusConverter())();
+  BoolColumn get manualOverride =>
+      boolean().withDefault(const Constant(false))();
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -169,6 +187,17 @@ class AppSettingsRows extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+@DataClassName('AppSessionPreferencesRow')
+class AppSessionPreferences extends Table {
+  TextColumn get id => text()();
+  TextColumn get lastActiveRole =>
+      text().withDefault(const Constant('welcome'))();
+  TextColumn get activeStudentId => text().nullable()();
+  DateTimeColumn get updatedAt => dateTime()();
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 @DriftDatabase(
   tables: [
     Teachers,
@@ -179,6 +208,7 @@ class AppSettingsRows extends Table {
     AttendanceRecords,
     Devices,
     AppSettingsRows,
+    AppSessionPreferences,
   ],
   daos: [
     TeacherDao,
@@ -188,6 +218,7 @@ class AppSettingsRows extends Table {
     AttendanceDao,
     DeviceDao,
     SettingsDao,
+    AppSessionDao,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -195,7 +226,7 @@ class AppDatabase extends _$AppDatabase {
     : super(executor ?? driftDatabase(name: 'classattend'));
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -235,6 +266,38 @@ class AppDatabase extends _$AppDatabase {
             )
         ''');
       }
+      if (from < 3) {
+        await m.alterTable(
+          TableMigration(
+            classSections,
+            newColumns: [
+              classSections.scheduleDays,
+              classSections.startMinutesOfDay,
+              classSections.endMinutesOfDay,
+            ],
+          ),
+        );
+        await m.addColumn(teachers, teachers.isLocal);
+        await m.addColumn(
+          attendanceSessions,
+          attendanceSessions.manualOverride,
+        );
+        await m.createTable(appSessionPreferences);
+        for (final row in await select(classSections).get()) {
+          await (update(
+            classSections,
+          )..where((t) => t.id.equals(row.id))).write(
+            ClassSectionsCompanion(
+              startMinutesOfDay: Value(
+                row.scheduleStart.hour * 60 + row.scheduleStart.minute,
+              ),
+              endMinutesOfDay: Value(
+                row.scheduleEnd.hour * 60 + row.scheduleEnd.minute,
+              ),
+            ),
+          );
+        }
+      }
     },
     beforeOpen: (details) async => customStatement('PRAGMA foreign_keys = ON'),
   );
@@ -244,10 +307,20 @@ class AppDatabase extends _$AppDatabase {
 class TeacherDao extends DatabaseAccessor<AppDatabase> with _$TeacherDaoMixin {
   TeacherDao(super.db);
   Stream<TeacherRow> watchTeacher() =>
-      (select(teachers)..limit(1)).watchSingle();
-  Future<TeacherRow> getTeacher() => (select(teachers)..limit(1)).getSingle();
+      (select(teachers)
+            ..where((t) => t.isLocal.equals(true))
+            ..limit(1))
+          .watchSingle();
+  Future<TeacherRow> getTeacher() =>
+      (select(teachers)
+            ..where((t) => t.isLocal.equals(true))
+            ..limit(1))
+          .getSingle();
   Future<TeacherRow?> getTeacherOrNull() =>
-      (select(teachers)..limit(1)).getSingleOrNull();
+      (select(teachers)
+            ..where((t) => t.isLocal.equals(true))
+            ..limit(1))
+          .getSingleOrNull();
   Future<void> save(TeachersCompanion row) =>
       into(teachers).insertOnConflictUpdate(row);
 }
@@ -255,26 +328,16 @@ class TeacherDao extends DatabaseAccessor<AppDatabase> with _$TeacherDaoMixin {
 @DriftAccessor(tables: [Students, Enrollments, ClassSections, Devices])
 class StudentDao extends DatabaseAccessor<AppDatabase> with _$StudentDaoMixin {
   StudentDao(super.db);
-  Selectable<TypedResult> _joined({
-    String? studentId,
-    bool currentOnly = false,
-  }) {
-    final query = select(students).join([
-      innerJoin(enrollments, enrollments.studentId.equalsExp(students.id)),
-      innerJoin(
-        classSections,
-        classSections.id.equalsExp(enrollments.classSectionId),
-      ),
-      leftOuterJoin(devices, devices.studentId.equalsExp(students.id)),
-    ]);
+  JoinedSelectStatement _identityQuery({String? studentId}) {
+    final query = select(
+      students,
+    ).join([leftOuterJoin(devices, devices.studentId.equalsExp(students.id))]);
     if (studentId != null) query.where(students.id.equals(studentId));
-    if (currentOnly) query.where(students.isCurrent.equals(true));
     return query;
   }
 
-  domain.Student _map(TypedResult row) {
+  domain.Student _mapIdentity(TypedResult row) {
     final student = row.readTable(students);
-    final section = row.readTable(classSections);
     final device = row.readTableOrNull(devices);
     return domain.Student(
       id: student.id,
@@ -282,53 +345,21 @@ class StudentDao extends DatabaseAccessor<AppDatabase> with _$StudentDaoMixin {
       syncStatus: student.syncStatus,
       name: student.fullName,
       studentNumber: student.studentNumber,
-      classId: section.id,
-      gradeLevel: 'Grade ${section.gradeLevel}',
       deviceRegistered: device != null,
-      sectionCode: section.sectionCode,
     );
   }
 
   Stream<List<domain.Student>> watchAll() =>
-      _joined().watch().map((rows) => rows.map(_map).toList());
+      _identityQuery().watch().map((rows) => rows.map(_mapIdentity).toList());
   Future<List<domain.Student>> getAll() =>
-      _joined().get().then((rows) => rows.map(_map).toList());
+      _identityQuery().get().then((rows) => rows.map(_mapIdentity).toList());
   Stream<domain.Student?> watchOne(String id) =>
-      _joined(studentId: id)
+      _identityQuery(studentId: id)
           .watch()
-          .map((rows) => rows.isEmpty ? null : _map(rows.first));
+          .map((rows) => rows.isEmpty ? null : _mapIdentity(rows.first));
   Future<domain.Student?> getOne(String id) async {
-    final query = select(students).join([
-      leftOuterJoin(enrollments, enrollments.studentId.equalsExp(students.id)),
-      leftOuterJoin(
-        classSections,
-        classSections.id.equalsExp(enrollments.classSectionId),
-      ),
-      leftOuterJoin(devices, devices.studentId.equalsExp(students.id)),
-    ])..where(students.id.equals(id));
-    final rows = await query.get();
-    if (rows.isEmpty) return null;
-    final row = rows.first;
-    final student = row.readTable(students);
-    final section = row.readTableOrNull(classSections);
-    final sectionCode =
-        section?.sectionCode ?? student.declaredSectionCode ?? '';
-    final parsedSection = parseSectionCode(sectionCode);
-    return domain.Student(
-      id: student.id,
-      updatedAt: student.updatedAt,
-      syncStatus: student.syncStatus,
-      name: student.fullName,
-      studentNumber: student.studentNumber,
-      classId: section?.id ?? '',
-      gradeLevel: section != null
-          ? 'Grade ${section.gradeLevel}'
-          : parsedSection == null
-          ? ''
-          : 'Grade ${parsedSection.gradeLevel}',
-      deviceRegistered: row.readTableOrNull(devices) != null,
-      sectionCode: sectionCode,
-    );
+    final rows = await _identityQuery(studentId: id).get();
+    return rows.isEmpty ? null : _mapIdentity(rows.first);
   }
 
   Stream<domain.Student?> watchCurrent() =>
@@ -365,6 +396,7 @@ class StudentDao extends DatabaseAccessor<AppDatabase> with _$StudentDaoMixin {
 @DriftAccessor(
   tables: [
     ClassSections,
+    Teachers,
     Enrollments,
     Students,
     Devices,
@@ -375,7 +407,9 @@ class StudentDao extends DatabaseAccessor<AppDatabase> with _$StudentDaoMixin {
 class ClassDao extends DatabaseAccessor<AppDatabase> with _$ClassDaoMixin {
   ClassDao(super.db);
   Stream<List<domain.ClassSection>> watchClasses() =>
-      _classCountQuery().watch().map((rows) {
+      (_classCountQuery()..where(teachers.isLocal.equals(true))).watch().map((
+        rows,
+      ) {
         final grouped = <String, List<TypedResult>>{};
         for (final row in rows) {
           final section = row.readTable(classSections);
@@ -389,8 +423,23 @@ class ClassDao extends DatabaseAccessor<AppDatabase> with _$ClassDaoMixin {
           return _map(section, count);
         }).toList();
       });
-  Future<List<domain.ClassSection>> getClasses() =>
-      select(classSections).get().then(_withCounts);
+  Future<List<domain.ClassSection>> getClasses() async {
+    final rows =
+        await (_classCountQuery()..where(teachers.isLocal.equals(true))).get();
+    final grouped = <String, List<TypedResult>>{};
+    for (final row in rows) {
+      final offering = row.readTable(classSections);
+      grouped.putIfAbsent(offering.id, () => []).add(row);
+    }
+    return grouped.values.map((group) {
+      final offering = group.first.readTable(classSections);
+      return _map(
+        offering,
+        group.where((row) => row.readTableOrNull(enrollments) != null).length,
+      );
+    }).toList();
+  }
+
   Future<List<domain.ClassSection>> _withCounts(
     List<ClassSectionRow> rows,
   ) async => Future.wait(
@@ -420,6 +469,9 @@ class ClassDao extends DatabaseAccessor<AppDatabase> with _$ClassDaoMixin {
       sectionCode: code,
       scheduleStart: row.scheduleStart,
       scheduleEnd: row.scheduleEnd,
+      scheduleDays: weekdaysFromMask(row.scheduleDays),
+      startMinutesOfDay: row.startMinutesOfDay,
+      endMinutesOfDay: row.endMinutesOfDay,
       bleBeaconId: row.bleBeaconId,
       teacherId: row.teacherId,
     );
@@ -458,13 +510,65 @@ class ClassDao extends DatabaseAccessor<AppDatabase> with _$ClassDaoMixin {
       enrollments,
       enrollments.classSectionId.equalsExp(classSections.id),
     ),
+    innerJoin(teachers, teachers.id.equalsExp(classSections.teacherId)),
   ]);
   Future<domain.ClassSection?> getByCode(String code) async {
-    final row = await (select(
+    final rows = await (select(
       classSections,
-    )..where((t) => t.sectionCode.equals(code))).getSingleOrNull();
+    )..where((t) => t.sectionCode.equals(code))).get();
+    return rows.isEmpty ? null : getClass(rows.first.id);
+  }
+
+  Future<domain.ClassSection?> findOffering(
+    String teacherId,
+    String sectionCode,
+    String subject,
+  ) async {
+    final row =
+        await (select(classSections)..where(
+              (t) =>
+                  t.teacherId.equals(teacherId) &
+                  t.sectionCode.equals(sectionCode) &
+                  t.subject.lower().equals(subject.trim().toLowerCase()),
+            ))
+            .getSingleOrNull();
     return row == null ? null : getClass(row.id);
   }
+
+  Future<List<domain.ClassSection>> getStudentOfferings(
+    String studentId,
+  ) async {
+    final rows = await (select(classSections).join([
+      innerJoin(
+        enrollments,
+        enrollments.classSectionId.equalsExp(classSections.id),
+      ),
+    ])..where(enrollments.studentId.equals(studentId))).get();
+    final offerings = await _withCounts(
+      rows.map((row) => row.readTable(classSections)).toList(),
+    );
+    offerings.sort(_offeringStartOrder);
+    return offerings;
+  }
+
+  Stream<List<domain.ClassSection>> watchStudentOfferings(String studentId) =>
+      (select(classSections).join([
+        innerJoin(
+          enrollments,
+          enrollments.classSectionId.equalsExp(classSections.id),
+        ),
+      ])..where(enrollments.studentId.equals(studentId))).watch().asyncMap((
+        rows,
+      ) async {
+        final offerings = await _withCounts(
+          rows.map((row) => row.readTable(classSections)).toList(),
+        );
+        offerings.sort(_offeringStartOrder);
+        return offerings;
+      });
+
+  int _offeringStartOrder(domain.ClassSection a, domain.ClassSection b) =>
+      (a.startMinutesOfDay ?? 0).compareTo(b.startMinutesOfDay ?? 0);
 
   Stream<domain.ClassSection?> watchByCode(String code) {
     final query = _classCountQuery()
@@ -482,7 +586,6 @@ class ClassDao extends DatabaseAccessor<AppDatabase> with _$ClassDaoMixin {
       _roster(classId).watch().map(
         (rows) => rows.map((row) {
           final student = row.readTable(students);
-          final section = row.readTable(classSections);
           final device = row.readTableOrNull(devices);
           return domain.Student(
             id: student.id,
@@ -490,8 +593,6 @@ class ClassDao extends DatabaseAccessor<AppDatabase> with _$ClassDaoMixin {
             syncStatus: student.syncStatus,
             name: student.fullName,
             studentNumber: student.studentNumber,
-            classId: classId,
-            gradeLevel: 'Grade ${section.gradeLevel}',
             deviceRegistered: device != null,
           );
         }).toList(),
@@ -500,7 +601,6 @@ class ClassDao extends DatabaseAccessor<AppDatabase> with _$ClassDaoMixin {
       _roster(classId).get().then(
         (rows) => rows.map((row) {
           final student = row.readTable(students);
-          final section = row.readTable(classSections);
           final device = row.readTableOrNull(devices);
           return domain.Student(
             id: student.id,
@@ -508,8 +608,6 @@ class ClassDao extends DatabaseAccessor<AppDatabase> with _$ClassDaoMixin {
             syncStatus: student.syncStatus,
             name: student.fullName,
             studentNumber: student.studentNumber,
-            classId: classId,
-            gradeLevel: 'Grade ${section.gradeLevel}',
             deviceRegistered: device != null,
           );
         }).toList(),
@@ -555,6 +653,14 @@ class EnrollmentDao extends DatabaseAccessor<AppDatabase>
   EnrollmentDao(super.db);
   Future<void> insert(EnrollmentsCompanion row) =>
       into(enrollments).insert(row);
+  Future<bool> containsPair(String studentId, String classId) async =>
+      await (select(enrollments)..where(
+            (row) =>
+                row.studentId.equals(studentId) &
+                row.classSectionId.equals(classId),
+          ))
+          .getSingleOrNull() !=
+      null;
   Future<void> upsert(EnrollmentsCompanion row) =>
       into(enrollments).insertOnConflictUpdate(row);
   Future<void> deletePair(String studentId, String classId) async =>
@@ -582,6 +688,7 @@ class AttendanceDao extends DatabaseAccessor<AppDatabase>
         date: row.date,
         endedAt: row.endedAt,
         scanDurationSeconds: row.scanDurationSeconds,
+        manualOverride: row.manualOverride,
       );
   domain.AttendanceRecord _record(AttendanceRecordRow row) =>
       domain.AttendanceRecord(
@@ -922,6 +1029,27 @@ class SettingsDao extends DatabaseAccessor<AppDatabase>
           .map((row) => row == null ? null : _map(row));
   Future<void> save(AppSettingsRowsCompanion row) =>
       into(appSettingsRows).insertOnConflictUpdate(row);
+}
+
+@DriftAccessor(tables: [AppSessionPreferences])
+class AppSessionDao extends DatabaseAccessor<AppDatabase>
+    with _$AppSessionDaoMixin {
+  AppSessionDao(super.db);
+
+  Future<AppSessionPreferencesRow?> getPreferences() =>
+      select(appSessionPreferences).getSingleOrNull();
+
+  Future<void> savePreferences({
+    required String lastActiveRole,
+    String? activeStudentId,
+  }) => into(appSessionPreferences).insertOnConflictUpdate(
+    AppSessionPreferencesCompanion.insert(
+      id: 'application',
+      lastActiveRole: Value(lastActiveRole),
+      activeStudentId: Value(activeStudentId),
+      updatedAt: DateTime.now(),
+    ),
+  );
 }
 
 String newDatabaseId() => const Uuid().v4();

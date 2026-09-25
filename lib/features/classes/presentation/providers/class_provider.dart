@@ -33,6 +33,7 @@ class ClassCreationController extends Notifier<bool> {
     required String room,
     required DateTime scheduleStart,
     required DateTime scheduleEnd,
+    Set<Weekday> scheduleDays = const {},
   }) async {
     state = true;
     try {
@@ -45,6 +46,7 @@ class ClassCreationController extends Notifier<bool> {
             room: room,
             scheduleStart: scheduleStart,
             scheduleEnd: scheduleEnd,
+            scheduleDays: scheduleDays,
           );
     } finally {
       state = false;

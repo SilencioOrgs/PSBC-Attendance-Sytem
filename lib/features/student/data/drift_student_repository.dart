@@ -1,6 +1,5 @@
 import 'package:drift/drift.dart';
 
-import '../../../core/utils/section_code.dart';
 import '../../../core/utils/ble_identity.dart';
 import '../../../domain/models.dart';
 import '../../../domain/repositories.dart';
@@ -29,21 +28,15 @@ class DriftStudentRepository implements StudentRepository {
   Future<Student> registerStudent({
     required String name,
     required String studentNumber,
-    required String sectionCode,
+    String? sectionCode,
   }) async {
-    final parsed = parseSectionCode(sectionCode);
-    if (parsed == null) {
-      throw const InvalidSectionCodeException();
+    if (name.trim().isEmpty || studentNumber.trim().isEmpty) {
+      throw const ClassValidationException();
     }
-    final normalizedCode = normalizeSectionCode(sectionCode);
     if (await _db.studentDao.byNumber(studentNumber.trim()) != null) {
       throw const DuplicateStudentNumberException();
     }
-
-    final section = await _db.classDao.getByCode(normalizedCode);
-
     final id = newDatabaseId();
-    final enrollmentId = newDatabaseId();
     final now = DateTime.now();
     try {
       await _db.transaction(() async {
@@ -56,20 +49,9 @@ class DriftStudentRepository implements StudentRepository {
             studentNumber: studentNumber.trim(),
             fullName: name.trim(),
             isCurrent: const Value(true),
-            declaredSectionCode: Value(normalizedCode),
+            declaredSectionCode: const Value(null),
           ),
         );
-        if (section != null) {
-          await _db.enrollmentDao.insert(
-            EnrollmentsCompanion.insert(
-              id: enrollmentId,
-              updatedAt: now,
-              syncStatus: SyncStatus.pendingCreate,
-              studentId: id,
-              classSectionId: section.id,
-            ),
-          );
-        }
       });
     } catch (error) {
       if (error.toString().contains(
@@ -85,10 +67,7 @@ class DriftStudentRepository implements StudentRepository {
       syncStatus: SyncStatus.pendingCreate,
       name: name.trim(),
       studentNumber: studentNumber.trim(),
-      classId: section?.id ?? '',
-      gradeLevel: 'Grade ${parsed.gradeLevel}',
       deviceRegistered: false,
-      sectionCode: normalizedCode,
     );
   }
 
@@ -102,9 +81,7 @@ class DriftStudentRepository implements StudentRepository {
     if (name.trim().isEmpty || studentNumber.trim().isEmpty) {
       throw const ClassValidationException();
     }
-    if (await _db.studentDao.byNumber(studentNumber.trim()) != null) {
-      throw const DuplicateStudentNumberException();
-    }
+    final existing = await _db.studentDao.byNumber(studentNumber.trim());
     final normalizedBleUuid = bleUuid?.trim().isNotEmpty == true
         ? normalizeBleIdentity(bleUuid!)
         : null;
@@ -113,37 +90,57 @@ class DriftStudentRepository implements StudentRepository {
     }
     final section = await _db.classDao.getClass(classId);
     if (section == null) throw const ClassSectionNotFoundException();
-    final id = newDatabaseId();
+    if (existing != null &&
+        await _db.enrollmentDao.containsPair(existing.id, classId)) {
+      throw const DuplicateEnrollmentException();
+    }
+    final id = existing?.id ?? newDatabaseId();
+    final existingDevice = await _db.deviceDao.getStudent(id);
+    if (normalizedBleUuid != null &&
+        existingDevice != null &&
+        normalizeBleIdentity(existingDevice.bleUuid) != normalizedBleUuid) {
+      throw const StudentAlreadyHasDeviceException();
+    }
     final enrollmentId = newDatabaseId();
     final now = DateTime.now();
     try {
       await _db.transaction(() async {
-        await _db.studentDao.insert(
-          StudentsCompanion.insert(
-            id: id,
-            updatedAt: now,
-            syncStatus: SyncStatus.pendingCreate,
-            studentNumber: studentNumber.trim(),
-            fullName: name.trim(),
-          ),
-        );
-        await _db.enrollmentDao.insert(
-          EnrollmentsCompanion.insert(
-            id: enrollmentId,
-            updatedAt: now,
-            syncStatus: SyncStatus.pendingCreate,
-            studentId: id,
-            classSectionId: classId,
-          ),
-        );
-        if (bleUuid?.trim().isNotEmpty == true) {
+        if (existing == null) {
+          await _db.studentDao.insert(
+            StudentsCompanion.insert(
+              id: id,
+              updatedAt: now,
+              syncStatus: SyncStatus.pendingCreate,
+              studentNumber: studentNumber.trim(),
+              fullName: name.trim(),
+            ),
+          );
+        }
+        try {
+          await _db.enrollmentDao.insert(
+            EnrollmentsCompanion.insert(
+              id: enrollmentId,
+              updatedAt: now,
+              syncStatus: SyncStatus.pendingCreate,
+              studentId: id,
+              classSectionId: classId,
+            ),
+          );
+        } catch (error) {
+          if (error.toString().contains('enrollments.student_id') ||
+              error.toString().contains('enrollments_student_class_unique')) {
+            throw const DuplicateEnrollmentException();
+          }
+          rethrow;
+        }
+        if (normalizedBleUuid != null && existingDevice == null) {
           await _db.deviceDao.insert(
             DevicesCompanion.insert(
               id: newDatabaseId(),
               updatedAt: now,
               syncStatus: SyncStatus.pendingCreate,
               studentId: id,
-              bleUuid: normalizedBleUuid!,
+              bleUuid: normalizedBleUuid,
               deviceModel: 'Student device',
               registeredAt: now,
             ),

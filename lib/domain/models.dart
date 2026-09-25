@@ -11,6 +11,8 @@ enum AttendanceRecordStatus {
   manualAbsent,
 }
 
+enum Weekday { monday, tuesday, wednesday, thursday, friday, saturday, sunday }
+
 class Teacher {
   const Teacher({
     required this.id,
@@ -31,24 +33,20 @@ class Student {
     required this.syncStatus,
     required this.name,
     required this.studentNumber,
-    required this.classId,
-    required this.gradeLevel,
-    required this.deviceRegistered,
-    this.sectionCode = '',
+    this.deviceRegistered = false,
   });
   final String id;
   final DateTime updatedAt;
   final SyncStatus syncStatus;
   final String name;
   final String studentNumber;
-  final String classId;
-  final String gradeLevel;
+
+  /// A roster projection only; enrollment remains the source of membership.
   final bool deviceRegistered;
-  final String sectionCode;
 }
 
-class ClassSection {
-  const ClassSection({
+class ClassOffering {
+  const ClassOffering({
     required this.id,
     required this.updatedAt,
     required this.syncStatus,
@@ -62,6 +60,9 @@ class ClassSection {
     this.sectionCode = '',
     this.scheduleStart,
     this.scheduleEnd,
+    this.scheduleDays = const {},
+    this.startMinutesOfDay,
+    this.endMinutesOfDay,
     this.bleBeaconId = '',
     this.teacherId = '',
   });
@@ -78,9 +79,15 @@ class ClassSection {
   final String sectionCode;
   final DateTime? scheduleStart;
   final DateTime? scheduleEnd;
+  final Set<Weekday> scheduleDays;
+  final int? startMinutesOfDay;
+  final int? endMinutesOfDay;
   final String bleBeaconId;
   final String teacherId;
 }
+
+/// Compatibility alias while existing class feature names are migrated.
+typedef ClassSection = ClassOffering;
 
 class Enrollment {
   const Enrollment({
@@ -88,13 +95,16 @@ class Enrollment {
     required this.updatedAt,
     required this.syncStatus,
     required this.studentId,
-    required this.classId,
+    required this.classOfferingId,
   });
   final String id;
   final DateTime updatedAt;
   final SyncStatus syncStatus;
   final String studentId;
-  final String classId;
+  final String classOfferingId;
+
+  @Deprecated('Use classOfferingId.')
+  String get classId => classOfferingId;
 }
 
 class AttendanceSession {
@@ -102,18 +112,22 @@ class AttendanceSession {
     required this.id,
     required this.updatedAt,
     required this.syncStatus,
-    required this.classId,
+    String? classId,
+    String? classOfferingId,
     required this.title,
     required this.startedAt,
     required this.status,
     this.date,
     this.endedAt,
     this.scanDurationSeconds = 0,
-  });
+    this.manualOverride = false,
+  }) : classOfferingId = classOfferingId ?? classId ?? '';
   final String id;
   final DateTime updatedAt;
   final SyncStatus syncStatus;
-  final String classId;
+  final String classOfferingId;
+  @Deprecated('Use classOfferingId.')
+  String get classId => classOfferingId;
   final String title;
   final DateTime startedAt;
 
@@ -122,6 +136,7 @@ class AttendanceSession {
   final DateTime? date;
   final DateTime? endedAt;
   final int scanDurationSeconds;
+  final bool manualOverride;
 }
 
 class AttendanceRecord {

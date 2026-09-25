@@ -18,7 +18,7 @@ class ReportDataService {
 
   Future<AttendanceSessionReport> attendanceSession(String sessionId) async {
     final session = await _requiredSession(sessionId);
-    final section = await _requiredClass(session.classId);
+    final section = await _requiredClass(session.classOfferingId);
     final teacher = await _teachers.getTeacher();
     final records = await _attendance.getRecords(sessionId);
     final rows = <AttendanceReportRow>[];
@@ -56,7 +56,7 @@ class ReportDataService {
         (await _attendance.getSessions())
             .where(
               (session) =>
-                  session.classId == classId &&
+                  session.classOfferingId == classId &&
                   session.status == AttendanceSessionStatus.completed,
             )
             .toList()
@@ -104,7 +104,7 @@ class ReportDataService {
         (await _attendance.getSessions())
             .where(
               (session) =>
-                  session.classId == classId &&
+                  session.classOfferingId == classId &&
                   session.status == AttendanceSessionStatus.completed,
             )
             .toList()

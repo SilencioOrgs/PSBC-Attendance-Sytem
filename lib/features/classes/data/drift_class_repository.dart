@@ -25,6 +25,12 @@ class DriftClassRepository implements ClassRepository {
   Stream<ClassSection?> watchClassByCode(String sectionCode) =>
       _db.classDao.watchByCode(sectionCode);
   @override
+  Future<List<ClassSection>> getStudentOfferings(String studentId) =>
+      _db.classDao.getStudentOfferings(studentId);
+  @override
+  Stream<List<ClassSection>> watchStudentOfferings(String studentId) =>
+      _db.classDao.watchStudentOfferings(studentId);
+  @override
   Future<List<Student>> getStudents(String classId) =>
       _db.classDao.getStudents(classId);
   @override
@@ -39,21 +45,23 @@ class DriftClassRepository implements ClassRepository {
     required String room,
     required DateTime scheduleStart,
     required DateTime scheduleEnd,
+    Set<Weekday> scheduleDays = const {},
   }) async {
     final parsed = parseSectionCode('GRADE$gradeLevel-$sectionLabel');
     if (gradeLevel <= 0 ||
         parsed == null ||
         subject.trim().isEmpty ||
         room.trim().isEmpty ||
-        scheduleEnd.isBefore(scheduleStart)) {
+        !scheduleEnd.isAfter(scheduleStart)) {
       throw const ClassValidationException();
     }
     final sectionCode = normalizeSectionCode('GRADE$gradeLevel-$sectionLabel');
-    if (await _db.classDao.getByCode(sectionCode) != null) {
-      throw const DuplicateClassException();
-    }
     final teacher = await _db.teacherDao.getTeacherOrNull();
     if (teacher == null) throw const ClassSectionNotFoundException();
+    if (await _db.classDao.findOffering(teacher.id, sectionCode, subject) !=
+        null) {
+      throw const DuplicateClassException();
+    }
     final id = newDatabaseId();
     final now = DateTime.now();
     try {
@@ -69,12 +77,17 @@ class DriftClassRepository implements ClassRepository {
           room: room.trim(),
           scheduleStart: scheduleStart,
           scheduleEnd: scheduleEnd,
+          scheduleDays: Value(weekdayMask(scheduleDays)),
+          startMinutesOfDay: Value(
+            scheduleStart.hour * 60 + scheduleStart.minute,
+          ),
+          endMinutesOfDay: Value(scheduleEnd.hour * 60 + scheduleEnd.minute),
           bleBeaconId: '',
           teacherId: teacher.id,
         ),
       );
     } catch (error) {
-      if (error.toString().contains('class_sections.section_code')) {
+      if (error.toString().contains('class_offering_identity_unique')) {
         throw const DuplicateClassException();
       }
       rethrow;
@@ -98,7 +111,11 @@ class DriftClassRepository implements ClassRepository {
     final code = normalizeSectionCode(
       'GRADE${section.gradeLevel}-${parsed.sectionLabel}',
     );
-    final duplicate = await _db.classDao.getByCode(code);
+    final duplicate = await _db.classDao.findOffering(
+      section.teacherId,
+      code,
+      section.subject,
+    );
     if (duplicate != null && duplicate.id != section.id) {
       throw const DuplicateClassException();
     }
@@ -114,6 +131,15 @@ class DriftClassRepository implements ClassRepository {
         room: Value(section.room.trim()),
         scheduleStart: Value(section.scheduleStart!),
         scheduleEnd: Value(section.scheduleEnd!),
+        scheduleDays: Value(weekdayMask(section.scheduleDays)),
+        startMinutesOfDay: Value(
+          section.startMinutesOfDay ??
+              section.scheduleStart!.hour * 60 + section.scheduleStart!.minute,
+        ),
+        endMinutesOfDay: Value(
+          section.endMinutesOfDay ??
+              section.scheduleEnd!.hour * 60 + section.scheduleEnd!.minute,
+        ),
       ),
     );
     final saved = await _db.classDao.getClass(section.id);

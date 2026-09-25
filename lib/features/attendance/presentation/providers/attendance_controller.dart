@@ -60,12 +60,15 @@ class AttendanceController extends Notifier<AttendanceWorkflow> {
     return const AttendanceWorkflow();
   }
 
-  Future<AttendanceSession> prepareSession(String classId) async {
+  Future<AttendanceSession> prepareSession(
+    String classId, {
+    bool manualOverride = false,
+  }) async {
     state = const AttendanceWorkflow(state: AttendanceWorkflowState.preparing);
     try {
       final session = await ref
           .read(attendanceRepositoryProvider)
-          .startSession(classId);
+          .startSession(classId, manualOverride: manualOverride);
       state = AttendanceWorkflow(
         state: AttendanceWorkflowState.idle,
         sessionId: session.id,
@@ -110,7 +113,7 @@ class AttendanceController extends Notifier<AttendanceWorkflow> {
       }
       final roster = await ref
           .read(classRepositoryProvider)
-          .getStudents(session.classId);
+          .getStudents(session.classOfferingId);
       if (roster.isEmpty) {
         throw const EmptyClassRosterException();
       }

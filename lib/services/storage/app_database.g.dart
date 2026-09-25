@@ -47,8 +47,29 @@ class $TeachersTable extends Teachers
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _isLocalMeta = const VerificationMeta(
+    'isLocal',
+  );
   @override
-  List<GeneratedColumn> get $columns => [id, updatedAt, syncStatus, name];
+  late final GeneratedColumn<bool> isLocal = GeneratedColumn<bool>(
+    'is_local',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_local" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    updatedAt,
+    syncStatus,
+    name,
+    isLocal,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -82,6 +103,12 @@ class $TeachersTable extends Teachers
     } else if (isInserting) {
       context.missing(_nameMeta);
     }
+    if (data.containsKey('is_local')) {
+      context.handle(
+        _isLocalMeta,
+        isLocal.isAcceptableOrUnknown(data['is_local']!, _isLocalMeta),
+      );
+    }
     return context;
   }
 
@@ -109,6 +136,10 @@ class $TeachersTable extends Teachers
         DriftSqlType.string,
         data['${effectivePrefix}name'],
       )!,
+      isLocal: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_local'],
+      )!,
     );
   }
 
@@ -126,11 +157,13 @@ class TeacherRow extends DataClass implements Insertable<TeacherRow> {
   final DateTime updatedAt;
   final domain.SyncStatus syncStatus;
   final String name;
+  final bool isLocal;
   const TeacherRow({
     required this.id,
     required this.updatedAt,
     required this.syncStatus,
     required this.name,
+    required this.isLocal,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -143,6 +176,7 @@ class TeacherRow extends DataClass implements Insertable<TeacherRow> {
       );
     }
     map['name'] = Variable<String>(name);
+    map['is_local'] = Variable<bool>(isLocal);
     return map;
   }
 
@@ -152,6 +186,7 @@ class TeacherRow extends DataClass implements Insertable<TeacherRow> {
       updatedAt: Value(updatedAt),
       syncStatus: Value(syncStatus),
       name: Value(name),
+      isLocal: Value(isLocal),
     );
   }
 
@@ -165,6 +200,7 @@ class TeacherRow extends DataClass implements Insertable<TeacherRow> {
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       syncStatus: serializer.fromJson<domain.SyncStatus>(json['syncStatus']),
       name: serializer.fromJson<String>(json['name']),
+      isLocal: serializer.fromJson<bool>(json['isLocal']),
     );
   }
   @override
@@ -175,6 +211,7 @@ class TeacherRow extends DataClass implements Insertable<TeacherRow> {
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'syncStatus': serializer.toJson<domain.SyncStatus>(syncStatus),
       'name': serializer.toJson<String>(name),
+      'isLocal': serializer.toJson<bool>(isLocal),
     };
   }
 
@@ -183,11 +220,13 @@ class TeacherRow extends DataClass implements Insertable<TeacherRow> {
     DateTime? updatedAt,
     domain.SyncStatus? syncStatus,
     String? name,
+    bool? isLocal,
   }) => TeacherRow(
     id: id ?? this.id,
     updatedAt: updatedAt ?? this.updatedAt,
     syncStatus: syncStatus ?? this.syncStatus,
     name: name ?? this.name,
+    isLocal: isLocal ?? this.isLocal,
   );
   TeacherRow copyWithCompanion(TeachersCompanion data) {
     return TeacherRow(
@@ -197,6 +236,7 @@ class TeacherRow extends DataClass implements Insertable<TeacherRow> {
           ? data.syncStatus.value
           : this.syncStatus,
       name: data.name.present ? data.name.value : this.name,
+      isLocal: data.isLocal.present ? data.isLocal.value : this.isLocal,
     );
   }
 
@@ -206,13 +246,14 @@ class TeacherRow extends DataClass implements Insertable<TeacherRow> {
           ..write('id: $id, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('syncStatus: $syncStatus, ')
-          ..write('name: $name')
+          ..write('name: $name, ')
+          ..write('isLocal: $isLocal')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, updatedAt, syncStatus, name);
+  int get hashCode => Object.hash(id, updatedAt, syncStatus, name, isLocal);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -220,7 +261,8 @@ class TeacherRow extends DataClass implements Insertable<TeacherRow> {
           other.id == this.id &&
           other.updatedAt == this.updatedAt &&
           other.syncStatus == this.syncStatus &&
-          other.name == this.name);
+          other.name == this.name &&
+          other.isLocal == this.isLocal);
 }
 
 class TeachersCompanion extends UpdateCompanion<TeacherRow> {
@@ -228,12 +270,14 @@ class TeachersCompanion extends UpdateCompanion<TeacherRow> {
   final Value<DateTime> updatedAt;
   final Value<domain.SyncStatus> syncStatus;
   final Value<String> name;
+  final Value<bool> isLocal;
   final Value<int> rowid;
   const TeachersCompanion({
     this.id = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.syncStatus = const Value.absent(),
     this.name = const Value.absent(),
+    this.isLocal = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   TeachersCompanion.insert({
@@ -241,6 +285,7 @@ class TeachersCompanion extends UpdateCompanion<TeacherRow> {
     required DateTime updatedAt,
     required domain.SyncStatus syncStatus,
     required String name,
+    this.isLocal = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        updatedAt = Value(updatedAt),
@@ -251,6 +296,7 @@ class TeachersCompanion extends UpdateCompanion<TeacherRow> {
     Expression<DateTime>? updatedAt,
     Expression<String>? syncStatus,
     Expression<String>? name,
+    Expression<bool>? isLocal,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -258,6 +304,7 @@ class TeachersCompanion extends UpdateCompanion<TeacherRow> {
       if (updatedAt != null) 'updated_at': updatedAt,
       if (syncStatus != null) 'sync_status': syncStatus,
       if (name != null) 'name': name,
+      if (isLocal != null) 'is_local': isLocal,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -267,6 +314,7 @@ class TeachersCompanion extends UpdateCompanion<TeacherRow> {
     Value<DateTime>? updatedAt,
     Value<domain.SyncStatus>? syncStatus,
     Value<String>? name,
+    Value<bool>? isLocal,
     Value<int>? rowid,
   }) {
     return TeachersCompanion(
@@ -274,6 +322,7 @@ class TeachersCompanion extends UpdateCompanion<TeacherRow> {
       updatedAt: updatedAt ?? this.updatedAt,
       syncStatus: syncStatus ?? this.syncStatus,
       name: name ?? this.name,
+      isLocal: isLocal ?? this.isLocal,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -295,6 +344,9 @@ class TeachersCompanion extends UpdateCompanion<TeacherRow> {
     if (name.present) {
       map['name'] = Variable<String>(name.value);
     }
+    if (isLocal.present) {
+      map['is_local'] = Variable<bool>(isLocal.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -308,6 +360,7 @@ class TeachersCompanion extends UpdateCompanion<TeacherRow> {
           ..write('updatedAt: $updatedAt, ')
           ..write('syncStatus: $syncStatus, ')
           ..write('name: $name, ')
+          ..write('isLocal: $isLocal, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -868,7 +921,6 @@ class $ClassSectionsTable extends ClassSections
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: true,
-    defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'),
   );
   static const VerificationMeta _subjectMeta = const VerificationMeta(
     'subject',
@@ -914,6 +966,42 @@ class $ClassSectionsTable extends ClassSections
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _scheduleDaysMeta = const VerificationMeta(
+    'scheduleDays',
+  );
+  @override
+  late final GeneratedColumn<int> scheduleDays = GeneratedColumn<int>(
+    'schedule_days',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _startMinutesOfDayMeta = const VerificationMeta(
+    'startMinutesOfDay',
+  );
+  @override
+  late final GeneratedColumn<int> startMinutesOfDay = GeneratedColumn<int>(
+    'start_minutes_of_day',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(480),
+  );
+  static const VerificationMeta _endMinutesOfDayMeta = const VerificationMeta(
+    'endMinutesOfDay',
+  );
+  @override
+  late final GeneratedColumn<int> endMinutesOfDay = GeneratedColumn<int>(
+    'end_minutes_of_day',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(540),
+  );
   static const VerificationMeta _bleBeaconIdMeta = const VerificationMeta(
     'bleBeaconId',
   );
@@ -951,6 +1039,9 @@ class $ClassSectionsTable extends ClassSections
     room,
     scheduleStart,
     scheduleEnd,
+    scheduleDays,
+    startMinutesOfDay,
+    endMinutesOfDay,
     bleBeaconId,
     teacherId,
   ];
@@ -1045,6 +1136,33 @@ class $ClassSectionsTable extends ClassSections
     } else if (isInserting) {
       context.missing(_scheduleEndMeta);
     }
+    if (data.containsKey('schedule_days')) {
+      context.handle(
+        _scheduleDaysMeta,
+        scheduleDays.isAcceptableOrUnknown(
+          data['schedule_days']!,
+          _scheduleDaysMeta,
+        ),
+      );
+    }
+    if (data.containsKey('start_minutes_of_day')) {
+      context.handle(
+        _startMinutesOfDayMeta,
+        startMinutesOfDay.isAcceptableOrUnknown(
+          data['start_minutes_of_day']!,
+          _startMinutesOfDayMeta,
+        ),
+      );
+    }
+    if (data.containsKey('end_minutes_of_day')) {
+      context.handle(
+        _endMinutesOfDayMeta,
+        endMinutesOfDay.isAcceptableOrUnknown(
+          data['end_minutes_of_day']!,
+          _endMinutesOfDayMeta,
+        ),
+      );
+    }
     if (data.containsKey('ble_beacon_id')) {
       context.handle(
         _bleBeaconIdMeta,
@@ -1115,6 +1233,18 @@ class $ClassSectionsTable extends ClassSections
         DriftSqlType.dateTime,
         data['${effectivePrefix}schedule_end'],
       )!,
+      scheduleDays: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}schedule_days'],
+      )!,
+      startMinutesOfDay: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}start_minutes_of_day'],
+      )!,
+      endMinutesOfDay: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}end_minutes_of_day'],
+      )!,
       bleBeaconId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}ble_beacon_id'],
@@ -1146,6 +1276,9 @@ class ClassSectionRow extends DataClass implements Insertable<ClassSectionRow> {
   final String room;
   final DateTime scheduleStart;
   final DateTime scheduleEnd;
+  final int scheduleDays;
+  final int startMinutesOfDay;
+  final int endMinutesOfDay;
   final String bleBeaconId;
   final String teacherId;
   const ClassSectionRow({
@@ -1159,6 +1292,9 @@ class ClassSectionRow extends DataClass implements Insertable<ClassSectionRow> {
     required this.room,
     required this.scheduleStart,
     required this.scheduleEnd,
+    required this.scheduleDays,
+    required this.startMinutesOfDay,
+    required this.endMinutesOfDay,
     required this.bleBeaconId,
     required this.teacherId,
   });
@@ -1179,6 +1315,9 @@ class ClassSectionRow extends DataClass implements Insertable<ClassSectionRow> {
     map['room'] = Variable<String>(room);
     map['schedule_start'] = Variable<DateTime>(scheduleStart);
     map['schedule_end'] = Variable<DateTime>(scheduleEnd);
+    map['schedule_days'] = Variable<int>(scheduleDays);
+    map['start_minutes_of_day'] = Variable<int>(startMinutesOfDay);
+    map['end_minutes_of_day'] = Variable<int>(endMinutesOfDay);
     map['ble_beacon_id'] = Variable<String>(bleBeaconId);
     map['teacher_id'] = Variable<String>(teacherId);
     return map;
@@ -1196,6 +1335,9 @@ class ClassSectionRow extends DataClass implements Insertable<ClassSectionRow> {
       room: Value(room),
       scheduleStart: Value(scheduleStart),
       scheduleEnd: Value(scheduleEnd),
+      scheduleDays: Value(scheduleDays),
+      startMinutesOfDay: Value(startMinutesOfDay),
+      endMinutesOfDay: Value(endMinutesOfDay),
       bleBeaconId: Value(bleBeaconId),
       teacherId: Value(teacherId),
     );
@@ -1217,6 +1359,9 @@ class ClassSectionRow extends DataClass implements Insertable<ClassSectionRow> {
       room: serializer.fromJson<String>(json['room']),
       scheduleStart: serializer.fromJson<DateTime>(json['scheduleStart']),
       scheduleEnd: serializer.fromJson<DateTime>(json['scheduleEnd']),
+      scheduleDays: serializer.fromJson<int>(json['scheduleDays']),
+      startMinutesOfDay: serializer.fromJson<int>(json['startMinutesOfDay']),
+      endMinutesOfDay: serializer.fromJson<int>(json['endMinutesOfDay']),
       bleBeaconId: serializer.fromJson<String>(json['bleBeaconId']),
       teacherId: serializer.fromJson<String>(json['teacherId']),
     );
@@ -1235,6 +1380,9 @@ class ClassSectionRow extends DataClass implements Insertable<ClassSectionRow> {
       'room': serializer.toJson<String>(room),
       'scheduleStart': serializer.toJson<DateTime>(scheduleStart),
       'scheduleEnd': serializer.toJson<DateTime>(scheduleEnd),
+      'scheduleDays': serializer.toJson<int>(scheduleDays),
+      'startMinutesOfDay': serializer.toJson<int>(startMinutesOfDay),
+      'endMinutesOfDay': serializer.toJson<int>(endMinutesOfDay),
       'bleBeaconId': serializer.toJson<String>(bleBeaconId),
       'teacherId': serializer.toJson<String>(teacherId),
     };
@@ -1251,6 +1399,9 @@ class ClassSectionRow extends DataClass implements Insertable<ClassSectionRow> {
     String? room,
     DateTime? scheduleStart,
     DateTime? scheduleEnd,
+    int? scheduleDays,
+    int? startMinutesOfDay,
+    int? endMinutesOfDay,
     String? bleBeaconId,
     String? teacherId,
   }) => ClassSectionRow(
@@ -1264,6 +1415,9 @@ class ClassSectionRow extends DataClass implements Insertable<ClassSectionRow> {
     room: room ?? this.room,
     scheduleStart: scheduleStart ?? this.scheduleStart,
     scheduleEnd: scheduleEnd ?? this.scheduleEnd,
+    scheduleDays: scheduleDays ?? this.scheduleDays,
+    startMinutesOfDay: startMinutesOfDay ?? this.startMinutesOfDay,
+    endMinutesOfDay: endMinutesOfDay ?? this.endMinutesOfDay,
     bleBeaconId: bleBeaconId ?? this.bleBeaconId,
     teacherId: teacherId ?? this.teacherId,
   );
@@ -1291,6 +1445,15 @@ class ClassSectionRow extends DataClass implements Insertable<ClassSectionRow> {
       scheduleEnd: data.scheduleEnd.present
           ? data.scheduleEnd.value
           : this.scheduleEnd,
+      scheduleDays: data.scheduleDays.present
+          ? data.scheduleDays.value
+          : this.scheduleDays,
+      startMinutesOfDay: data.startMinutesOfDay.present
+          ? data.startMinutesOfDay.value
+          : this.startMinutesOfDay,
+      endMinutesOfDay: data.endMinutesOfDay.present
+          ? data.endMinutesOfDay.value
+          : this.endMinutesOfDay,
       bleBeaconId: data.bleBeaconId.present
           ? data.bleBeaconId.value
           : this.bleBeaconId,
@@ -1311,6 +1474,9 @@ class ClassSectionRow extends DataClass implements Insertable<ClassSectionRow> {
           ..write('room: $room, ')
           ..write('scheduleStart: $scheduleStart, ')
           ..write('scheduleEnd: $scheduleEnd, ')
+          ..write('scheduleDays: $scheduleDays, ')
+          ..write('startMinutesOfDay: $startMinutesOfDay, ')
+          ..write('endMinutesOfDay: $endMinutesOfDay, ')
           ..write('bleBeaconId: $bleBeaconId, ')
           ..write('teacherId: $teacherId')
           ..write(')'))
@@ -1329,6 +1495,9 @@ class ClassSectionRow extends DataClass implements Insertable<ClassSectionRow> {
     room,
     scheduleStart,
     scheduleEnd,
+    scheduleDays,
+    startMinutesOfDay,
+    endMinutesOfDay,
     bleBeaconId,
     teacherId,
   );
@@ -1346,6 +1515,9 @@ class ClassSectionRow extends DataClass implements Insertable<ClassSectionRow> {
           other.room == this.room &&
           other.scheduleStart == this.scheduleStart &&
           other.scheduleEnd == this.scheduleEnd &&
+          other.scheduleDays == this.scheduleDays &&
+          other.startMinutesOfDay == this.startMinutesOfDay &&
+          other.endMinutesOfDay == this.endMinutesOfDay &&
           other.bleBeaconId == this.bleBeaconId &&
           other.teacherId == this.teacherId);
 }
@@ -1361,6 +1533,9 @@ class ClassSectionsCompanion extends UpdateCompanion<ClassSectionRow> {
   final Value<String> room;
   final Value<DateTime> scheduleStart;
   final Value<DateTime> scheduleEnd;
+  final Value<int> scheduleDays;
+  final Value<int> startMinutesOfDay;
+  final Value<int> endMinutesOfDay;
   final Value<String> bleBeaconId;
   final Value<String> teacherId;
   final Value<int> rowid;
@@ -1375,6 +1550,9 @@ class ClassSectionsCompanion extends UpdateCompanion<ClassSectionRow> {
     this.room = const Value.absent(),
     this.scheduleStart = const Value.absent(),
     this.scheduleEnd = const Value.absent(),
+    this.scheduleDays = const Value.absent(),
+    this.startMinutesOfDay = const Value.absent(),
+    this.endMinutesOfDay = const Value.absent(),
     this.bleBeaconId = const Value.absent(),
     this.teacherId = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -1390,6 +1568,9 @@ class ClassSectionsCompanion extends UpdateCompanion<ClassSectionRow> {
     required String room,
     required DateTime scheduleStart,
     required DateTime scheduleEnd,
+    this.scheduleDays = const Value.absent(),
+    this.startMinutesOfDay = const Value.absent(),
+    this.endMinutesOfDay = const Value.absent(),
     required String bleBeaconId,
     required String teacherId,
     this.rowid = const Value.absent(),
@@ -1415,6 +1596,9 @@ class ClassSectionsCompanion extends UpdateCompanion<ClassSectionRow> {
     Expression<String>? room,
     Expression<DateTime>? scheduleStart,
     Expression<DateTime>? scheduleEnd,
+    Expression<int>? scheduleDays,
+    Expression<int>? startMinutesOfDay,
+    Expression<int>? endMinutesOfDay,
     Expression<String>? bleBeaconId,
     Expression<String>? teacherId,
     Expression<int>? rowid,
@@ -1430,6 +1614,9 @@ class ClassSectionsCompanion extends UpdateCompanion<ClassSectionRow> {
       if (room != null) 'room': room,
       if (scheduleStart != null) 'schedule_start': scheduleStart,
       if (scheduleEnd != null) 'schedule_end': scheduleEnd,
+      if (scheduleDays != null) 'schedule_days': scheduleDays,
+      if (startMinutesOfDay != null) 'start_minutes_of_day': startMinutesOfDay,
+      if (endMinutesOfDay != null) 'end_minutes_of_day': endMinutesOfDay,
       if (bleBeaconId != null) 'ble_beacon_id': bleBeaconId,
       if (teacherId != null) 'teacher_id': teacherId,
       if (rowid != null) 'rowid': rowid,
@@ -1447,6 +1634,9 @@ class ClassSectionsCompanion extends UpdateCompanion<ClassSectionRow> {
     Value<String>? room,
     Value<DateTime>? scheduleStart,
     Value<DateTime>? scheduleEnd,
+    Value<int>? scheduleDays,
+    Value<int>? startMinutesOfDay,
+    Value<int>? endMinutesOfDay,
     Value<String>? bleBeaconId,
     Value<String>? teacherId,
     Value<int>? rowid,
@@ -1462,6 +1652,9 @@ class ClassSectionsCompanion extends UpdateCompanion<ClassSectionRow> {
       room: room ?? this.room,
       scheduleStart: scheduleStart ?? this.scheduleStart,
       scheduleEnd: scheduleEnd ?? this.scheduleEnd,
+      scheduleDays: scheduleDays ?? this.scheduleDays,
+      startMinutesOfDay: startMinutesOfDay ?? this.startMinutesOfDay,
+      endMinutesOfDay: endMinutesOfDay ?? this.endMinutesOfDay,
       bleBeaconId: bleBeaconId ?? this.bleBeaconId,
       teacherId: teacherId ?? this.teacherId,
       rowid: rowid ?? this.rowid,
@@ -1503,6 +1696,15 @@ class ClassSectionsCompanion extends UpdateCompanion<ClassSectionRow> {
     if (scheduleEnd.present) {
       map['schedule_end'] = Variable<DateTime>(scheduleEnd.value);
     }
+    if (scheduleDays.present) {
+      map['schedule_days'] = Variable<int>(scheduleDays.value);
+    }
+    if (startMinutesOfDay.present) {
+      map['start_minutes_of_day'] = Variable<int>(startMinutesOfDay.value);
+    }
+    if (endMinutesOfDay.present) {
+      map['end_minutes_of_day'] = Variable<int>(endMinutesOfDay.value);
+    }
     if (bleBeaconId.present) {
       map['ble_beacon_id'] = Variable<String>(bleBeaconId.value);
     }
@@ -1528,6 +1730,9 @@ class ClassSectionsCompanion extends UpdateCompanion<ClassSectionRow> {
           ..write('room: $room, ')
           ..write('scheduleStart: $scheduleStart, ')
           ..write('scheduleEnd: $scheduleEnd, ')
+          ..write('scheduleDays: $scheduleDays, ')
+          ..write('startMinutesOfDay: $startMinutesOfDay, ')
+          ..write('endMinutesOfDay: $endMinutesOfDay, ')
           ..write('bleBeaconId: $bleBeaconId, ')
           ..write('teacherId: $teacherId, ')
           ..write('rowid: $rowid')
@@ -2032,6 +2237,21 @@ class $AttendanceSessionsTable extends AttendanceSessions
       ).withConverter<domain.AttendanceSessionStatus>(
         $AttendanceSessionsTable.$converterstatus,
       );
+  static const VerificationMeta _manualOverrideMeta = const VerificationMeta(
+    'manualOverride',
+  );
+  @override
+  late final GeneratedColumn<bool> manualOverride = GeneratedColumn<bool>(
+    'manual_override',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("manual_override" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -2044,6 +2264,7 @@ class $AttendanceSessionsTable extends AttendanceSessions
     endedAt,
     scanDurationSeconds,
     status,
+    manualOverride,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2118,6 +2339,15 @@ class $AttendanceSessionsTable extends AttendanceSessions
         ),
       );
     }
+    if (data.containsKey('manual_override')) {
+      context.handle(
+        _manualOverrideMeta,
+        manualOverride.isAcceptableOrUnknown(
+          data['manual_override']!,
+          _manualOverrideMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -2171,6 +2401,10 @@ class $AttendanceSessionsTable extends AttendanceSessions
           data['${effectivePrefix}status'],
         )!,
       ),
+      manualOverride: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}manual_override'],
+      )!,
     );
   }
 
@@ -2197,6 +2431,7 @@ class AttendanceSessionRow extends DataClass
   final DateTime? endedAt;
   final int scanDurationSeconds;
   final domain.AttendanceSessionStatus status;
+  final bool manualOverride;
   const AttendanceSessionRow({
     required this.id,
     required this.updatedAt,
@@ -2208,6 +2443,7 @@ class AttendanceSessionRow extends DataClass
     this.endedAt,
     required this.scanDurationSeconds,
     required this.status,
+    required this.manualOverride,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2232,6 +2468,7 @@ class AttendanceSessionRow extends DataClass
         $AttendanceSessionsTable.$converterstatus.toSql(status),
       );
     }
+    map['manual_override'] = Variable<bool>(manualOverride);
     return map;
   }
 
@@ -2249,6 +2486,7 @@ class AttendanceSessionRow extends DataClass
           : Value(endedAt),
       scanDurationSeconds: Value(scanDurationSeconds),
       status: Value(status),
+      manualOverride: Value(manualOverride),
     );
   }
 
@@ -2272,6 +2510,7 @@ class AttendanceSessionRow extends DataClass
       status: serializer.fromJson<domain.AttendanceSessionStatus>(
         json['status'],
       ),
+      manualOverride: serializer.fromJson<bool>(json['manualOverride']),
     );
   }
   @override
@@ -2288,6 +2527,7 @@ class AttendanceSessionRow extends DataClass
       'endedAt': serializer.toJson<DateTime?>(endedAt),
       'scanDurationSeconds': serializer.toJson<int>(scanDurationSeconds),
       'status': serializer.toJson<domain.AttendanceSessionStatus>(status),
+      'manualOverride': serializer.toJson<bool>(manualOverride),
     };
   }
 
@@ -2302,6 +2542,7 @@ class AttendanceSessionRow extends DataClass
     Value<DateTime?> endedAt = const Value.absent(),
     int? scanDurationSeconds,
     domain.AttendanceSessionStatus? status,
+    bool? manualOverride,
   }) => AttendanceSessionRow(
     id: id ?? this.id,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -2313,6 +2554,7 @@ class AttendanceSessionRow extends DataClass
     endedAt: endedAt.present ? endedAt.value : this.endedAt,
     scanDurationSeconds: scanDurationSeconds ?? this.scanDurationSeconds,
     status: status ?? this.status,
+    manualOverride: manualOverride ?? this.manualOverride,
   );
   AttendanceSessionRow copyWithCompanion(AttendanceSessionsCompanion data) {
     return AttendanceSessionRow(
@@ -2332,6 +2574,9 @@ class AttendanceSessionRow extends DataClass
           ? data.scanDurationSeconds.value
           : this.scanDurationSeconds,
       status: data.status.present ? data.status.value : this.status,
+      manualOverride: data.manualOverride.present
+          ? data.manualOverride.value
+          : this.manualOverride,
     );
   }
 
@@ -2347,7 +2592,8 @@ class AttendanceSessionRow extends DataClass
           ..write('startedAt: $startedAt, ')
           ..write('endedAt: $endedAt, ')
           ..write('scanDurationSeconds: $scanDurationSeconds, ')
-          ..write('status: $status')
+          ..write('status: $status, ')
+          ..write('manualOverride: $manualOverride')
           ..write(')'))
         .toString();
   }
@@ -2364,6 +2610,7 @@ class AttendanceSessionRow extends DataClass
     endedAt,
     scanDurationSeconds,
     status,
+    manualOverride,
   );
   @override
   bool operator ==(Object other) =>
@@ -2378,7 +2625,8 @@ class AttendanceSessionRow extends DataClass
           other.startedAt == this.startedAt &&
           other.endedAt == this.endedAt &&
           other.scanDurationSeconds == this.scanDurationSeconds &&
-          other.status == this.status);
+          other.status == this.status &&
+          other.manualOverride == this.manualOverride);
 }
 
 class AttendanceSessionsCompanion
@@ -2393,6 +2641,7 @@ class AttendanceSessionsCompanion
   final Value<DateTime?> endedAt;
   final Value<int> scanDurationSeconds;
   final Value<domain.AttendanceSessionStatus> status;
+  final Value<bool> manualOverride;
   final Value<int> rowid;
   const AttendanceSessionsCompanion({
     this.id = const Value.absent(),
@@ -2405,6 +2654,7 @@ class AttendanceSessionsCompanion
     this.endedAt = const Value.absent(),
     this.scanDurationSeconds = const Value.absent(),
     this.status = const Value.absent(),
+    this.manualOverride = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   AttendanceSessionsCompanion.insert({
@@ -2418,6 +2668,7 @@ class AttendanceSessionsCompanion
     this.endedAt = const Value.absent(),
     this.scanDurationSeconds = const Value.absent(),
     required domain.AttendanceSessionStatus status,
+    this.manualOverride = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        updatedAt = Value(updatedAt),
@@ -2437,6 +2688,7 @@ class AttendanceSessionsCompanion
     Expression<DateTime>? endedAt,
     Expression<int>? scanDurationSeconds,
     Expression<String>? status,
+    Expression<bool>? manualOverride,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2451,6 +2703,7 @@ class AttendanceSessionsCompanion
       if (scanDurationSeconds != null)
         'scan_duration_seconds': scanDurationSeconds,
       if (status != null) 'status': status,
+      if (manualOverride != null) 'manual_override': manualOverride,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2466,6 +2719,7 @@ class AttendanceSessionsCompanion
     Value<DateTime?>? endedAt,
     Value<int>? scanDurationSeconds,
     Value<domain.AttendanceSessionStatus>? status,
+    Value<bool>? manualOverride,
     Value<int>? rowid,
   }) {
     return AttendanceSessionsCompanion(
@@ -2479,6 +2733,7 @@ class AttendanceSessionsCompanion
       endedAt: endedAt ?? this.endedAt,
       scanDurationSeconds: scanDurationSeconds ?? this.scanDurationSeconds,
       status: status ?? this.status,
+      manualOverride: manualOverride ?? this.manualOverride,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2520,6 +2775,9 @@ class AttendanceSessionsCompanion
         $AttendanceSessionsTable.$converterstatus.toSql(status.value),
       );
     }
+    if (manualOverride.present) {
+      map['manual_override'] = Variable<bool>(manualOverride.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2539,6 +2797,7 @@ class AttendanceSessionsCompanion
           ..write('endedAt: $endedAt, ')
           ..write('scanDurationSeconds: $scanDurationSeconds, ')
           ..write('status: $status, ')
+          ..write('manualOverride: $manualOverride, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -4109,6 +4368,340 @@ class AppSettingsRowsCompanion extends UpdateCompanion<AppSettingsDataRow> {
   }
 }
 
+class $AppSessionPreferencesTable extends AppSessionPreferences
+    with TableInfo<$AppSessionPreferencesTable, AppSessionPreferencesRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $AppSessionPreferencesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _lastActiveRoleMeta = const VerificationMeta(
+    'lastActiveRole',
+  );
+  @override
+  late final GeneratedColumn<String> lastActiveRole = GeneratedColumn<String>(
+    'last_active_role',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('welcome'),
+  );
+  static const VerificationMeta _activeStudentIdMeta = const VerificationMeta(
+    'activeStudentId',
+  );
+  @override
+  late final GeneratedColumn<String> activeStudentId = GeneratedColumn<String>(
+    'active_student_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    lastActiveRole,
+    activeStudentId,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'app_session_preferences';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<AppSessionPreferencesRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('last_active_role')) {
+      context.handle(
+        _lastActiveRoleMeta,
+        lastActiveRole.isAcceptableOrUnknown(
+          data['last_active_role']!,
+          _lastActiveRoleMeta,
+        ),
+      );
+    }
+    if (data.containsKey('active_student_id')) {
+      context.handle(
+        _activeStudentIdMeta,
+        activeStudentId.isAcceptableOrUnknown(
+          data['active_student_id']!,
+          _activeStudentIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  AppSessionPreferencesRow map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return AppSessionPreferencesRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      lastActiveRole: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}last_active_role'],
+      )!,
+      activeStudentId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}active_student_id'],
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $AppSessionPreferencesTable createAlias(String alias) {
+    return $AppSessionPreferencesTable(attachedDatabase, alias);
+  }
+}
+
+class AppSessionPreferencesRow extends DataClass
+    implements Insertable<AppSessionPreferencesRow> {
+  final String id;
+  final String lastActiveRole;
+  final String? activeStudentId;
+  final DateTime updatedAt;
+  const AppSessionPreferencesRow({
+    required this.id,
+    required this.lastActiveRole,
+    this.activeStudentId,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['last_active_role'] = Variable<String>(lastActiveRole);
+    if (!nullToAbsent || activeStudentId != null) {
+      map['active_student_id'] = Variable<String>(activeStudentId);
+    }
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  AppSessionPreferencesCompanion toCompanion(bool nullToAbsent) {
+    return AppSessionPreferencesCompanion(
+      id: Value(id),
+      lastActiveRole: Value(lastActiveRole),
+      activeStudentId: activeStudentId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(activeStudentId),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory AppSessionPreferencesRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return AppSessionPreferencesRow(
+      id: serializer.fromJson<String>(json['id']),
+      lastActiveRole: serializer.fromJson<String>(json['lastActiveRole']),
+      activeStudentId: serializer.fromJson<String?>(json['activeStudentId']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'lastActiveRole': serializer.toJson<String>(lastActiveRole),
+      'activeStudentId': serializer.toJson<String?>(activeStudentId),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  AppSessionPreferencesRow copyWith({
+    String? id,
+    String? lastActiveRole,
+    Value<String?> activeStudentId = const Value.absent(),
+    DateTime? updatedAt,
+  }) => AppSessionPreferencesRow(
+    id: id ?? this.id,
+    lastActiveRole: lastActiveRole ?? this.lastActiveRole,
+    activeStudentId: activeStudentId.present
+        ? activeStudentId.value
+        : this.activeStudentId,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  AppSessionPreferencesRow copyWithCompanion(
+    AppSessionPreferencesCompanion data,
+  ) {
+    return AppSessionPreferencesRow(
+      id: data.id.present ? data.id.value : this.id,
+      lastActiveRole: data.lastActiveRole.present
+          ? data.lastActiveRole.value
+          : this.lastActiveRole,
+      activeStudentId: data.activeStudentId.present
+          ? data.activeStudentId.value
+          : this.activeStudentId,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AppSessionPreferencesRow(')
+          ..write('id: $id, ')
+          ..write('lastActiveRole: $lastActiveRole, ')
+          ..write('activeStudentId: $activeStudentId, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, lastActiveRole, activeStudentId, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is AppSessionPreferencesRow &&
+          other.id == this.id &&
+          other.lastActiveRole == this.lastActiveRole &&
+          other.activeStudentId == this.activeStudentId &&
+          other.updatedAt == this.updatedAt);
+}
+
+class AppSessionPreferencesCompanion
+    extends UpdateCompanion<AppSessionPreferencesRow> {
+  final Value<String> id;
+  final Value<String> lastActiveRole;
+  final Value<String?> activeStudentId;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const AppSessionPreferencesCompanion({
+    this.id = const Value.absent(),
+    this.lastActiveRole = const Value.absent(),
+    this.activeStudentId = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  AppSessionPreferencesCompanion.insert({
+    required String id,
+    this.lastActiveRole = const Value.absent(),
+    this.activeStudentId = const Value.absent(),
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       updatedAt = Value(updatedAt);
+  static Insertable<AppSessionPreferencesRow> custom({
+    Expression<String>? id,
+    Expression<String>? lastActiveRole,
+    Expression<String>? activeStudentId,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (lastActiveRole != null) 'last_active_role': lastActiveRole,
+      if (activeStudentId != null) 'active_student_id': activeStudentId,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  AppSessionPreferencesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? lastActiveRole,
+    Value<String?>? activeStudentId,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return AppSessionPreferencesCompanion(
+      id: id ?? this.id,
+      lastActiveRole: lastActiveRole ?? this.lastActiveRole,
+      activeStudentId: activeStudentId ?? this.activeStudentId,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (lastActiveRole.present) {
+      map['last_active_role'] = Variable<String>(lastActiveRole.value);
+    }
+    if (activeStudentId.present) {
+      map['active_student_id'] = Variable<String>(activeStudentId.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AppSessionPreferencesCompanion(')
+          ..write('id: $id, ')
+          ..write('lastActiveRole: $lastActiveRole, ')
+          ..write('activeStudentId: $activeStudentId, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -4123,6 +4716,12 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $DevicesTable devices = $DevicesTable(this);
   late final $AppSettingsRowsTable appSettingsRows = $AppSettingsRowsTable(
     this,
+  );
+  late final $AppSessionPreferencesTable appSessionPreferences =
+      $AppSessionPreferencesTable(this);
+  late final Index classOfferingIdentityUnique = Index(
+    'class_offering_identity_unique',
+    'CREATE UNIQUE INDEX class_offering_identity_unique ON class_sections (teacher_id, section_code, lower(subject))',
   );
   late final Index enrollmentsStudentClassUnique = Index(
     'enrollments_student_class_unique',
@@ -4139,6 +4738,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final AttendanceDao attendanceDao = AttendanceDao(this as AppDatabase);
   late final DeviceDao deviceDao = DeviceDao(this as AppDatabase);
   late final SettingsDao settingsDao = SettingsDao(this as AppDatabase);
+  late final AppSessionDao appSessionDao = AppSessionDao(this as AppDatabase);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -4152,6 +4752,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     attendanceRecords,
     devices,
     appSettingsRows,
+    appSessionPreferences,
+    classOfferingIdentityUnique,
     enrollmentsStudentClassUnique,
     attendanceRecordsSessionStudentUnique,
   ];
@@ -4162,6 +4764,7 @@ typedef $$TeachersTableCreateCompanionBuilder = TeachersCompanion Function({
   required DateTime updatedAt,
   required domain.SyncStatus syncStatus,
   required String name,
+  Value<bool> isLocal,
   Value<int> rowid,
 });
 typedef $$TeachersTableUpdateCompanionBuilder = TeachersCompanion Function({
@@ -4169,6 +4772,7 @@ typedef $$TeachersTableUpdateCompanionBuilder = TeachersCompanion Function({
   Value<DateTime> updatedAt,
   Value<domain.SyncStatus> syncStatus,
   Value<String> name,
+  Value<bool> isLocal,
   Value<int> rowid,
 });
 
@@ -4222,6 +4826,11 @@ class $$TeachersTableFilterComposer
 
   ColumnFilters<String> get name => $composableBuilder(
     column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isLocal => $composableBuilder(
+    column: $table.isLocal,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4279,6 +4888,11 @@ class $$TeachersTableOrderingComposer
     column: $table.name,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get isLocal => $composableBuilder(
+    column: $table.isLocal,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$TeachersTableAnnotationComposer
@@ -4304,6 +4918,9 @@ class $$TeachersTableAnnotationComposer
 
   GeneratedColumn<String> get name =>
       $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<bool> get isLocal =>
+      $composableBuilder(column: $table.isLocal, builder: (column) => column);
 
   Expression<T> classSectionsRefs<T extends Object>(
     Expression<T> Function($$ClassSectionsTableAnnotationComposer a) f,
@@ -4363,12 +4980,14 @@ class $$TeachersTableTableManager
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<domain.SyncStatus> syncStatus = const Value.absent(),
                 Value<String> name = const Value.absent(),
+                Value<bool> isLocal = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => TeachersCompanion(
                 id: id,
                 updatedAt: updatedAt,
                 syncStatus: syncStatus,
                 name: name,
+                isLocal: isLocal,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -4377,12 +4996,14 @@ class $$TeachersTableTableManager
                 required DateTime updatedAt,
                 required domain.SyncStatus syncStatus,
                 required String name,
+                Value<bool> isLocal = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => TeachersCompanion.insert(
                 id: id,
                 updatedAt: updatedAt,
                 syncStatus: syncStatus,
                 name: name,
+                isLocal: isLocal,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -5001,6 +5622,9 @@ typedef $$ClassSectionsTableCreateCompanionBuilder =
       required String room,
       required DateTime scheduleStart,
       required DateTime scheduleEnd,
+      Value<int> scheduleDays,
+      Value<int> startMinutesOfDay,
+      Value<int> endMinutesOfDay,
       required String bleBeaconId,
       required String teacherId,
       Value<int> rowid,
@@ -5017,6 +5641,9 @@ typedef $$ClassSectionsTableUpdateCompanionBuilder =
       Value<String> room,
       Value<DateTime> scheduleStart,
       Value<DateTime> scheduleEnd,
+      Value<int> scheduleDays,
+      Value<int> startMinutesOfDay,
+      Value<int> endMinutesOfDay,
       Value<String> bleBeaconId,
       Value<String> teacherId,
       Value<int> rowid,
@@ -5148,6 +5775,21 @@ class $$ClassSectionsTableFilterComposer
 
   ColumnFilters<DateTime> get scheduleEnd => $composableBuilder(
     column: $table.scheduleEnd,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get scheduleDays => $composableBuilder(
+    column: $table.scheduleDays,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get startMinutesOfDay => $composableBuilder(
+    column: $table.startMinutesOfDay,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get endMinutesOfDay => $composableBuilder(
+    column: $table.endMinutesOfDay,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5289,6 +5931,21 @@ class $$ClassSectionsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get scheduleDays => $composableBuilder(
+    column: $table.scheduleDays,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get startMinutesOfDay => $composableBuilder(
+    column: $table.startMinutesOfDay,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get endMinutesOfDay => $composableBuilder(
+    column: $table.endMinutesOfDay,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get bleBeaconId => $composableBuilder(
     column: $table.bleBeaconId,
     builder: (column) => ColumnOrderings(column),
@@ -5367,6 +6024,21 @@ class $$ClassSectionsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get scheduleEnd => $composableBuilder(
     column: $table.scheduleEnd,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get scheduleDays => $composableBuilder(
+    column: $table.scheduleDays,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get startMinutesOfDay => $composableBuilder(
+    column: $table.startMinutesOfDay,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get endMinutesOfDay => $composableBuilder(
+    column: $table.endMinutesOfDay,
     builder: (column) => column,
   );
 
@@ -5492,6 +6164,9 @@ class $$ClassSectionsTableTableManager
                 Value<String> room = const Value.absent(),
                 Value<DateTime> scheduleStart = const Value.absent(),
                 Value<DateTime> scheduleEnd = const Value.absent(),
+                Value<int> scheduleDays = const Value.absent(),
+                Value<int> startMinutesOfDay = const Value.absent(),
+                Value<int> endMinutesOfDay = const Value.absent(),
                 Value<String> bleBeaconId = const Value.absent(),
                 Value<String> teacherId = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -5506,6 +6181,9 @@ class $$ClassSectionsTableTableManager
                 room: room,
                 scheduleStart: scheduleStart,
                 scheduleEnd: scheduleEnd,
+                scheduleDays: scheduleDays,
+                startMinutesOfDay: startMinutesOfDay,
+                endMinutesOfDay: endMinutesOfDay,
                 bleBeaconId: bleBeaconId,
                 teacherId: teacherId,
                 rowid: rowid,
@@ -5522,6 +6200,9 @@ class $$ClassSectionsTableTableManager
                 required String room,
                 required DateTime scheduleStart,
                 required DateTime scheduleEnd,
+                Value<int> scheduleDays = const Value.absent(),
+                Value<int> startMinutesOfDay = const Value.absent(),
+                Value<int> endMinutesOfDay = const Value.absent(),
                 required String bleBeaconId,
                 required String teacherId,
                 Value<int> rowid = const Value.absent(),
@@ -5536,6 +6217,9 @@ class $$ClassSectionsTableTableManager
                 room: room,
                 scheduleStart: scheduleStart,
                 scheduleEnd: scheduleEnd,
+                scheduleDays: scheduleDays,
+                startMinutesOfDay: startMinutesOfDay,
+                endMinutesOfDay: endMinutesOfDay,
                 bleBeaconId: bleBeaconId,
                 teacherId: teacherId,
                 rowid: rowid,
@@ -6076,6 +6760,7 @@ typedef $$AttendanceSessionsTableCreateCompanionBuilder =
       Value<DateTime?> endedAt,
       Value<int> scanDurationSeconds,
       required domain.AttendanceSessionStatus status,
+      Value<bool> manualOverride,
       Value<int> rowid,
     });
 typedef $$AttendanceSessionsTableUpdateCompanionBuilder =
@@ -6090,6 +6775,7 @@ typedef $$AttendanceSessionsTableUpdateCompanionBuilder =
       Value<DateTime?> endedAt,
       Value<int> scanDurationSeconds,
       Value<domain.AttendanceSessionStatus> status,
+      Value<bool> manualOverride,
       Value<int> rowid,
     });
 
@@ -6206,6 +6892,11 @@ class $$AttendanceSessionsTableFilterComposer
     builder: (column) => ColumnWithTypeConverterFilters(column),
   );
 
+  ColumnFilters<bool> get manualOverride => $composableBuilder(
+    column: $table.manualOverride,
+    builder: (column) => ColumnFilters(column),
+  );
+
   $$ClassSectionsTableFilterComposer get classSectionId {
     final $$ClassSectionsTableFilterComposer composer = $composerBuilder(
       composer: this,
@@ -6309,6 +7000,11 @@ class $$AttendanceSessionsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get manualOverride => $composableBuilder(
+    column: $table.manualOverride,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$ClassSectionsTableOrderingComposer get classSectionId {
     final $$ClassSectionsTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -6374,6 +7070,11 @@ class $$AttendanceSessionsTableAnnotationComposer
   GeneratedColumnWithTypeConverter<domain.AttendanceSessionStatus, String>
   get status =>
       $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<bool> get manualOverride => $composableBuilder(
+    column: $table.manualOverride,
+    builder: (column) => column,
+  );
 
   $$ClassSectionsTableAnnotationComposer get classSectionId {
     final $$ClassSectionsTableAnnotationComposer composer = $composerBuilder(
@@ -6472,6 +7173,7 @@ class $$AttendanceSessionsTableTableManager
                 Value<int> scanDurationSeconds = const Value.absent(),
                 Value<domain.AttendanceSessionStatus> status =
                     const Value.absent(),
+                Value<bool> manualOverride = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => AttendanceSessionsCompanion(
                 id: id,
@@ -6484,6 +7186,7 @@ class $$AttendanceSessionsTableTableManager
                 endedAt: endedAt,
                 scanDurationSeconds: scanDurationSeconds,
                 status: status,
+                manualOverride: manualOverride,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -6498,6 +7201,7 @@ class $$AttendanceSessionsTableTableManager
                 Value<DateTime?> endedAt = const Value.absent(),
                 Value<int> scanDurationSeconds = const Value.absent(),
                 required domain.AttendanceSessionStatus status,
+                Value<bool> manualOverride = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => AttendanceSessionsCompanion.insert(
                 id: id,
@@ -6510,6 +7214,7 @@ class $$AttendanceSessionsTableTableManager
                 endedAt: endedAt,
                 scanDurationSeconds: scanDurationSeconds,
                 status: status,
+                manualOverride: manualOverride,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -7741,6 +8446,222 @@ typedef $$AppSettingsRowsTableProcessedTableManager =
       AppSettingsDataRow,
       PrefetchHooks Function()
     >;
+typedef $$AppSessionPreferencesTableCreateCompanionBuilder =
+    AppSessionPreferencesCompanion Function({
+      required String id,
+      Value<String> lastActiveRole,
+      Value<String?> activeStudentId,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$AppSessionPreferencesTableUpdateCompanionBuilder =
+    AppSessionPreferencesCompanion Function({
+      Value<String> id,
+      Value<String> lastActiveRole,
+      Value<String?> activeStudentId,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$AppSessionPreferencesTableFilterComposer
+    extends Composer<_$AppDatabase, $AppSessionPreferencesTable> {
+  $$AppSessionPreferencesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lastActiveRole => $composableBuilder(
+    column: $table.lastActiveRole,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get activeStudentId => $composableBuilder(
+    column: $table.activeStudentId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$AppSessionPreferencesTableOrderingComposer
+    extends Composer<_$AppDatabase, $AppSessionPreferencesTable> {
+  $$AppSessionPreferencesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lastActiveRole => $composableBuilder(
+    column: $table.lastActiveRole,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get activeStudentId => $composableBuilder(
+    column: $table.activeStudentId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$AppSessionPreferencesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $AppSessionPreferencesTable> {
+  $$AppSessionPreferencesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get lastActiveRole => $composableBuilder(
+    column: $table.lastActiveRole,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get activeStudentId => $composableBuilder(
+    column: $table.activeStudentId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$AppSessionPreferencesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $AppSessionPreferencesTable,
+          AppSessionPreferencesRow,
+          $$AppSessionPreferencesTableFilterComposer,
+          $$AppSessionPreferencesTableOrderingComposer,
+          $$AppSessionPreferencesTableAnnotationComposer,
+          $$AppSessionPreferencesTableCreateCompanionBuilder,
+          $$AppSessionPreferencesTableUpdateCompanionBuilder,
+          (
+            AppSessionPreferencesRow,
+            BaseReferences<
+              _$AppDatabase,
+              $AppSessionPreferencesTable,
+              AppSessionPreferencesRow
+            >,
+          ),
+          AppSessionPreferencesRow,
+          PrefetchHooks Function()
+        > {
+  $$AppSessionPreferencesTableTableManager(
+    _$AppDatabase db,
+    $AppSessionPreferencesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$AppSessionPreferencesTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$AppSessionPreferencesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$AppSessionPreferencesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> lastActiveRole = const Value.absent(),
+                Value<String?> activeStudentId = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => AppSessionPreferencesCompanion(
+                id: id,
+                lastActiveRole: lastActiveRole,
+                activeStudentId: activeStudentId,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                Value<String> lastActiveRole = const Value.absent(),
+                Value<String?> activeStudentId = const Value.absent(),
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => AppSessionPreferencesCompanion.insert(
+                id: id,
+                lastActiveRole: lastActiveRole,
+                activeStudentId: activeStudentId,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<
+                    $AppSessionPreferencesTable,
+                    AppSessionPreferencesRow
+                  >(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $AppSessionPreferencesTable,
+                    AppSessionPreferencesRow
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$AppSessionPreferencesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $AppSessionPreferencesTable,
+      AppSessionPreferencesRow,
+      $$AppSessionPreferencesTableFilterComposer,
+      $$AppSessionPreferencesTableOrderingComposer,
+      $$AppSessionPreferencesTableAnnotationComposer,
+      $$AppSessionPreferencesTableCreateCompanionBuilder,
+      $$AppSessionPreferencesTableUpdateCompanionBuilder,
+      (
+        AppSessionPreferencesRow,
+        BaseReferences<
+          _$AppDatabase,
+          $AppSessionPreferencesTable,
+          AppSessionPreferencesRow
+        >,
+      ),
+      AppSessionPreferencesRow,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -7761,6 +8682,8 @@ class $AppDatabaseManager {
       $$DevicesTableTableManager(_db, _db.devices);
   $$AppSettingsRowsTableTableManager get appSettingsRows =>
       $$AppSettingsRowsTableTableManager(_db, _db.appSettingsRows);
+  $$AppSessionPreferencesTableTableManager get appSessionPreferences =>
+      $$AppSessionPreferencesTableTableManager(_db, _db.appSessionPreferences);
 }
 
 mixin _$TeacherDaoMixin on DatabaseAccessor<AppDatabase> {
@@ -7917,5 +8840,21 @@ class SettingsDaoManager {
       $$AppSettingsRowsTableTableManager(
         _db.attachedDatabase,
         _db.appSettingsRows,
+      );
+}
+
+mixin _$AppSessionDaoMixin on DatabaseAccessor<AppDatabase> {
+  $AppSessionPreferencesTable get appSessionPreferences =>
+      attachedDatabase.appSessionPreferences;
+  AppSessionDaoManager get managers => AppSessionDaoManager(this);
+}
+
+class AppSessionDaoManager {
+  final _$AppSessionDaoMixin _db;
+  AppSessionDaoManager(this._db);
+  $$AppSessionPreferencesTableTableManager get appSessionPreferences =>
+      $$AppSessionPreferencesTableTableManager(
+        _db.attachedDatabase,
+        _db.appSessionPreferences,
       );
 }

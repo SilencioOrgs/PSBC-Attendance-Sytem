@@ -1,16 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/attendance/presentation/screens/attendance_screens.dart';
 import '../../features/classes/presentation/screens/class_screens.dart';
 import '../../features/classes/presentation/screens/class_creation_screen.dart';
+import '../../features/classes/presentation/screens/share_subjects_screen.dart';
 import '../../features/device/presentation/screens/device_screens.dart';
 import '../../features/settings/presentation/screens/teacher_settings_screen.dart';
 import '../../features/student/presentation/screens/student_screens.dart';
+import '../../features/student/presentation/screens/add_subject_screen.dart';
 import '../../features/teacher/presentation/screens/teacher_home_screen.dart';
 import '../../features/teacher/presentation/screens/teacher_setup_screen.dart';
 import '../../features/teacher/presentation/screens/teacher_unlock_screen.dart';
 import '../auth/teacher_session.dart';
+import '../auth/application_session.dart';
+import '../widgets/app_widgets.dart';
+import '../providers/repository_providers.dart';
 import 'route_guards.dart';
 import 'route_names.dart';
 import 'welcome_screen.dart';
@@ -18,26 +24,36 @@ import 'welcome_screen.dart';
 final _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 
 /// Creates the two independent stateful role shells and all pre-shell routes.
-GoRouter createAppRouter({TeacherSession? session}) {
+GoRouter createAppRouter({
+  TeacherSession? session,
+  ApplicationSession? applicationSession,
+}) {
   final teacherSession =
       session ?? TeacherSession(state: TeacherSessionState.setupRequired);
-  final initialLocation = switch (teacherSession.state) {
-    TeacherSessionState.uninitialized => '/welcome',
-    TeacherSessionState.setupRequired => '/teacher/setup',
-    TeacherSessionState.locked => '/teacher/unlock',
-    TeacherSessionState.authenticated => '/teacher',
-  };
+  final initialLocation =
+      applicationSession?.initialLocation ??
+      switch (teacherSession.state) {
+        TeacherSessionState.uninitialized => '/welcome',
+        TeacherSessionState.setupRequired => '/teacher/setup',
+        TeacherSessionState.locked => '/teacher/unlock',
+        TeacherSessionState.authenticated => '/teacher',
+      };
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: initialLocation,
-    refreshListenable: teacherSession,
+    refreshListenable: applicationSession ?? teacherSession,
     redirect: (context, state) =>
+        applicationSession?.redirect(state.uri.path) ??
         teacherRouteRedirect(teacherSession.state, state.uri.path),
     routes: [
       GoRoute(
         path: '/welcome',
         name: AppRoutes.welcome,
         builder: (context, state) => const WelcomeScreen(),
+      ),
+      GoRoute(
+        path: '/roles',
+        builder: (context, state) => const _RolePickerScreen(),
       ),
       GoRoute(
         path: '/teacher/setup',
@@ -53,6 +69,16 @@ GoRouter createAppRouter({TeacherSession? session}) {
         path: '/student/setup',
         name: AppRoutes.studentSetup,
         builder: (context, state) => const StudentSetupScreen(),
+      ),
+      GoRoute(
+        path: '/teacher/share-subjects',
+        name: AppRoutes.shareSubjects,
+        builder: (context, state) => const ShareSubjectsScreen(),
+      ),
+      GoRoute(
+        path: '/student/add-subject',
+        name: AppRoutes.addSubject,
+        builder: (context, state) => const AddSubjectScreen(),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) => _RoleNavigationShell(
@@ -205,6 +231,41 @@ GoRouter createAppRouter({TeacherSession? session}) {
         ),
       ),
     ],
+  );
+}
+
+class _RolePickerScreen extends ConsumerWidget {
+  const _RolePickerScreen();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => PageScaffold(
+    title: 'Choose a role',
+    body: Column(
+      children: [
+        PrimaryActionButton(
+          label: 'Continue as teacher',
+          icon: Icons.school_outlined,
+          onPressed: () async {
+            await ref.read(applicationSessionProvider).selectTeacher();
+            if (context.mounted) context.go('/teacher');
+          },
+        ),
+        const SizedBox(height: 12),
+        SecondaryActionButton(
+          label: 'Continue as student',
+          icon: Icons.person_outline,
+          onPressed: () async {
+            final session = ref.read(applicationSessionProvider);
+            if (session.currentStudentId == null) {
+              if (context.mounted) context.go('/student/setup');
+              return;
+            }
+            await session.selectStudent();
+            if (context.mounted) context.go('/student');
+          },
+        ),
+      ],
+    ),
   );
 }
 

@@ -67,6 +67,12 @@ class TeacherSettingsScreen extends ConsumerWidget {
                   const Text('Teacher account is unavailable.'),
             ),
           ),
+          const SizedBox(height: Spacing.sm),
+          SecondaryActionButton(
+            label: 'Switch role',
+            icon: Icons.swap_horiz,
+            onPressed: () => context.go('/roles'),
+          ),
           const SizedBox(height: Spacing.lg),
           Text('Security', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: Spacing.sm),
@@ -220,6 +226,18 @@ class TeacherSettingsScreen extends ConsumerWidget {
             padding: EdgeInsets.zero,
             child: Column(
               children: [
+                ListTile(
+                  leading: const Icon(Icons.qr_code_2),
+                  title: const Text('Share subjects QR'),
+                  subtitle: const Text('Create an offline subject invitation'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.pushNamed(AppRoutes.shareSubjects),
+                ),
+                const Divider(
+                  height: 1,
+                  indent: Spacing.md,
+                  endIndent: Spacing.md,
+                ),
                 ListTile(
                   leading: const Icon(Icons.event_note_outlined),
                   title: const Text('Attendance history and exports'),

@@ -11,6 +11,7 @@ import '../../../attendance/presentation/providers/attendance_provider.dart';
 import '../../../attendance/presentation/providers/attendance_controller.dart';
 import '../providers/class_provider.dart';
 import '../../../../domain/models.dart';
+import '../../../../domain/attendance_window_policy.dart';
 import '../../../../domain/repositories.dart';
 import '../../../reports/models/report_models.dart';
 import '../../../reports/presentation/providers/report_export_provider.dart';
@@ -171,7 +172,7 @@ class ClassDetailsScreen extends ConsumerWidget {
     final hasCompletedSessions =
         sessionsAsync.asData?.value.any(
           (item) =>
-              item.classId == classId &&
+              item.classOfferingId == classId &&
               item.status == AttendanceSessionStatus.completed,
         ) ==
         true;
@@ -307,7 +308,7 @@ class ClassDetailsScreen extends ConsumerWidget {
                         final classSession = sessions
                             .where(
                               (item) =>
-                                  item.classId == classId &&
+                                  item.classOfferingId == classId &&
                                   item.status ==
                                       AttendanceSessionStatus.completed,
                             )
@@ -404,12 +405,21 @@ class ClassDetailsScreen extends ConsumerWidget {
                       onPressed: section.studentCount == 0
                           ? null
                           : () async {
+                              final window = const AttendanceWindowPolicy()
+                                  .evaluate(section, DateTime.now());
+                              final override = !window.isScheduled;
                               final accepted = await showDialog<bool>(
                                 context: context,
                                 builder: (context) => AlertDialog(
-                                  title: const Text('Start attendance?'),
+                                  title: Text(
+                                    override
+                                        ? 'Attendance is outside the schedule.'
+                                        : 'Start attendance?',
+                                  ),
                                   content: Text(
-                                    '${section.name}\n${section.studentCount} students\n\nMake sure student devices are nearby and Bluetooth is enabled.',
+                                    override
+                                        ? '${section.subject} is scheduled ${section.schedule} on ${section.scheduleDays.map((day) => day.name).join(', ')}.${window.nextAvailableAt == null ? '' : '\nNext available: ${TimeOfDay.fromDateTime(window.nextAvailableAt!).format(context)}'}\n\nStarting anyway will be recorded as a teacher override.'
+                                        : '${section.subject}\n${section.studentCount} students\n\nMake sure student devices are nearby and Bluetooth is enabled.',
                                   ),
                                   actions: [
                                     TextButton(
@@ -420,7 +430,11 @@ class ClassDetailsScreen extends ConsumerWidget {
                                     FilledButton(
                                       onPressed: () =>
                                           Navigator.pop(context, true),
-                                      child: const Text('Start scan'),
+                                      child: Text(
+                                        override
+                                            ? 'Start Anyway'
+                                            : 'Start scan',
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -429,7 +443,10 @@ class ClassDetailsScreen extends ConsumerWidget {
                               try {
                                 final created = await ref
                                     .read(attendanceControllerProvider.notifier)
-                                    .prepareSession(classId);
+                                    .prepareSession(
+                                      classId,
+                                      manualOverride: override,
+                                    );
                                 if (context.mounted) {
                                   context.pushNamed(
                                     AppRoutes.bleScanner,

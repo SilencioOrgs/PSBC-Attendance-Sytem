@@ -127,6 +127,7 @@ void main() {
           syncStatus: SyncStatus.synced,
           studentNumber: 'BLE-001',
           fullName: 'Asnor Sumdad',
+          isCurrent: const Value(true),
         ),
       );
 
@@ -160,6 +161,14 @@ void main() {
         final repository = DriftDeviceRepository(database);
         final reloaded = await repository.getStudentDevice(
           'student-stable-ble',
+        );
+        expect(
+          (await database.studentDao.getCurrent())?.id,
+          'student-stable-ble',
+        );
+        expect(
+          (await database.studentDao.getCurrent())?.name,
+          'Asnor Sumdad Updated',
         );
         expect(reloaded, isNotNull);
         expect(reloaded!.id, registered.id);

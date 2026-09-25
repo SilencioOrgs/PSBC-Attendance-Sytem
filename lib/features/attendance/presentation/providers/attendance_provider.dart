@@ -42,7 +42,7 @@ final attendanceRosterProvider = StreamProvider.family<List<Student>, String>((
       .asyncExpand(
         (session) => session == null
             ? Stream.value(const <Student>[])
-            : classes.watchStudents(session.classId),
+            : classes.watchStudents(session.classOfferingId),
       );
 });
 
@@ -112,7 +112,7 @@ final myAttendanceEntriesProvider =
                 .firstOrNull;
             if (session == null) continue;
             final section = sections
-                .where((item) => item.id == session.classId)
+                .where((item) => item.id == session.classOfferingId)
                 .firstOrNull;
             if (section != null) {
               entries.add(

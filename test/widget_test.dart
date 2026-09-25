@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:attendance_system_paete/core/auth/teacher_session.dart';
+import 'package:attendance_system_paete/core/auth/application_session.dart';
 import 'package:attendance_system_paete/core/providers/repository_providers.dart';
 import 'package:attendance_system_paete/core/router/app_router.dart';
 import 'package:attendance_system_paete/core/router/welcome_screen.dart';
@@ -51,7 +52,6 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextFormField).at(0), 'María Santos');
     await tester.enterText(find.byType(TextFormField).at(1), 'S-001');
-    await tester.enterText(find.byType(TextFormField).at(2), 'GRADE12-STEM A');
     await tester.tap(find.text('Complete registration'));
     await tester.pumpAndSettle();
 
@@ -116,6 +116,59 @@ void main() {
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 1));
+    await database.close();
+  });
+
+  testWidgets('teacher lock returns to an existing student profile', (
+    tester,
+  ) async {
+    final database = AppDatabase(NativeDatabase.memory());
+    final now = DateTime(2026, 9, 25);
+    await database.teacherDao.save(
+      TeachersCompanion.insert(
+        id: 'teacher-existing',
+        updatedAt: now,
+        syncStatus: SyncStatus.synced,
+        name: 'Teacher',
+      ),
+    );
+    final student = await DriftStudentRepository(database)
+        .registerStudent(name: 'Student Existing', studentNumber: 'S-EXISTING');
+    final teacherSession = TeacherSession(state: TeacherSessionState.locked);
+    final applicationSession = ApplicationSession(
+      database: database,
+      teacherSession: teacherSession,
+    );
+    await applicationSession.initialize(teacherPinExists: true);
+    final router = createAppRouter(
+      session: teacherSession,
+      applicationSession: applicationSession,
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(database),
+          teacherSessionProvider.overrideWithValue(teacherSession),
+          applicationSessionProvider.overrideWithValue(applicationSession),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Teacher sign in'), findsOneWidget);
+
+    await tester.tap(find.text('Continue as a student'));
+    await tester.pumpAndSettle();
+
+    expect(applicationSession.entry, ApplicationEntry.student);
+    expect(applicationSession.currentStudentId, student.id);
+    expect(find.text('No subjects yet'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 1));
+    router.dispose();
+    applicationSession.dispose();
     await database.close();
   });
 

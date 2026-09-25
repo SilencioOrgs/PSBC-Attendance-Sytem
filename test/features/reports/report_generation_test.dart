@@ -46,8 +46,6 @@ void main() {
     syncStatus: SyncStatus.synced,
     name: 'Ana "María",\nSantos',
     studentNumber: 'T-001',
-    classId: section.id,
-    gradeLevel: 'Grade 12',
     deviceRegistered: true,
   );
   final record = AttendanceRecord(
@@ -153,8 +151,6 @@ void main() {
                 ? 'María ${List.filled(12, 'Dela Cruz').join(' ')}'
                 : 'Student $index',
             studentNumber: 'T-${index.toString().padLeft(3, '0')}',
-            classId: section.id,
-            gradeLevel: 'Grade 12',
             deviceRegistered: false,
           ),
           record: AttendanceRecord(

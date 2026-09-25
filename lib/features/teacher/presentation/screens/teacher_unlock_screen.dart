@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/providers/repository_providers.dart';
 import '../../../../core/router/route_names.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/input_formatters.dart';
@@ -20,6 +21,20 @@ class _TeacherUnlockScreenState extends ConsumerState<TeacherUnlockScreen> {
   final _pin = TextEditingController();
   String? _error;
   bool _checking = false;
+
+  Future<void> _continueAsStudent() async {
+    final session = ref.read(applicationSessionProvider);
+    if (session.currentStudentId == null) {
+      if (mounted) context.goNamed(AppRoutes.studentSetup);
+      return;
+    }
+    try {
+      await session.selectStudent();
+      if (mounted) context.goNamed(AppRoutes.studentHome);
+    } catch (_) {
+      if (mounted) context.goNamed(AppRoutes.studentSetup);
+    }
+  }
 
   @override
   void dispose() {
@@ -94,7 +109,7 @@ class _TeacherUnlockScreenState extends ConsumerState<TeacherUnlockScreen> {
           const SizedBox(height: Spacing.md),
           Center(
             child: TextButton(
-              onPressed: () => context.goNamed(AppRoutes.studentSetup),
+              onPressed: _continueAsStudent,
               child: const Text('Continue as a student'),
             ),
           ),

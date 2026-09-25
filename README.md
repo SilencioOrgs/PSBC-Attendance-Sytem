@@ -7,20 +7,19 @@ ClassAttend is an offline-first Flutter app for teachers to manage class rosters
 ### Teacher
 
 1. On first launch, create a teacher PIN. Later launches require the PIN to unlock the teacher area.
-2. Create a class, then add its students.
-3. Open a student in the roster and register that student's BLE device code. Use **Replace device** when a student changes phones; removing or replacing a registration revokes the old identity immediately.
-4. Start attendance. The app scans for registered BLE service UUIDs and only accepts a match when the device owner is enrolled in the selected class.
+2. Create a class offering with a subject, section, room, weekdays, and start/end times. The same section can have multiple subjects.
+3. Add students to each offering. A student number identifies one student across offerings; register one BLE device for that student and use **Replace device** only when the physical phone changes.
+4. Optionally share selected offerings as a versioned offline subject QR. It contains teacher/offering display and schedule data, not credentials. A student scanning it stores local enrollment only; it does not update the teacher's separate offline database. The teacher still adds the student and BLE service UUID to each applicable roster.
+5. Start attendance. The selected offering defines the schedule and roster. Scans only accept a registered BLE UUID when its owner is enrolled in that offering.
 5. Review results. Detected students are Present; the rest remain Not Detected until the teacher saves. Manual Present and Manual Absent changes are retained as manual statuses.
 6. Confirm the save rule to convert remaining Not Detected students to Absent. The session and its records are committed together. History links to session details and exports.
 
 ### Student device registration
 
-1. Choose student setup and enter the student's profile and section code.
-2. Register the device to generate and persist a 128-bit BLE service UUID.
-3. Share the displayed device code with the teacher through an in-person or otherwise trusted channel. On the teacher's device, open the matching student in the class roster and enter the code. This association works offline and does not require a cloud service.
-4. Start the attendance beacon when asked. Keep the app open in the foreground and the device unlocked while advertising is needed. The UI reports the live advertising state separately from registration.
-
-The student profile can be set up before the teacher has created a matching local class. The section code is stored on the student device; it does not silently create teacher, class, or enrollment records there.
+1. Create one local student profile. On restart, the app loads that profile without student credentials; if teacher and student profiles coexist, startup restores the last selected role. Teacher access still requires the PIN.
+2. Register this phone once. Its permanent BLE service UUID is stored in the Drift device row and reused for foreground and background advertising, across app and screen restarts.
+3. Add subjects by scanning a teacher's offline QR invitation and confirming selected offerings. Enrollment is many-to-many; the profile and device stay the same for every subject.
+4. Enable **Background Attendance** to start Android's connected-device foreground service. The ongoing notification remains while the service is active. The service advertises the stored UUID, not a session or subject identity.
 
 ## Offline architecture
 
@@ -28,17 +27,17 @@ The student profile can be set up before the teacher has created a matching loca
 - `features/` contains feature screens, providers/controllers, and Drift-backed repositories.
 - `domain/` contains shared domain models and repository contracts.
 - `services/` contains the production BLE service, secure PIN storage, and the Drift database/DAOs.
-- Riverpod is the app's state-management and dependency-injection layer. GoRouter applies the initialized teacher session to route guards.
-- SQLite/Drift is the local source of truth. The database is not cleared on logout. Schema migrations preserve existing class and attendance data.
+- Riverpod is the app's state-management and dependency-injection layer. An application bootstrap loads local teacher/student profiles and the last role before GoRouter selects the initial route. Teacher authentication state remains separate and PIN-protected.
+- SQLite/Drift is the local source of truth. Students, devices, offerings, enrollments, attendance sessions, and records persist locally. Schema migrations preserve existing data; offering identity is teacher + section + subject.
 - Production startup injects `ProductionBleService`. BLE mocks are confined to `test/`.
 
 ## BLE behavior and Android permissions
 
 The student device advertises its registered service UUID. The teacher scans advertisements and compares the advertised service UUID against locally registered device UUIDs; device names, list order, and platform peripheral addresses do not determine attendance. Duplicate advertisements update the same student's detection record. Unknown or non-enrolled devices are ignored as attendance.
 
-Android declares legacy Bluetooth permissions through API 30, Android 12+ scan/connect/advertise permissions, and an optional BLE hardware feature. Runtime authorization is requested by the BLE platform manager. If Bluetooth is turned off, permission is denied/revoked, or the device lacks BLE support, scanning/advertising reports the corresponding unavailable state.
+Android declares legacy Bluetooth permissions through API 30, Android 12+ scan/connect/advertise permissions, connected-device foreground-service permissions, notification permission, camera access for QR scanning, and an optional BLE hardware feature. Runtime advertising permission and notification permission are requested after the student explicitly enables background attendance while the app is visible.
 
-Advertising is stopped when the app enters the paused, hidden, or detached lifecycle state. Background and lock-screen advertising is not claimed by this implementation. Return to the student device screen and start the beacon again after foregrounding the app. A teacher scan ends on timeout, explicit stop, or a Bluetooth/permission state failure. Review state is persisted, so a scan can be reviewed or resumed after reopening the app.
+Background advertising is owned by an Android foreground service and its status is reported from native service/advertiser state. On one Android 13 student phone, enabling attendance showed the foreground service, ongoing notification, and active Android BLE advertiser; the advertiser remained active after returning to the launcher. Screen-lock and ordinary app-restart recovery have not been verified. Android Force Stop, Bluetooth shutdown, permission revocation, and some manufacturer battery/task controls can stop advertising. Teacher scanning ends on timeout, explicit stop, or Bluetooth/permission failure; review state is persisted.
 
 ## Reports
 
@@ -69,27 +68,28 @@ The debug APK is written to `build/app/outputs/flutter-apk/app-debug.apk`.
 
 ## Two-phone BLE verification
 
-BLE runtime testing could not be performed in the current development environment because no physical Android phones or Android emulator were available. Use two Android phones for the following manual test; do not infer radio behavior from a successful build.
+The required two-phone BLE test could not be performed: one physical Android 13 phone is connected, and a second teacher phone is not available in this environment. Student background advertising was partially verified on the connected phone while the app was minimized, but screen-lock, restart recovery, and teacher-side discovery/matching remain unverified. Use two Android phones for the full procedure below; a successful build does not verify radio behavior.
 
 **Phone A — student**
 
-1. Install the app, choose student setup, create a profile and section code, register this phone, and copy its device code.
-2. Confirm the device screen says Registered, grant advertise permission, and start the beacon. Confirm it says Beacon Active.
-3. Repeat with the app backgrounded/phone locked: the app should report the beacon stopped after lifecycle transition. Foreground and unlock Phone A, then start the beacon again.
+1. Create the student profile, register Phone A, and record its BLE Service UUID as UUID A.
+2. From Phone B, create several offerings and share a subjects QR. Scan it on Phone A and confirm selected subjects.
+3. Enable Background Attendance while ClassAttend is visible. Grant Bluetooth advertise and notification permissions. Wait until the screen reports Active and the ongoing notification appears.
+4. Lock the screen and minimize the app. Confirm the notification remains and the student status remains active. Force Stop is outside the supported lifecycle.
+5. Restart the app at least three times. Open Device and verify its stored BLE Service UUID is still exactly UUID A; confirm the background status reflects the native service.
 
 **Phone B — teacher**
 
-1. Create a teacher PIN, class, and matching student roster record. Open that student and enter Phone A's device code.
-2. Grant scan/connect permissions and enable Bluetooth. Start attendance with both phones nearby and Phone A's beacon active.
-3. Confirm only the matched enrolled student changes to Present and a detection time is recorded. Repeated advertisements must not create duplicate students/records. An unregistered phone and a registered student outside this class must not be marked present.
-4. Stop the scan early or let it time out. Confirm undetected students remain Not Detected during review, manual status changes persist, and save confirmation turns remaining Not Detected into Absent.
-5. Open session history/details, export PDF and CSV, save through the native picker, and share each format. Reopen the app and confirm the finalized session and report data remain.
+1. Create a teacher PIN and matching subject offerings. For the test student, manually add the same student number and UUID A to each intended teacher roster; the offline QR does not transfer student identity to Phone B.
+2. Grant scan/connect permissions and enable Bluetooth. At a scheduled time, select one offering and start attendance while Phone A's background service is active.
+3. Confirm only the matched enrolled student changes to Present and a detection time is recorded. Repeated advertisements must not create duplicate students/records. An unregistered phone and a registered student outside this offering must not be marked present.
+4. Select another subject for which the student is enrolled and scan again. Confirm the same UUID A is accepted for that offering. Select an offering with no enrollment and confirm it is ignored.
+5. Stop the scan early or let it time out. Confirm undetected students remain Not Detected during review, manual status changes persist, and save confirmation turns remaining Not Detected into Absent.
 
-Also exercise Bluetooth disabled before and during scanning, denied and revoked permissions, beacon stopped, unknown nearby devices, early scan stop, scan timeout, leaving the scanner screen, app restart during review, and active-scan logout. For logout during an active session, the app should stop scanning and require review/cancel handling rather than silently finalizing or deleting data. Verify the document picker returns a saved location and that the Android share sheet receives an attached file.
-
+Also exercise Bluetooth disabled before and during scanning, denied and revoked permissions, beacon stopped, unknown nearby devices, early scan stop, scan timeout, leaving the scanner screen, app restart during review, Bluetooth being turned off during student advertising, and Android Force Stop. Verify service recovery and native save/share on target devices.
 ## Known limitations
 
-- Physical-device BLE discovery/advertising and native Android save/share have not been runtime-tested in this environment.
-- Student and teacher devices exchange the UUID manually; enrollment and device association are local and offline, with no QR import, cloud sync, or remote revocation.
-- Advertising is foreground-only and stops on app lifecycle backgrounding. Keep the student app visible and the phone unlocked during attendance.
+- Student foreground-service advertising, its ongoing notification, and advertiser persistence while the app is minimized were runtime-observed on one Android 13 phone. Screen-lock and restart recovery remain unverified. Teacher-side discovery and matching were not runtime-tested because a second physical Android phone is unavailable.
+- Subject QR imports offerings to the student's local database only. The teacher must also add the student identity and permanent UUID to their local rosters; there is no cloud sync or remote revocation.
+- Android Force Stop, Bluetooth being turned off, permission revocation, and manufacturer battery/task-killer behavior can stop background advertising.
 - The Android application ID is retained for existing local installations. Release builds still require a production signing configuration before distribution.

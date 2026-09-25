@@ -11,15 +11,15 @@ final currentStudentProvider = StreamProvider<Student?>(
   (ref) => ref.watch(studentRepositoryProvider).watchCurrentStudent(),
 );
 
-final currentStudentClassProvider = StreamProvider<ClassSection?>((ref) {
+final currentStudentOfferingsProvider = StreamProvider<List<ClassSection>>((
+  ref,
+) {
   final studentRepository = ref.watch(studentRepositoryProvider);
   final classRepository = ref.watch(classRepositoryProvider);
   return studentRepository.watchCurrentStudent().asyncExpand(
     (student) => student == null
-        ? Stream.value(null)
-        : student.classId.isNotEmpty
-        ? classRepository.watchClass(student.classId)
-        : classRepository.watchClassByCode(student.sectionCode),
+        ? Stream.value(const <ClassSection>[])
+        : classRepository.watchStudentOfferings(student.id),
   );
 });
 
@@ -35,18 +35,19 @@ class StudentRegistrationController extends Notifier<bool> {
   Future<void> register({
     required String name,
     required String studentNumber,
-    required String sectionCode,
+    String? sectionCode,
   }) async {
-    await ref
+    final student = await ref
         .read(studentRepositoryProvider)
         .registerStudent(
           name: name,
           studentNumber: studentNumber,
           sectionCode: sectionCode,
         );
+    await ref.read(applicationSessionProvider).studentRegistered(student.id);
     state = true;
     ref.invalidate(currentStudentProvider);
-    ref.invalidate(currentStudentClassProvider);
+    ref.invalidate(currentStudentOfferingsProvider);
     ref.invalidate(allStudentsProvider);
   }
 }

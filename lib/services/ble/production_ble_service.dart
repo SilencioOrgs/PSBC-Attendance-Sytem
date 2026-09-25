@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:bluetooth_low_energy/bluetooth_low_energy.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 import '../../domain/models.dart';
@@ -47,6 +48,10 @@ class ProductionBleService with WidgetsBindingObserver implements BleService {
   bool _scanning = false;
   bool _advertising = false;
   bool _advertisingKnown = true;
+  static const MethodChannel _backgroundChannel = MethodChannel(
+    'classattend/background_attendance',
+  );
+  bool _backgroundServiceActive = false;
 
   @override
   BleAvailability get adapterAvailability => _availability(_central.state);
@@ -106,8 +111,26 @@ class ProductionBleService with WidgetsBindingObserver implements BleService {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden ||
         state == AppLifecycleState.detached) {
-      unawaited(stopAdvertising());
+      unawaited(_reconcileBackgroundAndStopForeground());
+    } else if (state == AppLifecycleState.resumed) {
+      unawaited(_refreshBackgroundServiceState());
     }
+  }
+
+  Future<void> _refreshBackgroundServiceState() async {
+    try {
+      final value = await _backgroundChannel.invokeMapMethod<String, Object?>(
+        'state',
+      );
+      _backgroundServiceActive = value?['status'] == 'active';
+    } catch (_) {
+      _backgroundServiceActive = false;
+    }
+  }
+
+  Future<void> _reconcileBackgroundAndStopForeground() async {
+    await _refreshBackgroundServiceState();
+    if (!_backgroundServiceActive) await stopAdvertising();
   }
 
   BleAvailability _availability(BluetoothLowEnergyState state) =>

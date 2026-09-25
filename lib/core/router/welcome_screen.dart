@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../providers/repository_providers.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_widgets.dart';
 import 'route_names.dart';
 
-class WelcomeScreen extends StatelessWidget {
+class WelcomeScreen extends ConsumerWidget {
   const WelcomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context) => PageScaffold(
+  Widget build(BuildContext context, WidgetRef ref) => PageScaffold(
     title: 'ClassAttend',
     body: Center(
       child: SingleChildScrollView(
@@ -47,7 +49,10 @@ class WelcomeScreen extends StatelessWidget {
             PrimaryActionButton(
               label: 'Continue as teacher',
               icon: Icons.school_outlined,
-              onPressed: () => context.goNamed(AppRoutes.teacherSetup),
+              onPressed: () async {
+                await ref.read(applicationSessionProvider).selectTeacher();
+                if (context.mounted) context.goNamed(AppRoutes.teacherSetup);
+              },
             ),
             const SizedBox(height: Spacing.sm),
             SecondaryActionButton(

@@ -26,6 +26,7 @@ class _ClassCreationScreenState extends ConsumerState<ClassCreationScreen> {
   final _room = TextEditingController();
   TimeOfDay _start = const TimeOfDay(hour: 8, minute: 0);
   TimeOfDay _end = const TimeOfDay(hour: 9, minute: 0);
+  final Set<Weekday> _scheduleDays = {};
   String? _error;
 
   @override
@@ -37,6 +38,7 @@ class _ClassCreationScreenState extends ConsumerState<ClassCreationScreen> {
       _section.text = section.sectionLabel;
       _subject.text = section.subject;
       _room.text = section.room;
+      _scheduleDays.addAll(section.scheduleDays);
       if (section.scheduleStart != null) {
         _start = TimeOfDay.fromDateTime(section.scheduleStart!);
       }
@@ -63,6 +65,10 @@ class _ClassCreationScreenState extends ConsumerState<ClassCreationScreen> {
       setState(() => _error = 'End time must be after the start time.');
       return;
     }
+    if (_scheduleDays.isEmpty) {
+      setState(() => _error = 'Select at least one schedule day.');
+      return;
+    }
     try {
       final controller = ref.read(classCreationControllerProvider.notifier);
       final section = widget.initialSection;
@@ -74,6 +80,7 @@ class _ClassCreationScreenState extends ConsumerState<ClassCreationScreen> {
           room: _room.text,
           scheduleStart: start,
           scheduleEnd: end,
+          scheduleDays: _scheduleDays,
         );
       } else {
         await controller.update(
@@ -92,6 +99,9 @@ class _ClassCreationScreenState extends ConsumerState<ClassCreationScreen> {
             sectionCode: '',
             scheduleStart: start,
             scheduleEnd: end,
+            scheduleDays: _scheduleDays,
+            startMinutesOfDay: _start.hour * 60 + _start.minute,
+            endMinutesOfDay: _end.hour * 60 + _end.minute,
             bleBeaconId: section.bleBeaconId,
             teacherId: section.teacherId,
           ),
@@ -186,6 +196,34 @@ class _ClassCreationScreenState extends ConsumerState<ClassCreationScreen> {
               validator: (value) => value == null || value.trim().isEmpty
                   ? 'Enter a room.'
                   : null,
+            ),
+            const SizedBox(height: Spacing.md),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Schedule days',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+            ),
+            Wrap(
+              spacing: Spacing.xs,
+              children: Weekday.values
+                  .map(
+                    (day) => FilterChip(
+                      label: Text(
+                        day.name[0].toUpperCase() + day.name.substring(1, 3),
+                      ),
+                      selected: _scheduleDays.contains(day),
+                      onSelected: (selected) => setState(() {
+                        if (selected) {
+                          _scheduleDays.add(day);
+                        } else {
+                          _scheduleDays.remove(day);
+                        }
+                      }),
+                    ),
+                  )
+                  .toList(),
             ),
             const SizedBox(height: Spacing.md),
             Row(

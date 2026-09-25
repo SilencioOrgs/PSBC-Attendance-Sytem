@@ -8,7 +8,10 @@ class DriftAttendanceRepository implements AttendanceRepository {
   DriftAttendanceRepository(this._db);
   final AppDatabase _db;
   @override
-  Future<AttendanceSession> startSession(String classId) async {
+  Future<AttendanceSession> startSession(
+    String classId, {
+    bool manualOverride = false,
+  }) async {
     final activeSession = (await _db.attendanceDao.getSessions())
         .where(
           (session) =>
@@ -34,6 +37,7 @@ class DriftAttendanceRepository implements AttendanceRepository {
       date: DateTime(now.year, now.month, now.day),
       startedAt: now,
       status: AttendanceSessionStatus.scanning,
+      manualOverride: Value(manualOverride),
     );
     await _db.attendanceDao.startSession(session: session, roster: roster);
     final created = await _db.attendanceDao.getSession(id);
