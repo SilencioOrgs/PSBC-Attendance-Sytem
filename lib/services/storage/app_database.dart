@@ -148,7 +148,10 @@ class AttendanceRecords extends Table {
   DateTimeColumn get updatedAt => dateTime()();
   TextColumn get syncStatus => text().map(const SyncStatusConverter())();
   TextColumn get sessionId => text().references(AttendanceSessions, #id)();
-  TextColumn get studentId => text().references(Students, #id)();
+
+  /// Student or capability-roster identity. Officer rosters are carried by the
+  /// grant and deliberately do not create local Student rows.
+  TextColumn get studentId => text()();
   TextColumn get status => text().map(const RecordStatusConverter())();
   IntColumn get rssi => integer().nullable()();
   DateTimeColumn get detectedAt => dateTime().nullable()();
@@ -217,6 +220,23 @@ class AttendanceAccessGrants extends Table {
   Set<Column> get primaryKey => {invitationId};
 }
 
+@TableIndex(
+  name: 'attendance_access_offering_source_unique',
+  columns: {#sourceOfferingId},
+  unique: true,
+)
+@DataClassName('AttendanceAccessOfferingRow')
+class AttendanceAccessOfferings extends Table {
+  TextColumn get invitationId =>
+      text().references(AttendanceAccessGrants, #invitationId)();
+  TextColumn get sourceOfferingId => text()();
+  TextColumn get localOfferingId => text()();
+  TextColumn get subject => text()();
+  TextColumn get sectionCode => text()();
+  @override
+  Set<Column> get primaryKey => {invitationId, sourceOfferingId};
+}
+
 @DriftDatabase(
   tables: [
     Teachers,
@@ -229,6 +249,7 @@ class AttendanceAccessGrants extends Table {
     AppSettingsRows,
     AppSessionPreferences,
     AttendanceAccessGrants,
+    AttendanceAccessOfferings,
   ],
   daos: [
     TeacherDao,
@@ -247,7 +268,7 @@ class AppDatabase extends _$AppDatabase {
     : super(executor ?? driftDatabase(name: 'classattend'));
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -320,6 +341,30 @@ class AppDatabase extends _$AppDatabase {
         }
       }
       if (from < 4) await m.createTable(attendanceAccessGrants);
+      if (from < 5) {
+        await m.createAll();
+        await customStatement('''
+          INSERT INTO attendance_access_offerings (
+            invitation_id, source_offering_id, local_offering_id,
+            subject, section_code
+          )
+          SELECT invitation_id, source_offering_id, local_offering_id,
+                 subject, section_code
+          FROM attendance_access_grants
+        ''');
+      }
+      if (from < 6) {
+        await m.alterTable(TableMigration(attendanceRecords));
+        await customStatement(
+          "DELETE FROM devices WHERE student_id LIKE 'attendance:%'",
+        );
+        await customStatement(
+          "DELETE FROM enrollments WHERE student_id LIKE 'attendance:%'",
+        );
+        await customStatement(
+          "DELETE FROM students WHERE id LIKE 'attendance:%'",
+        );
+      }
     },
     beforeOpen: (details) async => customStatement('PRAGMA foreign_keys = ON'),
   );
@@ -1074,30 +1119,66 @@ class AppSessionDao extends DatabaseAccessor<AppDatabase>
   );
 }
 
-@DriftAccessor(tables: [AttendanceAccessGrants])
+@DriftAccessor(tables: [AttendanceAccessGrants, AttendanceAccessOfferings])
 class AttendanceAccessDao extends DatabaseAccessor<AppDatabase>
     with _$AttendanceAccessDaoMixin {
   AttendanceAccessDao(super.db);
+
+  JoinedSelectStatement _offeringQuery() =>
+      select(attendanceAccessOfferings).join([
+        innerJoin(
+          attendanceAccessGrants,
+          attendanceAccessGrants.invitationId.equalsExp(
+            attendanceAccessOfferings.invitationId,
+          ),
+        ),
+      ]);
+
+  (AttendanceAccessGrantRow, AttendanceAccessOfferingRow) _offeringResult(
+    TypedResult result,
+  ) => (
+    result.readTable(attendanceAccessGrants),
+    result.readTable(attendanceAccessOfferings),
+  );
 
   Future<AttendanceAccessGrantRow?> byInvitationId(String id) => (select(
     attendanceAccessGrants,
   )..where((row) => row.invitationId.equals(id))).getSingleOrNull();
 
-  Future<AttendanceAccessGrantRow?> bySourceOffering(
-    String teacherId,
-    String offeringId,
-  ) =>
-      (select(attendanceAccessGrants)..where(
-            (row) =>
-                row.sourceTeacherId.equals(teacherId) &
-                row.sourceOfferingId.equals(offeringId),
-          ))
-          .getSingleOrNull();
+  Future<(AttendanceAccessGrantRow, AttendanceAccessOfferingRow)?>
+  offeringBySource(String teacherId, String offeringId) async {
+    final query = _offeringQuery()
+      ..where(
+        attendanceAccessGrants.sourceTeacherId.equals(teacherId) &
+            attendanceAccessOfferings.sourceOfferingId.equals(offeringId),
+      );
+    final result = await query.getSingleOrNull();
+    return result == null ? null : _offeringResult(result);
+  }
 
-  Future<AttendanceAccessGrantRow?> byLocalOffering(String offeringId) =>
-      (select(attendanceAccessGrants)
-            ..where((row) => row.localOfferingId.equals(offeringId)))
-          .getSingleOrNull();
+  Future<(AttendanceAccessGrantRow, AttendanceAccessOfferingRow)?>
+  offeringByLocal(String offeringId) async {
+    final query = _offeringQuery()
+      ..where(attendanceAccessOfferings.localOfferingId.equals(offeringId));
+    final result = await query.getSingleOrNull();
+    return result == null ? null : _offeringResult(result);
+  }
+
+  Future<List<(AttendanceAccessGrantRow, AttendanceAccessOfferingRow)>>
+  getAllOfferings() async {
+    final rows =
+        await (_offeringQuery()
+              ..orderBy([OrderingTerm.asc(attendanceAccessGrants.grantedAt)]))
+            .get();
+    return rows.map(_offeringResult).toList(growable: false);
+  }
+
+  Stream<List<(AttendanceAccessGrantRow, AttendanceAccessOfferingRow)>>
+  watchAllOfferings() =>
+      (_offeringQuery()
+            ..orderBy([OrderingTerm.asc(attendanceAccessGrants.grantedAt)]))
+          .watch()
+          .map((rows) => rows.map(_offeringResult).toList(growable: false));
 
   Future<List<AttendanceAccessGrantRow>> getAll() => (select(
     attendanceAccessGrants,
@@ -1109,6 +1190,9 @@ class AttendanceAccessDao extends DatabaseAccessor<AppDatabase>
 
   Future<void> insert(AttendanceAccessGrantsCompanion grant) =>
       into(attendanceAccessGrants).insert(grant);
+
+  Future<void> insertOffering(AttendanceAccessOfferingsCompanion offering) =>
+      into(attendanceAccessOfferings).insert(offering);
 }
 
 String newDatabaseId() => const Uuid().v4();

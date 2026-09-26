@@ -55,7 +55,7 @@ void main() {
     );
     final unknownVersion =
         jsonDecode(invitation.encode()) as Map<String, Object?>
-          ..['version'] = 2;
+          ..['version'] = 3;
     expect(
       () => AttendanceAccessInvitation.decode(jsonEncode(unknownVersion)),
       throwsFormatException,

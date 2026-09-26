@@ -3,12 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/router/route_names.dart';
+import '../../../../core/providers/repository_providers.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/ble_identity.dart';
 import '../../../../core/utils/iterable_extensions.dart';
 import '../../../../core/widgets/app_widgets.dart';
 import '../../../attendance/presentation/providers/attendance_provider.dart';
 import '../../../attendance/presentation/providers/attendance_controller.dart';
+import '../../../device/presentation/providers/device_provider.dart';
 import '../providers/class_provider.dart';
 import '../../../../domain/models.dart';
 import '../../../../domain/attendance_window_policy.dart';
@@ -477,7 +479,7 @@ class ClassDetailsScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: Spacing.sm),
                     SecondaryActionButton(
-                      label: 'Create Attendance Officer QR',
+                      label: 'Share Attendance Access',
                       icon: Icons.qr_code_2,
                       onPressed: () => context.pushNamed(
                         AppRoutes.teacherAttendanceAccessQr,
@@ -707,11 +709,28 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
   String _query = '';
 
   Future<void> _edit(Student? student) async {
+    final classes = await ref.read(classRepositoryProvider).getClasses();
+    final ownedIds = classes.map((offering) => offering.id).toSet();
+    final memberships = student == null
+        ? const <ClassSection>[]
+        : await ref
+              .read(classRepositoryProvider)
+              .getStudentOfferings(student.id);
+    final selectedOfferingIds = student == null
+        ? {widget.classId}
+        : memberships
+              .map((offering) => offering.id)
+              .where(ownedIds.contains)
+              .toSet();
+    if (!mounted) return;
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (context) =>
-          _StudentEditorSheet(classId: widget.classId, student: student),
+      builder: (context) => StudentEditorForm(
+        classId: widget.classId,
+        student: student,
+        initialOfferingIds: selectedOfferingIds,
+      ),
     );
   }
 
@@ -1116,22 +1135,42 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
   );
 }
 
-class _StudentEditorSheet extends ConsumerStatefulWidget {
-  const _StudentEditorSheet({required this.classId, this.student});
-  final String classId;
-  final Student? student;
+class TeacherStudentRegistrationScreen extends StatelessWidget {
+  const TeacherStudentRegistrationScreen({super.key});
 
   @override
-  ConsumerState<_StudentEditorSheet> createState() =>
-      _StudentEditorSheetState();
+  Widget build(BuildContext context) => PageScaffold(
+    title: 'Add Student',
+    showBack: true,
+    body: StudentEditorForm(initialOfferingIds: const {}),
+  );
 }
 
-class _StudentEditorSheetState extends ConsumerState<_StudentEditorSheet> {
+class StudentEditorForm extends ConsumerStatefulWidget {
+  const StudentEditorForm({
+    super.key,
+    this.classId,
+    this.student,
+    this.initialOfferingIds = const {},
+  });
+
+  final String? classId;
+  final Student? student;
+  final Set<String> initialOfferingIds;
+
+  @override
+  ConsumerState<StudentEditorForm> createState() => _StudentEditorFormState();
+}
+
+class _StudentEditorFormState extends ConsumerState<StudentEditorForm> {
   late final _name = TextEditingController(text: widget.student?.name ?? '');
   late final _number = TextEditingController(
     text: widget.student?.studentNumber ?? '',
   );
   final _bleUuid = TextEditingController();
+  late final Set<String> _selectedOfferingIds = Set<String>.of(
+    widget.initialOfferingIds,
+  );
   String? _error;
 
   @override
@@ -1143,15 +1182,20 @@ class _StudentEditorSheetState extends ConsumerState<_StudentEditorSheet> {
   }
 
   Future<void> _save() async {
+    final selectedOfferingIds = Set<String>.of(_selectedOfferingIds);
     if (_name.text.trim().isEmpty || _number.text.trim().isEmpty) {
       setState(() => _error = 'Enter the student name and number.');
+      return;
+    }
+    if (widget.student == null && selectedOfferingIds.isEmpty) {
+      setState(() => _error = 'Select at least one subject.');
       return;
     }
     try {
       final controller = ref.read(studentManagementControllerProvider.notifier);
       if (widget.student == null) {
         await controller.add(
-          widget.classId,
+          selectedOfferingIds,
           _name.text,
           _number.text,
           bleUuid: _bleUuid.text.trim().isEmpty ? null : _bleUuid.text.trim(),
@@ -1162,14 +1206,16 @@ class _StudentEditorSheetState extends ConsumerState<_StudentEditorSheet> {
           widget.student!.id,
           _name.text,
           _number.text,
+          selectedOfferingIds,
         );
       }
       if (mounted) {
+        final messenger = ScaffoldMessenger.of(context);
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(
             content: Text(
-              widget.student == null ? 'Student added.' : 'Student updated.',
+              widget.student == null ? 'Student saved.' : 'Student updated.',
             ),
           ),
         );
@@ -1182,21 +1228,20 @@ class _StudentEditorSheetState extends ConsumerState<_StudentEditorSheet> {
   }
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: EdgeInsets.fromLTRB(
-      Spacing.md,
-      Spacing.lg,
-      Spacing.md,
-      MediaQuery.viewInsetsOf(context).bottom + Spacing.lg,
-    ),
-    child: Column(
+  Widget build(BuildContext context) {
+    final busy = ref.watch(studentManagementControllerProvider);
+    final content = Column(
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          widget.student == null ? 'Add student' : 'Edit student',
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
-        const SizedBox(height: Spacing.md),
+        if (widget.classId != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: Spacing.md),
+            child: Text(
+              widget.student == null ? 'Add student' : 'Edit student',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+          ),
         TextField(
           controller: _name,
           textCapitalization: TextCapitalization.words,
@@ -1214,12 +1259,111 @@ class _StudentEditorSheetState extends ConsumerState<_StudentEditorSheet> {
             autocorrect: false,
             enableSuggestions: false,
             decoration: const InputDecoration(
-              labelText: 'Student BLE Service UUID (optional)',
-              helperText: 'Enter the code shown on the student’s Device tab.',
+              labelText: 'BLE Service UUID (optional)',
+              helperText:
+                  'Enter the registered device UUID once for this student.',
               prefixIcon: Icon(Icons.bluetooth_outlined),
             ),
           ),
-        ],
+        ] else
+          Padding(
+            padding: const EdgeInsets.only(top: Spacing.md),
+            child: ref
+                .watch(studentDeviceProvider(widget.student!.id))
+                .when(
+                  data: (device) => SectionCard(
+                    child: Row(
+                      children: [
+                        Icon(
+                          device == null
+                              ? Icons.bluetooth_disabled
+                              : Icons.bluetooth_connected,
+                        ),
+                        const SizedBox(width: Spacing.sm),
+                        Expanded(
+                          child: Text(
+                            device == null
+                                ? 'No BLE device registered'
+                                : 'BLE device registered · ${device.bleUuid}',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  loading: () => const LinearProgressIndicator(),
+                  error: (error, stack) =>
+                      const Text('BLE device status unavailable.'),
+                ),
+          ),
+        const SizedBox(height: Spacing.md),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Subjects',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            TextButton(
+              onPressed: busy
+                  ? null
+                  : () => setState(() {
+                      _selectedOfferingIds
+                        ..clear()
+                        ..addAll(
+                          ref
+                                  .read(classListProvider)
+                                  .asData
+                                  ?.value
+                                  .map((offering) => offering.id) ??
+                              const <String>[],
+                        );
+                    }),
+              child: const Text('Select All'),
+            ),
+            TextButton(
+              onPressed: busy
+                  ? null
+                  : () => setState(_selectedOfferingIds.clear),
+              child: const Text('Clear All'),
+            ),
+          ],
+        ),
+        ref
+            .watch(classListProvider)
+            .when(
+              data: (offerings) => offerings.isEmpty
+                  ? const Text(
+                      'Create a class offering before registering a student.',
+                    )
+                  : SectionCard(
+                      child: Column(
+                        children: [
+                          for (final offering in offerings)
+                            CheckboxListTile(
+                              contentPadding: EdgeInsets.zero,
+                              value: _selectedOfferingIds.contains(offering.id),
+                              title: Text(offering.subject),
+                              subtitle: Text(offering.sectionCode),
+                              onChanged: busy
+                                  ? null
+                                  : (selected) => setState(() {
+                                      if (selected == true) {
+                                        _selectedOfferingIds.add(offering.id);
+                                      } else {
+                                        _selectedOfferingIds.remove(
+                                          offering.id,
+                                        );
+                                      }
+                                    }),
+                            ),
+                        ],
+                      ),
+                    ),
+              loading: () => const LinearProgressIndicator(),
+              error: (error, stack) =>
+                  const Text('Class offerings are unavailable.'),
+            ),
         if (_error != null)
           Padding(
             padding: const EdgeInsets.only(top: Spacing.sm),
@@ -1230,16 +1374,22 @@ class _StudentEditorSheetState extends ConsumerState<_StudentEditorSheet> {
           ),
         const SizedBox(height: Spacing.md),
         PrimaryActionButton(
-          label: ref.watch(studentManagementControllerProvider)
-              ? 'Saving...'
-              : 'Save student',
-          onPressed: ref.watch(studentManagementControllerProvider)
-              ? null
-              : _save,
+          label: busy ? 'Saving...' : 'Save student',
+          onPressed: busy ? null : _save,
         ),
       ],
-    ),
-  );
+    );
+
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(
+        Spacing.md,
+        Spacing.md,
+        Spacing.md,
+        MediaQuery.viewInsetsOf(context).bottom + Spacing.lg,
+      ),
+      child: content,
+    );
+  }
 }
 
 class _DetailLine extends StatelessWidget {

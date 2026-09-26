@@ -95,7 +95,7 @@ class StudentManagementController extends Notifier<bool> {
   bool build() => false;
 
   Future<void> add(
-    String classId,
+    Set<String> offeringIds,
     String name,
     String studentNumber, {
     String? bleUuid,
@@ -104,38 +104,60 @@ class StudentManagementController extends Notifier<bool> {
     try {
       await ref
           .read(studentRepositoryProvider)
-          .addStudentToClass(
+          .addStudentToOfferings(
             name: name,
             studentNumber: studentNumber,
-            classId: classId,
+            offeringIds: offeringIds,
             bleUuid: bleUuid,
           );
     } finally {
       state = false;
-      ref.invalidate(classRosterProvider(classId));
-      ref.invalidate(classByIdProvider(classId));
+      for (final offeringId in offeringIds) {
+        ref.invalidate(classRosterProvider(offeringId));
+        ref.invalidate(classByIdProvider(offeringId));
+      }
+      ref.invalidate(allStudentsProvider);
     }
   }
 
   Future<void> update(
-    String classId,
+    String? classId,
     String studentId,
     String name,
     String studentNumber,
+    Set<String> offeringIds,
   ) async {
     state = true;
+    List<ClassSection> oldOfferings = const [];
     try {
-      await ref
-          .read(studentRepositoryProvider)
-          .updateStudent(
-            studentId: studentId,
-            name: name,
-            studentNumber: studentNumber,
-          );
+      oldOfferings = await ref
+          .read(classRepositoryProvider)
+          .getStudentOfferings(studentId);
+      final repository = ref.read(studentRepositoryProvider);
+      await repository.updateStudent(
+        studentId: studentId,
+        name: name,
+        studentNumber: studentNumber,
+      );
+      await repository.setStudentOfferings(
+        studentId: studentId,
+        offeringIds: offeringIds,
+      );
     } finally {
       state = false;
-      ref.invalidate(classRosterProvider(classId));
-      ref.invalidate(classByIdProvider(classId));
+      for (final offering in oldOfferings) {
+        ref.invalidate(classRosterProvider(offering.id));
+        ref.invalidate(classByIdProvider(offering.id));
+      }
+      for (final offeringId in offeringIds) {
+        ref.invalidate(classRosterProvider(offeringId));
+        ref.invalidate(classByIdProvider(offeringId));
+      }
+      if (classId != null) {
+        ref.invalidate(classRosterProvider(classId));
+        ref.invalidate(classByIdProvider(classId));
+      }
+      ref.invalidate(allStudentsProvider);
     }
   }
 

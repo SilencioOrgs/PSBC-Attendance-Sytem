@@ -4,6 +4,7 @@ import '../../../domain/models.dart';
 import '../../../domain/repositories.dart';
 import '../../../domain/attendance_window_policy.dart';
 import '../../../domain/attendance_access_invitation.dart';
+import '../../../core/utils/iterable_extensions.dart';
 import '../../../services/storage/app_database.dart';
 
 class DriftAttendanceRepository implements AttendanceRepository {
@@ -56,21 +57,10 @@ class DriftAttendanceRepository implements AttendanceRepository {
     if (!window.isScheduled && !manualOverride) {
       throw AttendanceWindowException(window.status);
     }
-    final accessGrant = await _db.attendanceAccessDao.byLocalOffering(classId);
-    final roster = accessGrant == null
+    final accessEntry = await _db.attendanceAccessDao.offeringByLocal(classId);
+    final roster = accessEntry == null
         ? await _db.classDao.getStudents(classId)
-        : AttendanceAccessInvitation.decode(accessGrant.payload).roster
-              .map(
-                (student) => Student(
-                  id: _accessStudentId(classId, student.id),
-                  updatedAt: accessGrant.grantedAt,
-                  syncStatus: SyncStatus.synced,
-                  name: student.name,
-                  studentNumber: student.studentNumber,
-                  deviceRegistered: student.bleUuid != null,
-                ),
-              )
-              .toList(growable: false);
+        : _officerRoster(accessEntry.$1, accessEntry.$2);
     if (roster.isEmpty) throw const EmptyClassRosterException();
     final id = newDatabaseId();
     final session = AttendanceSessionsCompanion.insert(
@@ -219,5 +209,27 @@ class DriftAttendanceRepository implements AttendanceRepository {
   }
 }
 
-String _accessStudentId(String localOfferingId, String sourceStudentId) =>
-    'attendance:$localOfferingId:$sourceStudentId';
+List<Student> _officerRoster(
+  AttendanceAccessGrantRow grant,
+  AttendanceAccessOfferingRow accessOffering,
+) {
+  final invitation = AttendanceAccessInvitation.decode(grant.payload);
+  final offering = invitation.offerings
+      .where((item) => item.offering.id == accessOffering.sourceOfferingId)
+      .firstOrNull;
+  if (offering == null) return const [];
+  final rosterIds = offering.rosterStudentIds.toSet();
+  return invitation.roster
+      .where((student) => rosterIds.contains(student.id))
+      .map(
+        (student) => Student(
+          id: attendanceAccessStudentId(student.id),
+          updatedAt: grant.grantedAt,
+          syncStatus: SyncStatus.synced,
+          name: student.name,
+          studentNumber: student.studentNumber,
+          deviceRegistered: student.bleUuid != null,
+        ),
+      )
+      .toList(growable: false);
+}

@@ -10,31 +10,35 @@ class DriftAttendanceAccessRepository implements AttendanceAccessRepository {
   DriftAttendanceAccessRepository(this._db);
   final AppDatabase _db;
 
-  AttendanceAccessGrant _map(AttendanceAccessGrantRow row) =>
-      AttendanceAccessGrant(
-        invitationId: row.invitationId,
-        sourceTeacherId: row.sourceTeacherId,
-        sourceOfferingId: row.sourceOfferingId,
-        localOfferingId: row.localOfferingId,
-        subject: row.subject,
-        sectionCode: row.sectionCode,
-        payload: row.payload,
-        grantedAt: row.grantedAt,
-      );
+  AttendanceAccessGrant _map(
+    AttendanceAccessGrantRow row,
+    AttendanceAccessOfferingRow offering,
+  ) => AttendanceAccessGrant(
+    invitationId: row.invitationId,
+    sourceTeacherId: row.sourceTeacherId,
+    sourceOfferingId: offering.sourceOfferingId,
+    localOfferingId: offering.localOfferingId,
+    subject: offering.subject,
+    sectionCode: offering.sectionCode,
+    payload: row.payload,
+    grantedAt: row.grantedAt,
+  );
 
   @override
   Future<bool> hasAnyAccess() async =>
-      (await _db.attendanceAccessDao.getAll()).isNotEmpty;
+      (await _db.attendanceAccessDao.getAllOfferings()).isNotEmpty;
 
   @override
   Stream<List<AttendanceAccessGrant>> watchGrants() => _db.attendanceAccessDao
-      .watchAll()
-      .map((rows) => rows.map(_map).toList(growable: false));
+      .watchAllOfferings()
+      .map((rows) => rows.map((entry) => _map(entry.$1, entry.$2)).toList());
 
   @override
   Future<AttendanceAccessGrant?> findForOffering(String localOfferingId) async {
-    final row = await _db.attendanceAccessDao.byLocalOffering(localOfferingId);
-    return row == null ? null : _map(row);
+    final entry = await _db.attendanceAccessDao.offeringByLocal(
+      localOfferingId,
+    );
+    return entry == null ? null : _map(entry.$1, entry.$2);
   }
 
   @override
@@ -42,34 +46,45 @@ class DriftAttendanceAccessRepository implements AttendanceAccessRepository {
     String teacherId,
     String sourceOfferingId,
   ) async {
-    final row = await _db.attendanceAccessDao.bySourceOffering(
+    final entry = await _db.attendanceAccessDao.offeringBySource(
       teacherId,
       sourceOfferingId,
     );
-    return row == null ? null : _map(row);
+    return entry == null ? null : _map(entry.$1, entry.$2);
   }
 
   @override
   Stream<List<Student>> watchRoster(String localOfferingId) =>
-      _db.attendanceAccessDao.watchAll().asyncMap((rows) async {
-        final row = rows
-            .where((grant) => grant.localOfferingId == localOfferingId)
+      _db.attendanceAccessDao.watchAllOfferings().map((rows) {
+        final entry = rows
+            .where((item) => item.$2.localOfferingId == localOfferingId)
             .firstOrNull;
-        return row == null ? const <Student>[] : _roster(row);
+        return entry == null ? const <Student>[] : _roster(entry.$1, entry.$2);
       });
 
   @override
   Future<List<Student>> getRoster(String localOfferingId) async {
-    final row = await _db.attendanceAccessDao.byLocalOffering(localOfferingId);
-    return row == null ? const [] : _roster(row);
+    final entry = await _db.attendanceAccessDao.offeringByLocal(
+      localOfferingId,
+    );
+    return entry == null ? const [] : _roster(entry.$1, entry.$2);
   }
 
-  List<Student> _roster(AttendanceAccessGrantRow row) {
+  List<Student> _roster(
+    AttendanceAccessGrantRow row,
+    AttendanceAccessOfferingRow offeringRow,
+  ) {
     final invitation = AttendanceAccessInvitation.decode(row.payload);
+    final offering = invitation.offerings
+        .where((item) => item.offering.id == offeringRow.sourceOfferingId)
+        .firstOrNull;
+    if (offering == null) return const [];
+    final rosterIds = offering.rosterStudentIds.toSet();
     return invitation.roster
+        .where((source) => rosterIds.contains(source.id))
         .map(
           (source) => Student(
-            id: _studentId(row.localOfferingId, source.id),
+            id: attendanceAccessStudentId(source.id),
             updatedAt: row.grantedAt,
             syncStatus: SyncStatus.synced,
             name: source.name,
@@ -82,21 +97,29 @@ class DriftAttendanceAccessRepository implements AttendanceAccessRepository {
 
   @override
   Future<List<Device>> getDevices(String localOfferingId) async {
-    final row = await _db.attendanceAccessDao.byLocalOffering(localOfferingId);
-    if (row == null) return const [];
-    final invitation = AttendanceAccessInvitation.decode(row.payload);
+    final entry = await _db.attendanceAccessDao.offeringByLocal(
+      localOfferingId,
+    );
+    if (entry == null) return const [];
+    final invitation = AttendanceAccessInvitation.decode(entry.$1.payload);
+    final offering = invitation.offerings
+        .where((item) => item.offering.id == entry.$2.sourceOfferingId)
+        .firstOrNull;
+    if (offering == null) return const [];
+    final rosterIds = offering.rosterStudentIds.toSet();
     return [
       for (final source in invitation.roster)
-        if (source.bleUuid case final uuid?)
-          Device(
-            id: 'attendance-device-${_studentId(row.localOfferingId, source.id)}',
-            updatedAt: row.grantedAt,
-            syncStatus: SyncStatus.synced,
-            name: source.deviceName ?? 'Registered student device',
-            bleUuid: uuid,
-            ownerStudentId: _studentId(row.localOfferingId, source.id),
-            registeredAt: row.grantedAt,
-          ),
+        if (rosterIds.contains(source.id))
+          if (source.bleUuid case final uuid?)
+            Device(
+              id: 'attendance-device-${attendanceAccessStudentId(source.id)}',
+              updatedAt: entry.$1.grantedAt,
+              syncStatus: SyncStatus.synced,
+              name: source.deviceName ?? 'Registered student device',
+              bleUuid: uuid,
+              ownerStudentId: attendanceAccessStudentId(source.id),
+              registeredAt: entry.$1.grantedAt,
+            ),
     ];
   }
 
@@ -104,63 +127,100 @@ class DriftAttendanceAccessRepository implements AttendanceAccessRepository {
   Future<AttendanceAccessImportResult> importInvitation(
     AttendanceAccessInvitation invitation,
   ) async {
-    final duplicate = await _db.attendanceAccessDao.bySourceOffering(
-      invitation.teacherId,
-      invitation.offering.id,
+    final validated = AttendanceAccessInvitation.decode(invitation.encode());
+    final sameId = await _db.attendanceAccessDao.byInvitationId(
+      validated.invitationId,
     );
-    if (duplicate != null) {
+    if (sameId != null) {
+      final savedInvitation = AttendanceAccessInvitation.decode(sameId.payload);
+      if (savedInvitation.encode() != validated.encode()) {
+        throw const FormatException(
+          'This attendance QR identifier is invalid.',
+        );
+      }
+      final existing = await _db.attendanceAccessDao.getAllOfferings();
+      final match = existing
+          .where((entry) => entry.$1.invitationId == validated.invitationId)
+          .firstOrNull;
+      if (match == null) {
+        throw const FormatException(
+          'This attendance QR identifier is invalid.',
+        );
+      }
       return AttendanceAccessImportResult(
-        grant: _map(duplicate),
-        invitation: AttendanceAccessInvitation.decode(duplicate.payload),
+        grant: _map(match.$1, match.$2),
+        invitation: savedInvitation,
         alreadyExists: true,
       );
     }
-    final reusedId = await _db.attendanceAccessDao.byInvitationId(
-      invitation.invitationId,
-    );
-    if (reusedId != null) {
-      throw const FormatException('This attendance QR identifier is invalid.');
+
+    final existingBySource =
+        <String, (AttendanceAccessGrantRow, AttendanceAccessOfferingRow)>{};
+    for (final offering in validated.offerings) {
+      final existing = await _db.attendanceAccessDao.offeringBySource(
+        validated.teacherId,
+        offering.offering.id,
+      );
+      if (existing != null) existingBySource[offering.offering.id] = existing;
+    }
+    if (existingBySource.length == validated.offerings.length) {
+      final existing = existingBySource.values.first;
+      return AttendanceAccessImportResult(
+        grant: _map(existing.$1, existing.$2),
+        invitation: validated,
+        alreadyExists: true,
+      );
     }
 
     final now = DateTime.now();
     late AttendanceAccessGrantRow saved;
+    late AttendanceAccessOfferingRow firstSavedOffering;
     await _db.transaction(() async {
-      var teacher = await (_db.select(
+      final teacher = await (_db.select(
         _db.teachers,
-      )..where((row) => row.id.equals(invitation.teacherId))).getSingleOrNull();
+      )..where((row) => row.id.equals(validated.teacherId))).getSingleOrNull();
       if (teacher == null) {
         await _db.teacherDao.save(
           TeachersCompanion.insert(
-            id: invitation.teacherId,
+            id: validated.teacherId,
             updatedAt: now,
             syncStatus: SyncStatus.synced,
-            name: invitation.teacherName,
+            name: validated.teacherName,
             isLocal: const Value(false),
           ),
         );
-      } else if (teacher.name != invitation.teacherName) {
+      } else if (teacher.name != validated.teacherName) {
         throw const FormatException('The attendance teacher details conflict.');
       }
 
-      final existingClass = await _db.classDao.getClass(invitation.offering.id);
-      var localOfferingId = invitation.offering.id;
-      if (existingClass != null &&
-          (existingClass.teacherId != invitation.teacherId ||
-              existingClass.subject != invitation.offering.subject)) {
-        localOfferingId = 'attendance-${invitation.invitationId}';
-      }
-      final sameOffering = await _db.classDao.findOffering(
-        invitation.teacherId,
-        invitation.offering.sectionCode,
-        invitation.offering.subject,
-      );
-      if (sameOffering != null) localOfferingId = sameOffering.id;
-      if (await _db.classDao.getClass(localOfferingId) == null) {
-        final offering = invitation.offering;
+      final localOfferingIds = <String, String>{};
+      for (final accessOffering in validated.offerings) {
+        final offering = accessOffering.offering;
+        final existingAccess = existingBySource[offering.id];
+        if (existingAccess != null) {
+          localOfferingIds[offering.id] = existingAccess.$2.localOfferingId;
+          continue;
+        }
+        final existingClass = await _db.classDao.getClass(offering.id);
+        var localId = offering.id;
+        if (existingClass != null &&
+            (existingClass.teacherId != validated.teacherId ||
+                existingClass.subject != offering.subject)) {
+          localId = 'attendance-${validated.invitationId}-${offering.id}';
+        }
+        final sameOffering = await _db.classDao.findOffering(
+          validated.teacherId,
+          offering.sectionCode,
+          offering.subject,
+        );
+        if (sameOffering != null) localId = sameOffering.id;
+        localOfferingIds[offering.id] = localId;
+        if (await _db.classDao.getClass(localId) != null) continue;
+
         final date = DateTime(2000, 1, 1);
         await _db.classDao.insert(
           ClassSectionsCompanion.insert(
-            id: localOfferingId,
+            id: localId,
             updatedAt: now,
             syncStatus: SyncStatus.synced,
             gradeLevel: offering.gradeLevel,
@@ -176,52 +236,56 @@ class DriftAttendanceAccessRepository implements AttendanceAccessRepository {
             startMinutesOfDay: Value(offering.startMinutesOfDay),
             endMinutesOfDay: Value(offering.endMinutesOfDay),
             bleBeaconId: '',
-            teacherId: invitation.teacherId,
+            teacherId: validated.teacherId,
           ),
         );
       }
 
-      for (var index = 0; index < invitation.roster.length; index++) {
-        final source = invitation.roster[index];
-        final id = _studentId(localOfferingId, source.id);
-        final existingStudent = await _db.studentDao.getOne(id);
-        if (existingStudent == null) {
-          await _db.studentDao.insert(
-            StudentsCompanion.insert(
-              id: id,
-              updatedAt: now,
-              syncStatus: SyncStatus.synced,
-              studentNumber: 'OFFICER-${invitation.invitationId}-$index',
-              fullName: source.name,
-              isCurrent: const Value(false),
-            ),
-          );
-        }
-      }
-
+      final parentAccessOffering = validated.offerings.firstWhere(
+        (item) => !existingBySource.containsKey(item.offering.id),
+      );
+      final firstOffering = parentAccessOffering.offering;
+      final firstLocalId = localOfferingIds[firstOffering.id]!;
       await _db.attendanceAccessDao.insert(
         AttendanceAccessGrantsCompanion.insert(
-          invitationId: invitation.invitationId,
-          sourceTeacherId: invitation.teacherId,
-          sourceOfferingId: invitation.offering.id,
-          localOfferingId: localOfferingId,
-          subject: invitation.offering.subject,
-          sectionCode: invitation.offering.sectionCode,
-          payload: invitation.encode(),
+          invitationId: validated.invitationId,
+          sourceTeacherId: validated.teacherId,
+          sourceOfferingId: firstOffering.id,
+          localOfferingId: firstLocalId,
+          subject: firstOffering.subject,
+          sectionCode: firstOffering.sectionCode,
+          payload: validated.encode(),
           grantedAt: now,
         ),
       );
       saved = (await _db.attendanceAccessDao.byInvitationId(
-        invitation.invitationId,
+        validated.invitationId,
       ))!;
+
+      for (final accessOffering in validated.offerings) {
+        if (existingBySource.containsKey(accessOffering.offering.id)) continue;
+        final offering = accessOffering.offering;
+        await _db.attendanceAccessDao.insertOffering(
+          AttendanceAccessOfferingsCompanion.insert(
+            invitationId: validated.invitationId,
+            sourceOfferingId: offering.id,
+            localOfferingId: localOfferingIds[offering.id]!,
+            subject: offering.subject,
+            sectionCode: offering.sectionCode,
+          ),
+        );
+      }
+      final firstLinked = await _db.attendanceAccessDao.offeringBySource(
+        validated.teacherId,
+        firstOffering.id,
+      );
+      firstSavedOffering = firstLinked!.$2;
     });
+
     return AttendanceAccessImportResult(
-      grant: _map(saved),
-      invitation: invitation,
+      grant: _map(saved, firstSavedOffering),
+      invitation: validated,
       alreadyExists: false,
     );
   }
 }
-
-String _studentId(String localOfferingId, String sourceStudentId) =>
-    'attendance:$localOfferingId:$sourceStudentId';

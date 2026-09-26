@@ -2866,9 +2866,6 @@ class $AttendanceRecordsTable extends AttendanceRecords
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: true,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'REFERENCES students (id)',
-    ),
   );
   @override
   late final GeneratedColumnWithTypeConverter<
@@ -3034,6 +3031,9 @@ class AttendanceRecordRow extends DataClass
   final DateTime updatedAt;
   final domain.SyncStatus syncStatus;
   final String sessionId;
+
+  /// Student or capability-roster identity. Officer rosters are carried by the
+  /// grant and deliberately do not create local Student rows.
   final String studentId;
   final domain.AttendanceRecordStatus status;
   final int? rssi;
@@ -5251,6 +5251,413 @@ class AttendanceAccessGrantsCompanion
   }
 }
 
+class $AttendanceAccessOfferingsTable extends AttendanceAccessOfferings
+    with
+        TableInfo<
+          $AttendanceAccessOfferingsTable,
+          AttendanceAccessOfferingRow
+        > {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $AttendanceAccessOfferingsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _invitationIdMeta = const VerificationMeta(
+    'invitationId',
+  );
+  @override
+  late final GeneratedColumn<String> invitationId = GeneratedColumn<String>(
+    'invitation_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES attendance_access_grants (invitation_id)',
+    ),
+  );
+  static const VerificationMeta _sourceOfferingIdMeta = const VerificationMeta(
+    'sourceOfferingId',
+  );
+  @override
+  late final GeneratedColumn<String> sourceOfferingId = GeneratedColumn<String>(
+    'source_offering_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _localOfferingIdMeta = const VerificationMeta(
+    'localOfferingId',
+  );
+  @override
+  late final GeneratedColumn<String> localOfferingId = GeneratedColumn<String>(
+    'local_offering_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _subjectMeta = const VerificationMeta(
+    'subject',
+  );
+  @override
+  late final GeneratedColumn<String> subject = GeneratedColumn<String>(
+    'subject',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sectionCodeMeta = const VerificationMeta(
+    'sectionCode',
+  );
+  @override
+  late final GeneratedColumn<String> sectionCode = GeneratedColumn<String>(
+    'section_code',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    invitationId,
+    sourceOfferingId,
+    localOfferingId,
+    subject,
+    sectionCode,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'attendance_access_offerings';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<AttendanceAccessOfferingRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('invitation_id')) {
+      context.handle(
+        _invitationIdMeta,
+        invitationId.isAcceptableOrUnknown(
+          data['invitation_id']!,
+          _invitationIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_invitationIdMeta);
+    }
+    if (data.containsKey('source_offering_id')) {
+      context.handle(
+        _sourceOfferingIdMeta,
+        sourceOfferingId.isAcceptableOrUnknown(
+          data['source_offering_id']!,
+          _sourceOfferingIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_sourceOfferingIdMeta);
+    }
+    if (data.containsKey('local_offering_id')) {
+      context.handle(
+        _localOfferingIdMeta,
+        localOfferingId.isAcceptableOrUnknown(
+          data['local_offering_id']!,
+          _localOfferingIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_localOfferingIdMeta);
+    }
+    if (data.containsKey('subject')) {
+      context.handle(
+        _subjectMeta,
+        subject.isAcceptableOrUnknown(data['subject']!, _subjectMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_subjectMeta);
+    }
+    if (data.containsKey('section_code')) {
+      context.handle(
+        _sectionCodeMeta,
+        sectionCode.isAcceptableOrUnknown(
+          data['section_code']!,
+          _sectionCodeMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_sectionCodeMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {invitationId, sourceOfferingId};
+  @override
+  AttendanceAccessOfferingRow map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return AttendanceAccessOfferingRow(
+      invitationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}invitation_id'],
+      )!,
+      sourceOfferingId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_offering_id'],
+      )!,
+      localOfferingId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}local_offering_id'],
+      )!,
+      subject: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}subject'],
+      )!,
+      sectionCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}section_code'],
+      )!,
+    );
+  }
+
+  @override
+  $AttendanceAccessOfferingsTable createAlias(String alias) {
+    return $AttendanceAccessOfferingsTable(attachedDatabase, alias);
+  }
+}
+
+class AttendanceAccessOfferingRow extends DataClass
+    implements Insertable<AttendanceAccessOfferingRow> {
+  final String invitationId;
+  final String sourceOfferingId;
+  final String localOfferingId;
+  final String subject;
+  final String sectionCode;
+  const AttendanceAccessOfferingRow({
+    required this.invitationId,
+    required this.sourceOfferingId,
+    required this.localOfferingId,
+    required this.subject,
+    required this.sectionCode,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['invitation_id'] = Variable<String>(invitationId);
+    map['source_offering_id'] = Variable<String>(sourceOfferingId);
+    map['local_offering_id'] = Variable<String>(localOfferingId);
+    map['subject'] = Variable<String>(subject);
+    map['section_code'] = Variable<String>(sectionCode);
+    return map;
+  }
+
+  AttendanceAccessOfferingsCompanion toCompanion(bool nullToAbsent) {
+    return AttendanceAccessOfferingsCompanion(
+      invitationId: Value(invitationId),
+      sourceOfferingId: Value(sourceOfferingId),
+      localOfferingId: Value(localOfferingId),
+      subject: Value(subject),
+      sectionCode: Value(sectionCode),
+    );
+  }
+
+  factory AttendanceAccessOfferingRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return AttendanceAccessOfferingRow(
+      invitationId: serializer.fromJson<String>(json['invitationId']),
+      sourceOfferingId: serializer.fromJson<String>(json['sourceOfferingId']),
+      localOfferingId: serializer.fromJson<String>(json['localOfferingId']),
+      subject: serializer.fromJson<String>(json['subject']),
+      sectionCode: serializer.fromJson<String>(json['sectionCode']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'invitationId': serializer.toJson<String>(invitationId),
+      'sourceOfferingId': serializer.toJson<String>(sourceOfferingId),
+      'localOfferingId': serializer.toJson<String>(localOfferingId),
+      'subject': serializer.toJson<String>(subject),
+      'sectionCode': serializer.toJson<String>(sectionCode),
+    };
+  }
+
+  AttendanceAccessOfferingRow copyWith({
+    String? invitationId,
+    String? sourceOfferingId,
+    String? localOfferingId,
+    String? subject,
+    String? sectionCode,
+  }) => AttendanceAccessOfferingRow(
+    invitationId: invitationId ?? this.invitationId,
+    sourceOfferingId: sourceOfferingId ?? this.sourceOfferingId,
+    localOfferingId: localOfferingId ?? this.localOfferingId,
+    subject: subject ?? this.subject,
+    sectionCode: sectionCode ?? this.sectionCode,
+  );
+  AttendanceAccessOfferingRow copyWithCompanion(
+    AttendanceAccessOfferingsCompanion data,
+  ) {
+    return AttendanceAccessOfferingRow(
+      invitationId: data.invitationId.present
+          ? data.invitationId.value
+          : this.invitationId,
+      sourceOfferingId: data.sourceOfferingId.present
+          ? data.sourceOfferingId.value
+          : this.sourceOfferingId,
+      localOfferingId: data.localOfferingId.present
+          ? data.localOfferingId.value
+          : this.localOfferingId,
+      subject: data.subject.present ? data.subject.value : this.subject,
+      sectionCode: data.sectionCode.present
+          ? data.sectionCode.value
+          : this.sectionCode,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AttendanceAccessOfferingRow(')
+          ..write('invitationId: $invitationId, ')
+          ..write('sourceOfferingId: $sourceOfferingId, ')
+          ..write('localOfferingId: $localOfferingId, ')
+          ..write('subject: $subject, ')
+          ..write('sectionCode: $sectionCode')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    invitationId,
+    sourceOfferingId,
+    localOfferingId,
+    subject,
+    sectionCode,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is AttendanceAccessOfferingRow &&
+          other.invitationId == this.invitationId &&
+          other.sourceOfferingId == this.sourceOfferingId &&
+          other.localOfferingId == this.localOfferingId &&
+          other.subject == this.subject &&
+          other.sectionCode == this.sectionCode);
+}
+
+class AttendanceAccessOfferingsCompanion
+    extends UpdateCompanion<AttendanceAccessOfferingRow> {
+  final Value<String> invitationId;
+  final Value<String> sourceOfferingId;
+  final Value<String> localOfferingId;
+  final Value<String> subject;
+  final Value<String> sectionCode;
+  final Value<int> rowid;
+  const AttendanceAccessOfferingsCompanion({
+    this.invitationId = const Value.absent(),
+    this.sourceOfferingId = const Value.absent(),
+    this.localOfferingId = const Value.absent(),
+    this.subject = const Value.absent(),
+    this.sectionCode = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  AttendanceAccessOfferingsCompanion.insert({
+    required String invitationId,
+    required String sourceOfferingId,
+    required String localOfferingId,
+    required String subject,
+    required String sectionCode,
+    this.rowid = const Value.absent(),
+  }) : invitationId = Value(invitationId),
+       sourceOfferingId = Value(sourceOfferingId),
+       localOfferingId = Value(localOfferingId),
+       subject = Value(subject),
+       sectionCode = Value(sectionCode);
+  static Insertable<AttendanceAccessOfferingRow> custom({
+    Expression<String>? invitationId,
+    Expression<String>? sourceOfferingId,
+    Expression<String>? localOfferingId,
+    Expression<String>? subject,
+    Expression<String>? sectionCode,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (invitationId != null) 'invitation_id': invitationId,
+      if (sourceOfferingId != null) 'source_offering_id': sourceOfferingId,
+      if (localOfferingId != null) 'local_offering_id': localOfferingId,
+      if (subject != null) 'subject': subject,
+      if (sectionCode != null) 'section_code': sectionCode,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  AttendanceAccessOfferingsCompanion copyWith({
+    Value<String>? invitationId,
+    Value<String>? sourceOfferingId,
+    Value<String>? localOfferingId,
+    Value<String>? subject,
+    Value<String>? sectionCode,
+    Value<int>? rowid,
+  }) {
+    return AttendanceAccessOfferingsCompanion(
+      invitationId: invitationId ?? this.invitationId,
+      sourceOfferingId: sourceOfferingId ?? this.sourceOfferingId,
+      localOfferingId: localOfferingId ?? this.localOfferingId,
+      subject: subject ?? this.subject,
+      sectionCode: sectionCode ?? this.sectionCode,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (invitationId.present) {
+      map['invitation_id'] = Variable<String>(invitationId.value);
+    }
+    if (sourceOfferingId.present) {
+      map['source_offering_id'] = Variable<String>(sourceOfferingId.value);
+    }
+    if (localOfferingId.present) {
+      map['local_offering_id'] = Variable<String>(localOfferingId.value);
+    }
+    if (subject.present) {
+      map['subject'] = Variable<String>(subject.value);
+    }
+    if (sectionCode.present) {
+      map['section_code'] = Variable<String>(sectionCode.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AttendanceAccessOfferingsCompanion(')
+          ..write('invitationId: $invitationId, ')
+          ..write('sourceOfferingId: $sourceOfferingId, ')
+          ..write('localOfferingId: $localOfferingId, ')
+          ..write('subject: $subject, ')
+          ..write('sectionCode: $sectionCode, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -5270,6 +5677,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $AppSessionPreferencesTable(this);
   late final $AttendanceAccessGrantsTable attendanceAccessGrants =
       $AttendanceAccessGrantsTable(this);
+  late final $AttendanceAccessOfferingsTable attendanceAccessOfferings =
+      $AttendanceAccessOfferingsTable(this);
   late final Index classOfferingIdentityUnique = Index(
     'class_offering_identity_unique',
     'CREATE UNIQUE INDEX class_offering_identity_unique ON class_sections (teacher_id, section_code, lower(subject))',
@@ -5285,6 +5694,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final Index attendanceAccessSourceClassUnique = Index(
     'attendance_access_source_class_unique',
     'CREATE UNIQUE INDEX attendance_access_source_class_unique ON attendance_access_grants (source_teacher_id, source_offering_id)',
+  );
+  late final Index attendanceAccessOfferingSourceUnique = Index(
+    'attendance_access_offering_source_unique',
+    'CREATE UNIQUE INDEX attendance_access_offering_source_unique ON attendance_access_offerings (source_offering_id)',
   );
   late final TeacherDao teacherDao = TeacherDao(this as AppDatabase);
   late final StudentDao studentDao = StudentDao(this as AppDatabase);
@@ -5312,10 +5725,12 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     appSettingsRows,
     appSessionPreferences,
     attendanceAccessGrants,
+    attendanceAccessOfferings,
     classOfferingIdentityUnique,
     enrollmentsStudentClassUnique,
     attendanceRecordsSessionStudentUnique,
     attendanceAccessSourceClassUnique,
+    attendanceAccessOfferingSourceUnique,
   ];
 }
 
@@ -5666,27 +6081,6 @@ final class $$StudentsTableReferences
     );
   }
 
-  static MultiTypedResultKey<$AttendanceRecordsTable, List<AttendanceRecordRow>>
-  _attendanceRecordsRefsTable(_$AppDatabase db) =>
-      MultiTypedResultKey.fromTable(
-        db.attendanceRecords,
-        aliasName: 'students__id__attendance_records__student_id',
-      );
-
-  $$AttendanceRecordsTableProcessedTableManager get attendanceRecordsRefs {
-    final manager = $$AttendanceRecordsTableTableManager(
-      $_db,
-      $_db.attendanceRecords,
-    ).filter((f) => f.studentId.id.sqlEquals($_itemColumn<String>('id')!));
-
-    final cache = $_typedResult.readTableOrNull(
-      _attendanceRecordsRefsTable($_db),
-    );
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: cache),
-    );
-  }
-
   static MultiTypedResultKey<$DevicesTable, List<DeviceRow>> _devicesRefsTable(
     _$AppDatabase db,
   ) => MultiTypedResultKey.fromTable(
@@ -5768,31 +6162,6 @@ class $$StudentsTableFilterComposer
           }) => $$EnrollmentsTableFilterComposer(
             $db: $db,
             $table: $db.enrollments,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return f(composer);
-  }
-
-  Expression<bool> attendanceRecordsRefs(
-    Expression<bool> Function($$AttendanceRecordsTableFilterComposer f) f,
-  ) {
-    final $$AttendanceRecordsTableFilterComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.id,
-      referencedTable: $db.attendanceRecords,
-      getReferencedColumn: (t) => t.studentId,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$AttendanceRecordsTableFilterComposer(
-            $db: $db,
-            $table: $db.attendanceRecords,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -5935,32 +6304,6 @@ class $$StudentsTableAnnotationComposer
     return f(composer);
   }
 
-  Expression<T> attendanceRecordsRefs<T extends Object>(
-    Expression<T> Function($$AttendanceRecordsTableAnnotationComposer a) f,
-  ) {
-    final $$AttendanceRecordsTableAnnotationComposer composer =
-        $composerBuilder(
-          composer: this,
-          getCurrentColumn: (t) => t.id,
-          referencedTable: $db.attendanceRecords,
-          getReferencedColumn: (t) => t.studentId,
-          builder:
-              (
-                joinBuilder, {
-                $addJoinBuilderToRootComposer,
-                $removeJoinBuilderFromRootComposer,
-              }) => $$AttendanceRecordsTableAnnotationComposer(
-                $db: $db,
-                $table: $db.attendanceRecords,
-                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-                joinBuilder: joinBuilder,
-                $removeJoinBuilderFromRootComposer:
-                    $removeJoinBuilderFromRootComposer,
-              ),
-        );
-    return f(composer);
-  }
-
   Expression<T> devicesRefs<T extends Object>(
     Expression<T> Function($$DevicesTableAnnotationComposer a) f,
   ) {
@@ -6000,11 +6343,7 @@ class $$StudentsTableTableManager
           $$StudentsTableUpdateCompanionBuilder,
           (StudentRow, $$StudentsTableReferences),
           StudentRow,
-          PrefetchHooks Function({
-            bool enrollmentsRefs,
-            bool attendanceRecordsRefs,
-            bool devicesRefs,
-          })
+          PrefetchHooks Function({bool enrollmentsRefs, bool devicesRefs})
         > {
   $$StudentsTableTableManager(_$AppDatabase db, $StudentsTable table)
     : super(
@@ -6066,16 +6405,11 @@ class $$StudentsTableTableManager
               )
               .toList(),
           prefetchHooksCallback:
-              ({
-                enrollmentsRefs = false,
-                attendanceRecordsRefs = false,
-                devicesRefs = false,
-              }) {
+              ({enrollmentsRefs = false, devicesRefs = false}) {
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [
                     if (enrollmentsRefs) db.enrollments,
-                    if (attendanceRecordsRefs) db.attendanceRecords,
                     if (devicesRefs) db.devices,
                   ],
                   addJoins: null,
@@ -6096,27 +6430,6 @@ class $$StudentsTableTableManager
                                 table,
                                 p0,
                               ).enrollmentsRefs,
-                          referencedItemsForCurrentItem:
-                              (item, referencedItems) => referencedItems.where(
-                                (e) => e.studentId == item.id,
-                              ),
-                          typedResults: items,
-                        ),
-                      if (attendanceRecordsRefs)
-                        await $_getPrefetchedData<
-                          StudentRow,
-                          $StudentsTable,
-                          AttendanceRecordRow
-                        >(
-                          currentTable: table,
-                          referencedTable: $$StudentsTableReferences
-                              ._attendanceRecordsRefsTable(db),
-                          managerFromTypedResult: (p0) =>
-                              $$StudentsTableReferences(
-                                db,
-                                table,
-                                p0,
-                              ).attendanceRecordsRefs,
                           referencedItemsForCurrentItem:
                               (item, referencedItems) => referencedItems.where(
                                 (e) => e.studentId == item.id,
@@ -6164,11 +6477,7 @@ typedef $$StudentsTableProcessedTableManager =
       $$StudentsTableUpdateCompanionBuilder,
       (StudentRow, $$StudentsTableReferences),
       StudentRow,
-      PrefetchHooks Function({
-        bool enrollmentsRefs,
-        bool attendanceRecordsRefs,
-        bool devicesRefs,
-      })
+      PrefetchHooks Function({bool enrollmentsRefs, bool devicesRefs})
     >;
 typedef $$ClassSectionsTableCreateCompanionBuilder =
     ClassSectionsCompanion Function({
@@ -7925,23 +8234,6 @@ final class $$AttendanceRecordsTableReferences
       manager.$state.copyWith(prefetchedData: [item]),
     );
   }
-
-  static $StudentsTable _studentIdTable(_$AppDatabase db) =>
-      db.students.createAlias('attendance_records__student_id__students__id');
-
-  $$StudentsTableProcessedTableManager get studentId {
-    final $_column = $_itemColumn<String>('student_id')!;
-
-    final manager = $$StudentsTableTableManager(
-      $_db,
-      $_db.students,
-    ).filter((f) => f.id.sqlEquals($_column));
-    final item = $_typedResult.readTableOrNull(_studentIdTable($_db));
-    if (item == null) return manager;
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: [item]),
-    );
-  }
 }
 
 class $$AttendanceRecordsTableFilterComposer
@@ -7967,6 +8259,11 @@ class $$AttendanceRecordsTableFilterComposer
   get syncStatus => $composableBuilder(
     column: $table.syncStatus,
     builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<String> get studentId => $composableBuilder(
+    column: $table.studentId,
+    builder: (column) => ColumnFilters(column),
   );
 
   ColumnWithTypeConverterFilters<
@@ -8011,29 +8308,6 @@ class $$AttendanceRecordsTableFilterComposer
     );
     return composer;
   }
-
-  $$StudentsTableFilterComposer get studentId {
-    final $$StudentsTableFilterComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.studentId,
-      referencedTable: $db.students,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$StudentsTableFilterComposer(
-            $db: $db,
-            $table: $db.students,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
 }
 
 class $$AttendanceRecordsTableOrderingComposer
@@ -8057,6 +8331,11 @@ class $$AttendanceRecordsTableOrderingComposer
 
   ColumnOrderings<String> get syncStatus => $composableBuilder(
     column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get studentId => $composableBuilder(
+    column: $table.studentId,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -8097,29 +8376,6 @@ class $$AttendanceRecordsTableOrderingComposer
     );
     return composer;
   }
-
-  $$StudentsTableOrderingComposer get studentId {
-    final $$StudentsTableOrderingComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.studentId,
-      referencedTable: $db.students,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$StudentsTableOrderingComposer(
-            $db: $db,
-            $table: $db.students,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
 }
 
 class $$AttendanceRecordsTableAnnotationComposer
@@ -8142,6 +8398,9 @@ class $$AttendanceRecordsTableAnnotationComposer
         column: $table.syncStatus,
         builder: (column) => column,
       );
+
+  GeneratedColumn<String> get studentId =>
+      $composableBuilder(column: $table.studentId, builder: (column) => column);
 
   GeneratedColumnWithTypeConverter<domain.AttendanceRecordStatus, String>
   get status =>
@@ -8178,29 +8437,6 @@ class $$AttendanceRecordsTableAnnotationComposer
         );
     return composer;
   }
-
-  $$StudentsTableAnnotationComposer get studentId {
-    final $$StudentsTableAnnotationComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.studentId,
-      referencedTable: $db.students,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$StudentsTableAnnotationComposer(
-            $db: $db,
-            $table: $db.students,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
 }
 
 class $$AttendanceRecordsTableTableManager
@@ -8216,7 +8452,7 @@ class $$AttendanceRecordsTableTableManager
           $$AttendanceRecordsTableUpdateCompanionBuilder,
           (AttendanceRecordRow, $$AttendanceRecordsTableReferences),
           AttendanceRecordRow,
-          PrefetchHooks Function({bool sessionId, bool studentId})
+          PrefetchHooks Function({bool sessionId})
         > {
   $$AttendanceRecordsTableTableManager(
     _$AppDatabase db,
@@ -8289,7 +8525,7 @@ class $$AttendanceRecordsTableTableManager
                 ),
               )
               .toList(),
-          prefetchHooksCallback: ({sessionId = false, studentId = false}) {
+          prefetchHooksCallback: ({sessionId = false}) {
             return PrefetchHooks(
               db: db,
               explicitlyWatchedTables: [],
@@ -8320,17 +8556,6 @@ class $$AttendanceRecordsTableTableManager
                             .id,
                       ) as T;
                     }
-                    if (studentId) {
-                      state = state.withJoin(
-                        currentTable: table,
-                        currentColumn: table.studentId,
-                        referencedTable: $$AttendanceRecordsTableReferences
-                            ._studentIdTable(db),
-                        referencedColumn: $$AttendanceRecordsTableReferences
-                            ._studentIdTable(db)
-                            .id,
-                      ) as T;
-                    }
 
                     return state;
                   },
@@ -8355,7 +8580,7 @@ typedef $$AttendanceRecordsTableProcessedTableManager =
       $$AttendanceRecordsTableUpdateCompanionBuilder,
       (AttendanceRecordRow, $$AttendanceRecordsTableReferences),
       AttendanceRecordRow,
-      PrefetchHooks Function({bool sessionId, bool studentId})
+      PrefetchHooks Function({bool sessionId})
     >;
 typedef $$DevicesTableCreateCompanionBuilder = DevicesCompanion Function({
   required String id,
@@ -9247,6 +9472,50 @@ typedef $$AttendanceAccessGrantsTableUpdateCompanionBuilder =
       Value<int> rowid,
     });
 
+final class $$AttendanceAccessGrantsTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $AttendanceAccessGrantsTable,
+          AttendanceAccessGrantRow
+        > {
+  $$AttendanceAccessGrantsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static MultiTypedResultKey<
+    $AttendanceAccessOfferingsTable,
+    List<AttendanceAccessOfferingRow>
+  >
+  _attendanceAccessOfferingsRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.attendanceAccessOfferings,
+        aliasName: 'attendance_access_grants__invitation_id__attendance_access_offerings__invitation_id',
+      );
+
+  $$AttendanceAccessOfferingsTableProcessedTableManager
+  get attendanceAccessOfferingsRefs {
+    final manager =
+        $$AttendanceAccessOfferingsTableTableManager(
+          $_db,
+          $_db.attendanceAccessOfferings,
+        ).filter(
+          (f) => f.invitationId.invitationId.sqlEquals(
+            $_itemColumn<String>('invitation_id')!,
+          ),
+        );
+
+    final cache = $_typedResult.readTableOrNull(
+      _attendanceAccessOfferingsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
 class $$AttendanceAccessGrantsTableFilterComposer
     extends Composer<_$AppDatabase, $AttendanceAccessGrantsTable> {
   $$AttendanceAccessGrantsTableFilterComposer({
@@ -9295,6 +9564,33 @@ class $$AttendanceAccessGrantsTableFilterComposer
     column: $table.grantedAt,
     builder: (column) => ColumnFilters(column),
   );
+
+  Expression<bool> attendanceAccessOfferingsRefs(
+    Expression<bool> Function($$AttendanceAccessOfferingsTableFilterComposer f)
+    f,
+  ) {
+    final $$AttendanceAccessOfferingsTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.invitationId,
+          referencedTable: $db.attendanceAccessOfferings,
+          getReferencedColumn: (t) => t.invitationId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$AttendanceAccessOfferingsTableFilterComposer(
+                $db: $db,
+                $table: $db.attendanceAccessOfferings,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
 }
 
 class $$AttendanceAccessGrantsTableOrderingComposer
@@ -9389,6 +9685,33 @@ class $$AttendanceAccessGrantsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get grantedAt =>
       $composableBuilder(column: $table.grantedAt, builder: (column) => column);
+
+  Expression<T> attendanceAccessOfferingsRefs<T extends Object>(
+    Expression<T> Function($$AttendanceAccessOfferingsTableAnnotationComposer a)
+    f,
+  ) {
+    final $$AttendanceAccessOfferingsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.invitationId,
+          referencedTable: $db.attendanceAccessOfferings,
+          getReferencedColumn: (t) => t.invitationId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$AttendanceAccessOfferingsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.attendanceAccessOfferings,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
 }
 
 class $$AttendanceAccessGrantsTableTableManager
@@ -9402,16 +9725,9 @@ class $$AttendanceAccessGrantsTableTableManager
           $$AttendanceAccessGrantsTableAnnotationComposer,
           $$AttendanceAccessGrantsTableCreateCompanionBuilder,
           $$AttendanceAccessGrantsTableUpdateCompanionBuilder,
-          (
-            AttendanceAccessGrantRow,
-            BaseReferences<
-              _$AppDatabase,
-              $AttendanceAccessGrantsTable,
-              AttendanceAccessGrantRow
-            >,
-          ),
+          (AttendanceAccessGrantRow, $$AttendanceAccessGrantsTableReferences),
           AttendanceAccessGrantRow,
-          PrefetchHooks Function()
+          PrefetchHooks Function({bool attendanceAccessOfferingsRefs})
         > {
   $$AttendanceAccessGrantsTableTableManager(
     _$AppDatabase db,
@@ -9486,15 +9802,44 @@ class $$AttendanceAccessGrantsTableTableManager
                     $AttendanceAccessGrantsTable,
                     AttendanceAccessGrantRow
                   >(table),
-                  BaseReferences<
-                    _$AppDatabase,
-                    $AttendanceAccessGrantsTable,
-                    AttendanceAccessGrantRow
-                  >(db, table, e),
+                  $$AttendanceAccessGrantsTableReferences(db, table, e),
                 ),
               )
               .toList(),
-          prefetchHooksCallback: null,
+          prefetchHooksCallback: ({attendanceAccessOfferingsRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [
+                if (attendanceAccessOfferingsRefs) db.attendanceAccessOfferings,
+              ],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (attendanceAccessOfferingsRefs)
+                    await $_getPrefetchedData<
+                      AttendanceAccessGrantRow,
+                      $AttendanceAccessGrantsTable,
+                      AttendanceAccessOfferingRow
+                    >(
+                      currentTable: table,
+                      referencedTable: $$AttendanceAccessGrantsTableReferences
+                          ._attendanceAccessOfferingsRefsTable(db),
+                      managerFromTypedResult: (p0) =>
+                          $$AttendanceAccessGrantsTableReferences(
+                            db,
+                            table,
+                            p0,
+                          ).attendanceAccessOfferingsRefs,
+                      referencedItemsForCurrentItem: (item, referencedItems) =>
+                          referencedItems.where(
+                            (e) => e.invitationId == item.invitationId,
+                          ),
+                      typedResults: items,
+                    ),
+                ];
+              },
+            );
+          },
         ),
       );
 }
@@ -9509,16 +9854,363 @@ typedef $$AttendanceAccessGrantsTableProcessedTableManager =
       $$AttendanceAccessGrantsTableAnnotationComposer,
       $$AttendanceAccessGrantsTableCreateCompanionBuilder,
       $$AttendanceAccessGrantsTableUpdateCompanionBuilder,
-      (
-        AttendanceAccessGrantRow,
+      (AttendanceAccessGrantRow, $$AttendanceAccessGrantsTableReferences),
+      AttendanceAccessGrantRow,
+      PrefetchHooks Function({bool attendanceAccessOfferingsRefs})
+    >;
+typedef $$AttendanceAccessOfferingsTableCreateCompanionBuilder =
+    AttendanceAccessOfferingsCompanion Function({
+      required String invitationId,
+      required String sourceOfferingId,
+      required String localOfferingId,
+      required String subject,
+      required String sectionCode,
+      Value<int> rowid,
+    });
+typedef $$AttendanceAccessOfferingsTableUpdateCompanionBuilder =
+    AttendanceAccessOfferingsCompanion Function({
+      Value<String> invitationId,
+      Value<String> sourceOfferingId,
+      Value<String> localOfferingId,
+      Value<String> subject,
+      Value<String> sectionCode,
+      Value<int> rowid,
+    });
+
+final class $$AttendanceAccessOfferingsTableReferences
+    extends
         BaseReferences<
           _$AppDatabase,
-          $AttendanceAccessGrantsTable,
-          AttendanceAccessGrantRow
-        >,
-      ),
-      AttendanceAccessGrantRow,
-      PrefetchHooks Function()
+          $AttendanceAccessOfferingsTable,
+          AttendanceAccessOfferingRow
+        > {
+  $$AttendanceAccessOfferingsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $AttendanceAccessGrantsTable _invitationIdTable(_$AppDatabase db) =>
+      db.attendanceAccessGrants.createAlias(
+        'attendance_access_offerings__invitation_id__attendance_access_grants__invitation_id',
+      );
+
+  $$AttendanceAccessGrantsTableProcessedTableManager get invitationId {
+    final $_column = $_itemColumn<String>('invitation_id')!;
+
+    final manager = $$AttendanceAccessGrantsTableTableManager(
+      $_db,
+      $_db.attendanceAccessGrants,
+    ).filter((f) => f.invitationId.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_invitationIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$AttendanceAccessOfferingsTableFilterComposer
+    extends Composer<_$AppDatabase, $AttendanceAccessOfferingsTable> {
+  $$AttendanceAccessOfferingsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get sourceOfferingId => $composableBuilder(
+    column: $table.sourceOfferingId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get localOfferingId => $composableBuilder(
+    column: $table.localOfferingId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get subject => $composableBuilder(
+    column: $table.subject,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sectionCode => $composableBuilder(
+    column: $table.sectionCode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$AttendanceAccessGrantsTableFilterComposer get invitationId {
+    final $$AttendanceAccessGrantsTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.invitationId,
+          referencedTable: $db.attendanceAccessGrants,
+          getReferencedColumn: (t) => t.invitationId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$AttendanceAccessGrantsTableFilterComposer(
+                $db: $db,
+                $table: $db.attendanceAccessGrants,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return composer;
+  }
+}
+
+class $$AttendanceAccessOfferingsTableOrderingComposer
+    extends Composer<_$AppDatabase, $AttendanceAccessOfferingsTable> {
+  $$AttendanceAccessOfferingsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get sourceOfferingId => $composableBuilder(
+    column: $table.sourceOfferingId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get localOfferingId => $composableBuilder(
+    column: $table.localOfferingId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get subject => $composableBuilder(
+    column: $table.subject,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sectionCode => $composableBuilder(
+    column: $table.sectionCode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$AttendanceAccessGrantsTableOrderingComposer get invitationId {
+    final $$AttendanceAccessGrantsTableOrderingComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.invitationId,
+          referencedTable: $db.attendanceAccessGrants,
+          getReferencedColumn: (t) => t.invitationId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$AttendanceAccessGrantsTableOrderingComposer(
+                $db: $db,
+                $table: $db.attendanceAccessGrants,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return composer;
+  }
+}
+
+class $$AttendanceAccessOfferingsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $AttendanceAccessOfferingsTable> {
+  $$AttendanceAccessOfferingsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get sourceOfferingId => $composableBuilder(
+    column: $table.sourceOfferingId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get localOfferingId => $composableBuilder(
+    column: $table.localOfferingId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get subject =>
+      $composableBuilder(column: $table.subject, builder: (column) => column);
+
+  GeneratedColumn<String> get sectionCode => $composableBuilder(
+    column: $table.sectionCode,
+    builder: (column) => column,
+  );
+
+  $$AttendanceAccessGrantsTableAnnotationComposer get invitationId {
+    final $$AttendanceAccessGrantsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.invitationId,
+          referencedTable: $db.attendanceAccessGrants,
+          getReferencedColumn: (t) => t.invitationId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$AttendanceAccessGrantsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.attendanceAccessGrants,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return composer;
+  }
+}
+
+class $$AttendanceAccessOfferingsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $AttendanceAccessOfferingsTable,
+          AttendanceAccessOfferingRow,
+          $$AttendanceAccessOfferingsTableFilterComposer,
+          $$AttendanceAccessOfferingsTableOrderingComposer,
+          $$AttendanceAccessOfferingsTableAnnotationComposer,
+          $$AttendanceAccessOfferingsTableCreateCompanionBuilder,
+          $$AttendanceAccessOfferingsTableUpdateCompanionBuilder,
+          (
+            AttendanceAccessOfferingRow,
+            $$AttendanceAccessOfferingsTableReferences,
+          ),
+          AttendanceAccessOfferingRow,
+          PrefetchHooks Function({bool invitationId})
+        > {
+  $$AttendanceAccessOfferingsTableTableManager(
+    _$AppDatabase db,
+    $AttendanceAccessOfferingsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$AttendanceAccessOfferingsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$AttendanceAccessOfferingsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$AttendanceAccessOfferingsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> invitationId = const Value.absent(),
+                Value<String> sourceOfferingId = const Value.absent(),
+                Value<String> localOfferingId = const Value.absent(),
+                Value<String> subject = const Value.absent(),
+                Value<String> sectionCode = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => AttendanceAccessOfferingsCompanion(
+                invitationId: invitationId,
+                sourceOfferingId: sourceOfferingId,
+                localOfferingId: localOfferingId,
+                subject: subject,
+                sectionCode: sectionCode,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String invitationId,
+                required String sourceOfferingId,
+                required String localOfferingId,
+                required String subject,
+                required String sectionCode,
+                Value<int> rowid = const Value.absent(),
+              }) => AttendanceAccessOfferingsCompanion.insert(
+                invitationId: invitationId,
+                sourceOfferingId: sourceOfferingId,
+                localOfferingId: localOfferingId,
+                subject: subject,
+                sectionCode: sectionCode,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<
+                    $AttendanceAccessOfferingsTable,
+                    AttendanceAccessOfferingRow
+                  >(table),
+                  $$AttendanceAccessOfferingsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({invitationId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (invitationId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.invitationId,
+                        referencedTable:
+                            $$AttendanceAccessOfferingsTableReferences
+                                ._invitationIdTable(db),
+                        referencedColumn:
+                            $$AttendanceAccessOfferingsTableReferences
+                                ._invitationIdTable(db)
+                                .invitationId,
+                      ) as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$AttendanceAccessOfferingsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $AttendanceAccessOfferingsTable,
+      AttendanceAccessOfferingRow,
+      $$AttendanceAccessOfferingsTableFilterComposer,
+      $$AttendanceAccessOfferingsTableOrderingComposer,
+      $$AttendanceAccessOfferingsTableAnnotationComposer,
+      $$AttendanceAccessOfferingsTableCreateCompanionBuilder,
+      $$AttendanceAccessOfferingsTableUpdateCompanionBuilder,
+      (AttendanceAccessOfferingRow, $$AttendanceAccessOfferingsTableReferences),
+      AttendanceAccessOfferingRow,
+      PrefetchHooks Function({bool invitationId})
     >;
 
 class $AppDatabaseManager {
@@ -9546,6 +10238,11 @@ class $AppDatabaseManager {
       $$AttendanceAccessGrantsTableTableManager(
         _db,
         _db.attendanceAccessGrants,
+      );
+  $$AttendanceAccessOfferingsTableTableManager get attendanceAccessOfferings =>
+      $$AttendanceAccessOfferingsTableTableManager(
+        _db,
+        _db.attendanceAccessOfferings,
       );
 }
 
@@ -9649,7 +10346,6 @@ mixin _$AttendanceDaoMixin on DatabaseAccessor<AppDatabase> {
   $ClassSectionsTable get classSections => attachedDatabase.classSections;
   $AttendanceSessionsTable get attendanceSessions =>
       attachedDatabase.attendanceSessions;
-  $StudentsTable get students => attachedDatabase.students;
   $AttendanceRecordsTable get attendanceRecords =>
       attachedDatabase.attendanceRecords;
   AttendanceDaoManager get managers => AttendanceDaoManager(this);
@@ -9667,8 +10363,6 @@ class AttendanceDaoManager {
         _db.attachedDatabase,
         _db.attendanceSessions,
       );
-  $$StudentsTableTableManager get students =>
-      $$StudentsTableTableManager(_db.attachedDatabase, _db.students);
   $$AttendanceRecordsTableTableManager get attendanceRecords =>
       $$AttendanceRecordsTableTableManager(
         _db.attachedDatabase,
@@ -9725,6 +10419,8 @@ class AppSessionDaoManager {
 mixin _$AttendanceAccessDaoMixin on DatabaseAccessor<AppDatabase> {
   $AttendanceAccessGrantsTable get attendanceAccessGrants =>
       attachedDatabase.attendanceAccessGrants;
+  $AttendanceAccessOfferingsTable get attendanceAccessOfferings =>
+      attachedDatabase.attendanceAccessOfferings;
   AttendanceAccessDaoManager get managers => AttendanceAccessDaoManager(this);
 }
 
@@ -9735,5 +10431,10 @@ class AttendanceAccessDaoManager {
       $$AttendanceAccessGrantsTableTableManager(
         _db.attachedDatabase,
         _db.attendanceAccessGrants,
+      );
+  $$AttendanceAccessOfferingsTableTableManager get attendanceAccessOfferings =>
+      $$AttendanceAccessOfferingsTableTableManager(
+        _db.attachedDatabase,
+        _db.attendanceAccessOfferings,
       );
 }

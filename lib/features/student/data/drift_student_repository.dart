@@ -43,21 +43,33 @@ class DriftStudentRepository implements StudentRepository {
   @override
   Future<Student?> getStudent(String studentId) async {
     final local = await _db.studentDao.getOne(studentId);
-    if (local == null || !studentId.startsWith('attendance:')) return local;
-    for (final grant in await _db.attendanceAccessDao.getAll()) {
-      if (grant.localOfferingId.isEmpty) continue;
-      final source = AttendanceAccessInvitation.decode(grant.payload).roster
+    if (!studentId.startsWith('attendance:')) return local;
+    for (final entry in await _db.attendanceAccessDao.getAllOfferings()) {
+      final grant = entry.$1;
+      final offeringLink = entry.$2;
+      final invitation = AttendanceAccessInvitation.decode(grant.payload);
+      final offering = invitation.offerings
+          .where((item) => item.offering.id == offeringLink.sourceOfferingId)
+          .firstOrNull;
+      if (offering == null) continue;
+      final rosterIds = offering.rosterStudentIds.toSet();
+      final source = invitation.roster
           .where(
             (item) =>
-                _attendanceStudentId(grant.localOfferingId, item.id) ==
-                studentId,
+                rosterIds.contains(item.id) &&
+                (attendanceAccessStudentId(item.id) == studentId ||
+                    legacyAttendanceAccessStudentId(
+                          offeringLink.localOfferingId,
+                          item.id,
+                        ) ==
+                        studentId),
           )
           .firstOrNull;
       if (source != null) {
         return Student(
-          id: local.id,
-          updatedAt: local.updatedAt,
-          syncStatus: local.syncStatus,
+          id: studentId,
+          updatedAt: grant.grantedAt,
+          syncStatus: SyncStatus.synced,
           name: source.name,
           studentNumber: source.studentNumber,
           deviceRegistered: source.bleUuid != null,
@@ -134,8 +146,24 @@ class DriftStudentRepository implements StudentRepository {
     required String studentNumber,
     required String classId,
     String? bleUuid,
+  }) => addStudentToOfferings(
+    name: name,
+    studentNumber: studentNumber,
+    offeringIds: {classId},
+    bleUuid: bleUuid,
+  );
+
+  @override
+  Future<Student> addStudentToOfferings({
+    required String name,
+    required String studentNumber,
+    required Set<String> offeringIds,
+    String? bleUuid,
   }) async {
-    await _assertCanManage(classId: classId);
+    if (offeringIds.isEmpty) throw const ClassValidationException();
+    for (final offeringId in offeringIds) {
+      await _assertCanManage(classId: offeringId);
+    }
     if (name.trim().isEmpty || studentNumber.trim().isEmpty) {
       throw const ClassValidationException();
     }
@@ -146,11 +174,10 @@ class DriftStudentRepository implements StudentRepository {
     if (bleUuid?.trim().isNotEmpty == true && normalizedBleUuid == null) {
       throw const InvalidBleUuidException();
     }
-    final section = await _db.classDao.getClass(classId);
-    if (section == null) throw const ClassSectionNotFoundException();
-    if (existing != null &&
-        await _db.enrollmentDao.containsPair(existing.id, classId)) {
-      throw const DuplicateEnrollmentException();
+    for (final offeringId in offeringIds) {
+      if (await _db.classDao.getClass(offeringId) == null) {
+        throw const ClassSectionNotFoundException();
+      }
     }
     final id = existing?.id ?? newDatabaseId();
     final existingDevice = await _db.deviceDao.getStudent(id);
@@ -159,7 +186,6 @@ class DriftStudentRepository implements StudentRepository {
         normalizeBleIdentity(existingDevice.bleUuid) != normalizedBleUuid) {
       throw const StudentAlreadyHasDeviceException();
     }
-    final enrollmentId = newDatabaseId();
     final now = DateTime.now();
     try {
       await _db.transaction(() async {
@@ -173,23 +199,27 @@ class DriftStudentRepository implements StudentRepository {
               fullName: name.trim(),
             ),
           );
+        } else if (existing.name != name.trim()) {
+          await _db.studentDao.updateStudent(
+            id,
+            StudentsCompanion(
+              fullName: Value(name.trim()),
+              updatedAt: Value(now),
+              syncStatus: const Value(SyncStatus.pendingUpdate),
+            ),
+          );
         }
-        try {
+        for (final offeringId in offeringIds) {
+          if (await _db.enrollmentDao.containsPair(id, offeringId)) continue;
           await _db.enrollmentDao.insert(
             EnrollmentsCompanion.insert(
-              id: enrollmentId,
+              id: newDatabaseId(),
               updatedAt: now,
               syncStatus: SyncStatus.pendingCreate,
               studentId: id,
-              classSectionId: classId,
+              classSectionId: offeringId,
             ),
           );
-        } catch (error) {
-          if (error.toString().contains('enrollments.student_id') ||
-              error.toString().contains('enrollments_student_class_unique')) {
-            throw const DuplicateEnrollmentException();
-          }
-          rethrow;
         }
         if (normalizedBleUuid != null && existingDevice == null) {
           await _db.deviceDao.insert(
@@ -219,6 +249,40 @@ class DriftStudentRepository implements StudentRepository {
     }
     final student = (await _db.studentDao.getOne(id))!;
     return student;
+  }
+
+  @override
+  Future<void> setStudentOfferings({
+    required String studentId,
+    required Set<String> offeringIds,
+  }) async {
+    await _assertCanManage(studentId: studentId);
+    for (final offeringId in offeringIds) {
+      await _assertCanManage(classId: offeringId);
+    }
+    final teacher = await _db.teacherDao.getTeacherOrNull();
+    if (teacher == null) throw const PermissionDeniedException();
+    final memberships = await _db.classDao.getStudentOfferings(studentId);
+    final managedMemberships = memberships
+        .where((offering) => offering.teacherId == teacher.id)
+        .map((offering) => offering.id)
+        .toSet();
+    await _db.transaction(() async {
+      for (final offeringId in managedMemberships.difference(offeringIds)) {
+        await _db.enrollmentDao.deletePair(studentId, offeringId);
+      }
+      for (final offeringId in offeringIds.difference(managedMemberships)) {
+        await _db.enrollmentDao.insert(
+          EnrollmentsCompanion.insert(
+            id: newDatabaseId(),
+            updatedAt: DateTime.now(),
+            syncStatus: SyncStatus.pendingCreate,
+            studentId: studentId,
+            classSectionId: offeringId,
+          ),
+        );
+      }
+    });
   }
 
   @override
@@ -266,6 +330,3 @@ class DriftStudentRepository implements StudentRepository {
     await _db.enrollmentDao.deletePair(studentId, classId);
   }
 }
-
-String _attendanceStudentId(String localOfferingId, String sourceStudentId) =>
-    'attendance:$localOfferingId:$sourceStudentId';

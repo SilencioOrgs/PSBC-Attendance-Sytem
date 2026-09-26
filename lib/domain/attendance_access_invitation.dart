@@ -49,29 +49,95 @@ class AttendanceAccessStudent {
   }
 }
 
+/// One selected class offering and the global roster identities enrolled in it.
+class AttendanceAccessOffering {
+  const AttendanceAccessOffering({
+    required this.offering,
+    required this.rosterStudentIds,
+  });
+
+  final SubjectInvitationOffering offering;
+  final List<String> rosterStudentIds;
+
+  Map<String, Object?> toJson() => {
+    ...offering.toJson(),
+    'rosterStudentIds': rosterStudentIds,
+  };
+
+  factory AttendanceAccessOffering.fromJson(Object? value) {
+    if (value is! Map<String, Object?>) {
+      throw const FormatException('Invalid attendance subject details.');
+    }
+    final rosterValue = value['rosterStudentIds'];
+    if (rosterValue is! List<Object?>) {
+      throw const FormatException('Invalid attendance subject roster.');
+    }
+    final rosterStudentIds = rosterValue
+        .map((id) {
+          if (id is! String || id.trim().isEmpty) {
+            throw const FormatException('Invalid attendance subject roster.');
+          }
+          return id.trim();
+        })
+        .toList(growable: false);
+    if (rosterStudentIds.toSet().length != rosterStudentIds.length) {
+      throw const FormatException(
+        'The attendance subject has duplicate students.',
+      );
+    }
+    return AttendanceAccessOffering(
+      offering: SubjectInvitationOffering.fromJson(
+        value,
+        allowNoSchedule: true,
+      ),
+      rosterStudentIds: rosterStudentIds,
+    );
+  }
+}
+
 class AttendanceAccessInvitation {
-  const AttendanceAccessInvitation({
+  AttendanceAccessInvitation({
     required this.invitationId,
     required this.issuedAt,
     required this.teacherId,
     required this.teacherName,
-    required this.offering,
     required this.roster,
+    SubjectInvitationOffering? offering,
+    List<AttendanceAccessOffering>? offerings,
     this.role = 'attendance',
-  });
+  }) : offerings =
+           offerings ??
+           (offering == null
+               ? const <AttendanceAccessOffering>[]
+               : [
+                   AttendanceAccessOffering(
+                     offering: offering,
+                     rosterStudentIds: roster
+                         .map((student) => student.id)
+                         .toList(),
+                   ),
+                 ]) {
+    if (this.offerings.isEmpty) {
+      throw ArgumentError('An attendance invitation must include an offering.');
+    }
+  }
 
   static const type = 'classattend.attendance_access';
-  static const version = 1;
+  static const version = 2;
+  static const maxOfferingCount = 30;
   static const maxRosterSize = 1000;
-  static const maxJsonLength = 200000;
+  static const maxJsonLength = 1000000;
 
   final String invitationId;
   final DateTime issuedAt;
   final String role;
   final String teacherId;
   final String teacherName;
-  final SubjectInvitationOffering offering;
+  final List<AttendanceAccessOffering> offerings;
   final List<AttendanceAccessStudent> roster;
+
+  /// Compatibility accessor for callers presenting a single offering.
+  SubjectInvitationOffering get offering => offerings.first.offering;
 
   String encode() => jsonEncode({
     'type': type,
@@ -80,7 +146,7 @@ class AttendanceAccessInvitation {
     'issuedAt': issuedAt.toUtc().toIso8601String(),
     'role': role,
     'teacher': {'id': teacherId, 'name': teacherName},
-    'offering': offering.toJson(),
+    'offerings': offerings.map((item) => item.toJson()).toList(),
     'roster': roster.map((student) => student.toJson()).toList(),
   });
 
@@ -97,7 +163,8 @@ class AttendanceAccessInvitation {
     if (decoded is! Map<String, Object?> || decoded['type'] != type) {
       throw const FormatException('This QR is not for attendance access.');
     }
-    if (decoded['version'] != version) {
+    final payloadVersion = decoded['version'];
+    if (payloadVersion != 1 && payloadVersion != version) {
       throw const FormatException(
         'This attendance QR is not supported by this app version.',
       );
@@ -109,7 +176,7 @@ class AttendanceAccessInvitation {
     final rosterValue = decoded['roster'];
     if (teacher is! Map<String, Object?> ||
         rosterValue is! List<Object?> ||
-        rosterValue.isEmpty ||
+        (payloadVersion == 1 && rosterValue.isEmpty) ||
         rosterValue.length > maxRosterSize) {
       throw const FormatException('The attendance QR is incomplete.');
     }
@@ -127,15 +194,62 @@ class AttendanceAccessInvitation {
     if (ids.length != roster.length) {
       throw const FormatException('The attendance roster has duplicate IDs.');
     }
+    final offerings = payloadVersion == 1
+        ? [
+            AttendanceAccessOffering(
+              offering: SubjectInvitationOffering.fromJson(
+                decoded['offering'],
+                allowNoSchedule: true,
+              ),
+              rosterStudentIds: roster.map((student) => student.id).toList(),
+            ),
+          ]
+        : (decoded['offerings'] is List<Object?>
+              ? (decoded['offerings'] as List<Object?>)
+                    .map(AttendanceAccessOffering.fromJson)
+                    .toList(growable: false)
+              : throw const FormatException(
+                  'The attendance QR is incomplete.',
+                ));
+    if (offerings.isEmpty || offerings.length > maxOfferingCount) {
+      throw const FormatException(
+        'The attendance QR must include between 1 and 30 subjects.',
+      );
+    }
+    final offeringIds = offerings.map((item) => item.offering.id).toSet();
+    if (offeringIds.length != offerings.length) {
+      throw const FormatException('The attendance QR has duplicate subjects.');
+    }
+    final referencedStudentIds = <String>{};
+    for (final item in offerings) {
+      if (item.rosterStudentIds.any((id) => !ids.contains(id))) {
+        throw const FormatException(
+          'The attendance subject roster is invalid.',
+        );
+      }
+      referencedStudentIds.addAll(item.rosterStudentIds);
+    }
+    if (referencedStudentIds.length != roster.length) {
+      throw const FormatException(
+        'The attendance QR contains unused students.',
+      );
+    }
+    final uuids = roster
+        .map((student) => student.bleUuid?.trim().toLowerCase())
+        .whereType<String>()
+        .toSet();
+    if (uuids.length !=
+        roster.where((student) => student.bleUuid != null).length) {
+      throw const FormatException(
+        'The attendance QR has duplicate BLE devices.',
+      );
+    }
     return AttendanceAccessInvitation(
       invitationId: _requiredString(decoded, 'invitationId'),
       issuedAt: issuedAt.toUtc(),
       teacherId: _requiredString(teacher, 'id'),
       teacherName: _requiredString(teacher, 'name'),
-      offering: SubjectInvitationOffering.fromJson(
-        decoded['offering'],
-        allowNoSchedule: true,
-      ),
+      offerings: offerings,
       roster: roster,
     );
   }
@@ -210,7 +324,9 @@ class AttendanceAccessQrFrame {
   static List<AttendanceAccessQrFrame> createFrames(
     AttendanceAccessInvitation invitation,
   ) {
-    final compressed = gzip.encode(utf8.encode(invitation.encode()));
+    final raw = invitation.encode();
+    AttendanceAccessInvitation.decode(raw);
+    final compressed = gzip.encode(utf8.encode(raw));
     final encoded = base64Url.encode(compressed);
     final total = (encoded.length / frameDataLength).ceil();
     if (total > maxFrames) {
@@ -269,3 +385,13 @@ String _requiredString(Map<String, Object?> map, String key) {
   }
   return value.trim();
 }
+
+/// Stable roster identity shared by every offering in one attendance grant.
+String attendanceAccessStudentId(String sourceStudentId) =>
+    'attendance:$sourceStudentId';
+
+/// IDs written by earlier builds included the local offering ID.
+String legacyAttendanceAccessStudentId(
+  String localOfferingId,
+  String sourceStudentId,
+) => 'attendance:$localOfferingId:$sourceStudentId';

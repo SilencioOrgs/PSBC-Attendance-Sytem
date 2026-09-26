@@ -87,6 +87,14 @@ GoRouter createAppRouter({
         builder: (context, state) => const AttendanceAccessImportScreen(),
       ),
       GoRoute(
+        path: '/teacher/students/add',
+        builder: (context, state) => const TeacherStudentRegistrationScreen(),
+      ),
+      GoRoute(
+        path: '/teacher/share-attendance',
+        builder: (context, state) => const TeacherAttendanceAccessQrScreen(),
+      ),
+      GoRoute(
         path: '/teacher/share-attendance/:classId',
         name: AppRoutes.teacherAttendanceAccessQr,
         builder: (context, state) => TeacherAttendanceAccessQrScreen(

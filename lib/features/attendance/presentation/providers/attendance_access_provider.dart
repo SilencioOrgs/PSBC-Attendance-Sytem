@@ -27,7 +27,8 @@ class AttendanceAccessQrController extends Notifier<bool> {
   @override
   bool build() => false;
 
-  Future<List<AttendanceAccessQrFrame>> create(String offeringId) async {
+  Future<List<AttendanceAccessQrFrame>> create(Set<String> offeringIds) async {
+    final selectedIds = Set<String>.of(offeringIds);
     final session = ref.read(applicationSessionProvider);
     if (session.entry != ApplicationEntry.teacher ||
         ref.read(teacherSessionProvider).state !=
@@ -36,17 +37,39 @@ class AttendanceAccessQrController extends Notifier<bool> {
     }
     state = true;
     try {
-      final offering = await ref
-          .read(classRepositoryProvider)
-          .getClass(offeringId);
+      if (selectedIds.isEmpty) throw const ClassSectionNotFoundException();
       final teacher = await ref.read(teacherRepositoryProvider).getTeacher();
-      if (offering == null || offering.teacherId != teacher.id) {
+      final ownedOfferings = await ref
+          .read(classRepositoryProvider)
+          .getClasses();
+      final selectedOfferings = ownedOfferings
+          .where((offering) => selectedIds.contains(offering.id))
+          .toList(growable: false);
+      if (selectedOfferings.length != selectedIds.length ||
+          selectedOfferings.any(
+            (offering) => offering.teacherId != teacher.id,
+          )) {
         throw const ClassSectionNotFoundException();
       }
-      final roster = await ref
-          .read(classRepositoryProvider)
-          .getStudents(offeringId);
-      if (roster.isEmpty) throw const EmptyClassRosterException();
+      final rosterByOffering = <String, List<Student>>{};
+      final globalRoster = <String, Student>{};
+      for (final offering in selectedOfferings) {
+        final roster = await ref
+            .read(classRepositoryProvider)
+            .getStudents(offering.id);
+        rosterByOffering[offering.id] = roster;
+        for (final student in roster) {
+          final existing = globalRoster[student.id];
+          if (existing != null &&
+              (existing.name != student.name ||
+                  existing.studentNumber != student.studentNumber)) {
+            throw const FormatException(
+              'Student details conflict between selected subjects.',
+            );
+          }
+          globalRoster[student.id] = student;
+        }
+      }
       final devices = await ref.read(deviceRepositoryProvider).getDevices();
       final deviceByStudent = {
         for (final device in devices)
@@ -57,23 +80,33 @@ class AttendanceAccessQrController extends Notifier<bool> {
         issuedAt: DateTime.now().toUtc(),
         teacherId: teacher.id,
         teacherName: teacher.name,
-        offering: SubjectInvitationOffering(
-          id: offering.id,
-          subject: offering.subject,
-          sectionCode: offering.sectionCode,
-          gradeLevel: offering.gradeLevel,
-          sectionLabel: offering.sectionLabel,
-          room: offering.room,
-          scheduleDays: offering.scheduleDays,
-          startMinutesOfDay:
-              offering.startMinutesOfDay ??
-              offering.scheduleStart!.hour * 60 +
-                  offering.scheduleStart!.minute,
-          endMinutesOfDay:
-              offering.endMinutesOfDay ??
-              offering.scheduleEnd!.hour * 60 + offering.scheduleEnd!.minute,
-        ),
-        roster: roster
+        offerings: selectedOfferings
+            .map((offering) {
+              return AttendanceAccessOffering(
+                offering: SubjectInvitationOffering(
+                  id: offering.id,
+                  subject: offering.subject,
+                  sectionCode: offering.sectionCode,
+                  gradeLevel: offering.gradeLevel,
+                  sectionLabel: offering.sectionLabel,
+                  room: offering.room,
+                  scheduleDays: offering.scheduleDays,
+                  startMinutesOfDay:
+                      offering.startMinutesOfDay ??
+                      offering.scheduleStart!.hour * 60 +
+                          offering.scheduleStart!.minute,
+                  endMinutesOfDay:
+                      offering.endMinutesOfDay ??
+                      offering.scheduleEnd!.hour * 60 +
+                          offering.scheduleEnd!.minute,
+                ),
+                rosterStudentIds: rosterByOffering[offering.id]!
+                    .map((student) => student.id)
+                    .toList(growable: false),
+              );
+            })
+            .toList(growable: false),
+        roster: globalRoster.values
             .map((student) {
               final device = deviceByStudent[student.id];
               return AttendanceAccessStudent(

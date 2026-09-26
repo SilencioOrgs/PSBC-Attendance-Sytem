@@ -7,7 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test(
-    'v3 to v4 creates attendance access storage and preserves local data',
+    'v3 to current schema creates attendance access storage and preserves local data',
     () async {
       final file = File(
         '${Directory.systemTemp.path}${Platform.pathSeparator}'
@@ -98,7 +98,7 @@ void main() {
         if (await file.exists()) await file.delete();
       });
 
-      expect(after.schemaVersion, 4);
+      expect(after.schemaVersion, 6);
       expect((await after.teacherDao.getTeacherOrNull())?.name, 'Ana Reyes');
       expect((await after.classDao.getClass('class-v3'))?.subject, 'General');
       expect(

@@ -20,8 +20,8 @@ import '../providers/attendance_provider.dart';
 import '../../../classes/presentation/providers/class_provider.dart';
 
 class TeacherAttendanceAccessQrScreen extends ConsumerStatefulWidget {
-  const TeacherAttendanceAccessQrScreen({super.key, required this.offeringId});
-  final String offeringId;
+  const TeacherAttendanceAccessQrScreen({super.key, this.offeringId});
+  final String? offeringId;
 
   @override
   ConsumerState<TeacherAttendanceAccessQrScreen> createState() =>
@@ -31,21 +31,34 @@ class TeacherAttendanceAccessQrScreen extends ConsumerStatefulWidget {
 class _TeacherAttendanceAccessQrScreenState
     extends ConsumerState<TeacherAttendanceAccessQrScreen> {
   List<AttendanceAccessQrFrame>? _frames;
+  List<ClassSection> _createdOfferings = const [];
+  final Set<String> _selectedOfferingIds = {};
+  bool _selectionInitialized = false;
   int _index = 0;
   String? _error;
 
-  Future<void> _create() async {
+  Future<void> _create(
+    List<ClassSection> offerings,
+    Set<String> selectedIds,
+  ) async {
     setState(() => _error = null);
     try {
       final frames = await ref
           .read(attendanceAccessQrControllerProvider.notifier)
-          .create(widget.offeringId);
+          .create(selectedIds);
       if (!mounted) return;
-      setState(() => _frames = frames);
+      setState(() {
+        _frames = frames;
+        _createdOfferings = offerings
+            .where((offering) => selectedIds.contains(offering.id))
+            .toList(growable: false);
+      });
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Attendance QR created.')));
     } on RepositoryException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } on FormatException catch (error) {
       if (mounted) setState(() => _error = error.message);
     } catch (_) {
       if (mounted) setState(() => _error = 'Unable to create this QR.');
@@ -54,18 +67,22 @@ class _TeacherAttendanceAccessQrScreenState
 
   @override
   Widget build(BuildContext context) {
-    final offeringAsync = ref.watch(classByIdProvider(widget.offeringId));
+    final offeringsAsync = ref.watch(classListProvider);
     final busy = ref.watch(attendanceAccessQrControllerProvider);
     return PageScaffold(
-      title: 'Attendance access',
+      title: 'Share Attendance Access',
       showBack: true,
-      body: offeringAsync.when(
-        data: (offering) {
-          if (offering == null) {
-            return const HelpfulEmptyState(
-              title: 'Class unavailable',
-              message: 'This class could not be found on this device.',
-            );
+      body: offeringsAsync.when(
+        data: (offerings) {
+          if (!_selectionInitialized) {
+            _selectedOfferingIds
+              ..clear()
+              ..addAll(
+                offerings
+                    .where((offering) => offering.id == widget.offeringId)
+                    .map((offering) => offering.id),
+              );
+            _selectionInitialized = true;
           }
           final frames = _frames;
           if (frames == null) {
@@ -77,15 +94,62 @@ class _TeacherAttendanceAccessQrScreenState
               children: [
                 const SectionCard(
                   child: Text(
-                    'This QR grants attendance-only access for one class. It includes the roster and registered student BLE codes so attendance works offline. It does not enroll students.',
+                    'Select the class offerings this Attendance Officer may handle. The QR includes only those rosters and their registered BLE device mappings. It does not enroll students.',
                   ),
                 ),
-                const SizedBox(height: Spacing.md),
-                _OfferingSummary(
-                  subject: offering.subject,
-                  section: offering.sectionCode,
-                  role: 'Attendance Officer',
+                const SizedBox(height: Spacing.sm),
+                Row(
+                  children: [
+                    TextButton(
+                      onPressed: offerings.isEmpty || busy
+                          ? null
+                          : () => setState(() {
+                              _selectedOfferingIds
+                                ..clear()
+                                ..addAll(offerings.map((item) => item.id));
+                            }),
+                      child: const Text('Select All'),
+                    ),
+                    TextButton(
+                      onPressed: busy
+                          ? null
+                          : () => setState(_selectedOfferingIds.clear),
+                      child: const Text('Clear All'),
+                    ),
+                    const Spacer(),
+                    Text('${_selectedOfferingIds.length} selected'),
+                  ],
                 ),
+                if (offerings.isEmpty)
+                  const HelpfulEmptyState(
+                    title: 'No offerings yet',
+                    message: 'Create a class offering before sharing access.',
+                  )
+                else
+                  SectionCard(
+                    child: Column(
+                      children: [
+                        for (final offering in offerings)
+                          CheckboxListTile(
+                            contentPadding: EdgeInsets.zero,
+                            value: _selectedOfferingIds.contains(offering.id),
+                            title: Text(offering.subject),
+                            subtitle: Text(
+                              '${offering.sectionCode} · ${offering.schedule}',
+                            ),
+                            onChanged: busy
+                                ? null
+                                : (selected) => setState(() {
+                                    if (selected == true) {
+                                      _selectedOfferingIds.add(offering.id);
+                                    } else {
+                                      _selectedOfferingIds.remove(offering.id);
+                                    }
+                                  }),
+                          ),
+                      ],
+                    ),
+                  ),
                 if (_error != null) ...[
                   const SizedBox(height: Spacing.sm),
                   Text(
@@ -101,7 +165,12 @@ class _TeacherAttendanceAccessQrScreenState
                       ? 'Creating QR...'
                       : 'Create Attendance Officer QR',
                   icon: Icons.qr_code_2,
-                  onPressed: busy ? null : _create,
+                  onPressed: busy || _selectedOfferingIds.isEmpty
+                      ? null
+                      : () => _create(
+                          offerings,
+                          Set<String>.of(_selectedOfferingIds),
+                        ),
                 ),
               ],
             );
@@ -127,10 +196,21 @@ class _TeacherAttendanceAccessQrScreenState
                 ),
               ),
               const SizedBox(height: Spacing.md),
-              _OfferingSummary(
-                subject: offering.subject,
-                section: offering.sectionCode,
-                role: 'Attendance Officer',
+              SectionCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Attendance Officer access'),
+                    const SizedBox(height: Spacing.sm),
+                    for (final offering in _createdOfferings)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: Spacing.xs),
+                        child: Text(
+                          '${offering.subject} · ${offering.sectionCode}',
+                        ),
+                      ),
+                  ],
+                ),
               ),
               const SizedBox(height: Spacing.sm),
               Text(
@@ -172,8 +252,8 @@ class _TeacherAttendanceAccessQrScreenState
         },
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stack) => const HelpfulEmptyState(
-          title: 'Class unavailable',
-          message: 'This class could not be loaded.',
+          title: 'Offerings unavailable',
+          message: 'Your class offerings could not be loaded.',
         ),
       ),
     );
@@ -199,6 +279,7 @@ class _AttendanceAccessImportScreenState
   int? _total;
   String? _message;
   bool _processing = false;
+  AttendanceAccessInvitation? _pendingInvitation;
 
   @override
   void dispose() {
@@ -208,7 +289,11 @@ class _AttendanceAccessImportScreenState
   }
 
   void _onDetect(BarcodeCapture capture) {
-    if (_processing || _releaseFrame?.isActive == true) return;
+    if (_processing ||
+        _pendingInvitation != null ||
+        _releaseFrame?.isActive == true) {
+      return;
+    }
     final raw = capture.barcodes
         .map((barcode) => barcode.rawValue)
         .whereType<String>()
@@ -241,26 +326,58 @@ class _AttendanceAccessImportScreenState
 
   Future<void> _importCompleteSet() async {
     if (_processing) return;
-    setState(() => _processing = true);
     try {
       final invitation = AttendanceAccessQrFrame.decodeFrames(
         _frames.values.toList(),
       );
-      final result = await ref
+      if (!mounted) return;
+      setState(() {
+        _pendingInvitation = invitation;
+        _message = null;
+      });
+    } on FormatException catch (error) {
+      if (mounted) setState(() => _message = error.message);
+    } catch (_) {
+      if (mounted) setState(() => _message = 'Attendance QR import failed.');
+    }
+  }
+
+  Future<void> _confirmImport() async {
+    final invitation = _pendingInvitation;
+    if (invitation == null || _processing) return;
+    setState(() => _processing = true);
+    try {
+      await ref
           .read(attendanceAccessRepositoryProvider)
           .importInvitation(invitation);
       await ref.read(applicationSessionProvider).selectAttendanceOfficer();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            result.alreadyExists
-                ? 'Attendance access already exists for this subject.'
-                : 'Attendance access imported for ${result.invitation.offering.subject}.',
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Attendance access granted'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final offering in invitation.offerings)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: Spacing.xs),
+                  child: Text(offering.offering.subject),
+                ),
+              const SizedBox(height: Spacing.sm),
+              const Text('Role: Attendance Officer'),
+            ],
           ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Continue'),
+            ),
+          ],
         ),
       );
-      context.go('/attendance-officer');
+      if (mounted) context.go('/attendance-officer');
     } on FormatException catch (error) {
       if (mounted) setState(() => _message = error.message);
     } on RepositoryException catch (error) {
@@ -285,27 +402,77 @@ class _AttendanceAccessImportScreenState
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: Spacing.md),
-        Expanded(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(Radii.card),
-            child: MobileScanner(controller: _scanner, onDetect: _onDetect),
+        if (_pendingInvitation case final invitation?)
+          Expanded(
+            child: ListView(
+              children: [
+                SectionCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Attendance access will be granted for:',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: Spacing.sm),
+                      for (final offering in invitation.offerings)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: Spacing.xs),
+                          child: Text(
+                            '${offering.offering.subject} · ${offering.offering.sectionCode}',
+                          ),
+                        ),
+                      const SizedBox(height: Spacing.sm),
+                      const Text('Role: Attendance Officer'),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: Spacing.md),
+                PrimaryActionButton(
+                  label: _processing
+                      ? 'Importing...'
+                      : 'Grant attendance access',
+                  icon: Icons.fact_check_outlined,
+                  onPressed: _processing ? null : _confirmImport,
+                ),
+                TextButton(
+                  onPressed: _processing
+                      ? null
+                      : () => setState(() {
+                          _frames.clear();
+                          _invitationId = null;
+                          _total = null;
+                          _pendingInvitation = null;
+                          _message = null;
+                        }),
+                  child: const Text('Discard this QR'),
+                ),
+              ],
+            ),
+          )
+        else
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(Radii.card),
+              child: MobileScanner(controller: _scanner, onDetect: _onDetect),
+            ),
           ),
-        ),
         if (_message != null)
           Padding(
             padding: const EdgeInsets.all(Spacing.md),
             child: Text(_message!, textAlign: TextAlign.center),
           ),
         if (_processing) const LinearProgressIndicator(),
-        TextButton(
-          onPressed: () => setState(() {
-            _frames.clear();
-            _invitationId = null;
-            _total = null;
-            _message = null;
-          }),
-          child: const Text('Start over'),
-        ),
+        if (_pendingInvitation == null)
+          TextButton(
+            onPressed: () => setState(() {
+              _frames.clear();
+              _invitationId = null;
+              _total = null;
+              _message = null;
+            }),
+            child: const Text('Start over'),
+          ),
         const SizedBox(height: Spacing.sm),
       ],
     ),
@@ -487,27 +654,4 @@ class AttendanceOfficerHomeScreen extends ConsumerWidget {
       ),
     );
   }
-}
-
-class _OfferingSummary extends StatelessWidget {
-  const _OfferingSummary({
-    required this.subject,
-    required this.section,
-    required this.role,
-  });
-  final String subject;
-  final String section;
-  final String role;
-
-  @override
-  Widget build(BuildContext context) => SectionCard(
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Subject: $subject'),
-        Text('Section: $section'),
-        Text('Role: $role'),
-      ],
-    ),
-  );
 }

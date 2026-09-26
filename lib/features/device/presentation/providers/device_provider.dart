@@ -10,6 +10,11 @@ final deviceListProvider = StreamProvider<List<Device>>(
   (ref) => ref.watch(deviceRepositoryProvider).watchDevices(),
 );
 
+final studentDeviceProvider = StreamProvider.family<Device?, String>(
+  (ref, studentId) =>
+      ref.watch(deviceRepositoryProvider).watchStudentDevice(studentId),
+);
+
 final bleAdvertisingStateProvider = StreamProvider<BleAdvertisingState>(
   (ref) => ref.watch(bleServiceProvider).watchAdvertisingState(),
 );

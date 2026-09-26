@@ -48,6 +48,18 @@ class TeacherHomeScreen extends ConsumerWidget {
               style: Theme.of(context).textTheme.bodyMedium
                   ?.copyWith(color: AppColors.muted),
             ),
+            const SizedBox(height: Spacing.md),
+            SecondaryActionButton(
+              label: 'Share Attendance Access',
+              icon: Icons.qr_code_2,
+              onPressed: () => context.push('/teacher/share-attendance'),
+            ),
+            const SizedBox(height: Spacing.sm),
+            SecondaryActionButton(
+              label: 'Add Student',
+              icon: Icons.person_add_alt_1_outlined,
+              onPressed: () => context.push('/teacher/students/add'),
+            ),
             if (hasAttendanceAccess)
               Align(
                 alignment: Alignment.centerLeft,

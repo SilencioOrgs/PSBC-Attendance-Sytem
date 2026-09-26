@@ -143,6 +143,12 @@ abstract interface class StudentRepository {
     required String classId,
     String? bleUuid,
   });
+  Future<Student> addStudentToOfferings({
+    required String name,
+    required String studentNumber,
+    required Set<String> offeringIds,
+    String? bleUuid,
+  });
   Future<Student> updateStudent({
     required String studentId,
     required String name,
@@ -151,6 +157,10 @@ abstract interface class StudentRepository {
   Future<void> removeStudentFromClass({
     required String studentId,
     required String classId,
+  });
+  Future<void> setStudentOfferings({
+    required String studentId,
+    required Set<String> offeringIds,
   });
 }
 

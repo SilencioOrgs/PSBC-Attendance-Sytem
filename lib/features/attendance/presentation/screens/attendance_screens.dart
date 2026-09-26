@@ -29,6 +29,8 @@ class BleScannerScreen extends ConsumerStatefulWidget {
 }
 
 class _BleScannerScreenState extends ConsumerState<BleScannerScreen> {
+  bool _allowPop = false;
+
   Future<void> _stopAndReview() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -90,11 +92,21 @@ class _BleScannerScreenState extends ConsumerState<BleScannerScreen> {
           .read(attendanceControllerProvider.notifier)
           .cancel(widget.sessionId);
       if (mounted) {
-        context.go(
-          widget.isAttendanceOfficer
-              ? '/attendance-officer'
-              : '/teacher/classes',
-        );
+        setState(() => _allowPop = true);
+        await WidgetsBinding.instance.endOfFrame;
+        if (!mounted) return;
+
+        // The scanner is pushed from the class or officer page. Preserve that
+        // route so Back returns to the screen where attendance was started.
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.go(
+            widget.isAttendanceOfficer
+                ? '/attendance-officer'
+                : '/teacher/classes',
+          );
+        }
       }
     } catch (_) {
       if (mounted) {
@@ -129,7 +141,7 @@ class _BleScannerScreenState extends ConsumerState<BleScannerScreen> {
     final scan = ref.watch(attendanceControllerProvider);
     final rosterAsync = ref.watch(attendanceRosterProvider(widget.sessionId));
     return PopScope(
-      canPop: false,
+      canPop: _allowPop,
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop) _stopAndReview();
       },

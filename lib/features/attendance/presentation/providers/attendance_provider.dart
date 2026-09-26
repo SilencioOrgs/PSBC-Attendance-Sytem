@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/providers/repository_providers.dart';
 import '../../../../core/utils/iterable_extensions.dart';
 import '../../../../domain/models.dart';
+import '../../../../domain/repositories.dart';
 
 final todaySessionProvider = StreamProvider<AttendanceSession?>(
   (ref) => ref.watch(attendanceRepositoryProvider).watchTodaySession(),
@@ -25,9 +26,15 @@ final attendanceRecordStudentsProvider =
       final access = ref.watch(attendanceAccessRepositoryProvider);
       final session = await attendance.getSession(sessionId);
       if (session == null) return const <Student>[];
-      final grant = await access.findForOffering(session.classOfferingId);
-      if (grant != null) return access.getRoster(session.classOfferingId);
       final records = await attendance.getRecords(sessionId);
+      final grant = await access.findForOffering(session.classOfferingId);
+      if (grant != null) {
+        return _restoreLegacyOfficerRosterIds(
+          grant,
+          await access.getRoster(session.classOfferingId),
+          records,
+        );
+      }
       final resolved = <Student>[];
       for (final record in records) {
         final student = await students.getStudent(record.studentId);
@@ -52,10 +59,51 @@ final attendanceRosterProvider = StreamProvider.family<List<Student>, String>((
                   .asyncExpand(
                     (grant) => grant == null
                         ? classes.watchStudents(session.classOfferingId)
-                        : access.watchRoster(session.classOfferingId),
+                        : Stream.fromFuture(
+                            _officerRosterForSession(
+                              grant,
+                              session.id,
+                              sessions,
+                              access,
+                            ),
+                          ),
                   ),
       );
 });
+
+Future<List<Student>> _officerRosterForSession(
+  AttendanceAccessGrant grant,
+  String sessionId,
+  AttendanceRepository attendance,
+  AttendanceAccessRepository access,
+) async => _restoreLegacyOfficerRosterIds(
+  grant,
+  await access.getRoster(grant.localOfferingId),
+  await attendance.getRecords(sessionId),
+);
+
+List<Student> _restoreLegacyOfficerRosterIds(
+  AttendanceAccessGrant grant,
+  List<Student> roster,
+  List<AttendanceRecord> records,
+) {
+  final legacyPrefix = 'attendance:${grant.localOfferingId}:';
+  if (!records.any((record) => record.studentId.startsWith(legacyPrefix))) {
+    return roster;
+  }
+  return roster
+      .map(
+        (student) => Student(
+          id: '$legacyPrefix${student.id.substring('attendance:'.length)}',
+          updatedAt: student.updatedAt,
+          syncStatus: student.syncStatus,
+          name: student.name,
+          studentNumber: student.studentNumber,
+          deviceRegistered: student.deviceRegistered,
+        ),
+      )
+      .toList(growable: false);
+}
 
 final attendanceRecordsProvider =
     AsyncNotifierProvider.family<
