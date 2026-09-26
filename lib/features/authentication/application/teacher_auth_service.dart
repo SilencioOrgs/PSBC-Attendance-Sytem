@@ -24,12 +24,22 @@ class TeacherAuthService {
   final ApplicationSession? applicationSession;
 
   Future<void> setup({required String name, required String pin}) async {
+    if (applicationSession != null &&
+        applicationSession!.entry != ApplicationEntry.uninitialized &&
+        applicationSession!.entry != ApplicationEntry.teacherSetup) {
+      throw const PermissionDeniedException();
+    }
     await _teachers.setupTeacher(name: name, pin: pin);
     _session.authenticate();
     await applicationSession?.selectTeacher();
   }
 
   Future<bool> unlock(String pin) async {
+    if (applicationSession != null &&
+        applicationSession!.entry != ApplicationEntry.uninitialized &&
+        applicationSession!.entry != ApplicationEntry.teacherLocked) {
+      throw const PermissionDeniedException();
+    }
     final matches = await _pins.verifyPin(pin);
     if (matches) {
       _session.authenticate();
@@ -42,6 +52,11 @@ class TeacherAuthService {
     required String currentPin,
     required String newPin,
   }) async {
+    if (applicationSession != null &&
+        applicationSession!.entry != ApplicationEntry.uninitialized &&
+        applicationSession!.entry != ApplicationEntry.teacher) {
+      throw const PermissionDeniedException();
+    }
     if (!await _pins.verifyPin(currentPin)) {
       throw const InvalidTeacherPinException();
     }
@@ -49,6 +64,11 @@ class TeacherAuthService {
   }
 
   Future<void> logout() async {
+    if (applicationSession != null &&
+        applicationSession!.entry != ApplicationEntry.uninitialized &&
+        applicationSession!.entry != ApplicationEntry.teacher) {
+      throw const PermissionDeniedException();
+    }
     final activeSessions = (await _attendance.getSessions()).where(
       (item) =>
           item.status == AttendanceSessionStatus.scanning ||

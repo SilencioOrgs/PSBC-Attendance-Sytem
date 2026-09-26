@@ -1,5 +1,6 @@
 import 'package:attendance_system_paete/core/providers/repository_providers.dart';
 import 'package:attendance_system_paete/domain/models.dart';
+import 'package:attendance_system_paete/features/attendance/data/drift_attendance_repository.dart';
 import 'package:attendance_system_paete/features/attendance/presentation/providers/attendance_controller.dart';
 import 'package:attendance_system_paete/features/classes/data/drift_class_repository.dart';
 import 'package:attendance_system_paete/features/device/data/drift_device_repository.dart';
@@ -20,6 +21,12 @@ void main() {
       final container = ProviderContainer(
         overrides: [
           appDatabaseProvider.overrideWithValue(database),
+          attendanceRepositoryProvider.overrideWithValue(
+            DriftAttendanceRepository(
+              database,
+              canAccessOffering: _allowAttendance,
+            ),
+          ),
           bleServiceProvider.overrideWithValue(ble),
         ],
       );
@@ -43,8 +50,9 @@ void main() {
         sectionLabel: 'STEM A',
         subject: 'Science',
         room: 'Room 1',
-        scheduleStart: now,
-        scheduleEnd: now.add(const Duration(hours: 1)),
+        scheduleStart: DateTime(2000, 1, 1),
+        scheduleEnd: DateTime(2000, 1, 1, 23, 59),
+        scheduleDays: Weekday.values.toSet(),
       );
       final students = DriftStudentRepository(database);
       final roster = [
@@ -141,3 +149,5 @@ void main() {
     },
   );
 }
+
+Future<bool> _allowAttendance(String offeringId) async => true;

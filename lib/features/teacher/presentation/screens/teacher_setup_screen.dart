@@ -5,10 +5,10 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/router/route_names.dart';
 import '../../../../core/providers/repository_providers.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../core/utils/input_formatters.dart';
 import '../../../../core/utils/teacher_pin.dart';
 import '../../../../core/widgets/app_widgets.dart';
 import '../providers/teacher_provider.dart';
+import '../widgets/pin_keypad.dart';
 
 /// First-run teacher PIN setup screen.
 class TeacherSetupScreen extends ConsumerStatefulWidget {
@@ -21,7 +21,9 @@ class TeacherSetupScreen extends ConsumerStatefulWidget {
 class _TeacherSetupScreenState extends ConsumerState<TeacherSetupScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final _pinController = TextEditingController();
+  String _pinBuffer = '';
+  String _firstPin = '';
+  int _pinStep = 0;
   bool _isSubmitting = false;
   String? _error;
 
@@ -42,21 +44,31 @@ class _TeacherSetupScreenState extends ConsumerState<TeacherSetupScreen> {
   @override
   void dispose() {
     _nameController.dispose();
-    _pinController.dispose();
     super.dispose();
   }
 
   Future<void> _completeSetup() async {
     if (_formKey.currentState?.validate() != true) return;
+    if (!isValidTeacherPin(_firstPin) || _firstPin != _pinBuffer) {
+      setState(() {
+        _pinBuffer = '';
+        _error = 'PINs do not match. Confirm the same PIN to continue.';
+      });
+      return;
+    }
     setState(() => _isSubmitting = true);
     try {
       await ref
           .read(teacherSetupControllerProvider.notifier)
           .complete(
             name: _nameController.text.trim(),
-            pin: normalizeTeacherPin(_pinController.text),
+            pin: normalizeTeacherPin(_firstPin),
           );
-      if (mounted) context.goNamed(AppRoutes.teacherHome);
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('PIN saved.')));
+        context.goNamed(AppRoutes.teacherHome);
+      }
     } catch (_) {
       if (mounted) {
         setState(() => _error = 'Unable to save setup. Please try again.');
@@ -64,6 +76,30 @@ class _TeacherSetupScreenState extends ConsumerState<TeacherSetupScreen> {
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
+  }
+
+  Future<void> _advancePinStep() async {
+    if (!isValidTeacherPin(_pinBuffer)) {
+      setState(() => _error = 'Use 4 to 6 digits.');
+      return;
+    }
+    if (_pinStep == 0) {
+      setState(() {
+        _firstPin = _pinBuffer;
+        _pinBuffer = '';
+        _pinStep = 1;
+        _error = null;
+      });
+      return;
+    }
+    if (_firstPin != _pinBuffer) {
+      setState(() {
+        _pinBuffer = '';
+        _error = 'PINs do not match. Enter your PIN again.';
+      });
+      return;
+    }
+    await _completeSetup();
   }
 
   @override
@@ -123,36 +159,34 @@ class _TeacherSetupScreenState extends ConsumerState<TeacherSetupScreen> {
                         : null,
                   ),
                   const SizedBox(height: Spacing.md),
-                  TextFormField(
-                    controller: _pinController,
-                    keyboardType: TextInputType.number,
-                    obscureText: true,
-                    maxLength: 6,
-                    inputFormatters: const [DigitsOnlyPinFormatter()],
-                    decoration: const InputDecoration(
-                      labelText: 'Create a 4 to 6 digit PIN',
-                      prefixIcon: Icon(Icons.lock_outline),
-                    ),
-                    validator: (value) => !isValidTeacherPin(value ?? '')
-                        ? 'Use 4 to 6 digits.'
-                        : null,
+                  PinKeypad(
+                    pin: _pinBuffer,
+                    title: _pinStep == 0 ? 'Create PIN' : 'Confirm PIN',
+                    helperText: _error ?? 'Use 4 to 6 digits.',
+                    onDigit: (digit) => setState(() {
+                      _pinBuffer += digit;
+                      _error = null;
+                    }),
+                    onDelete: () => setState(() {
+                      _pinBuffer = _pinBuffer.substring(
+                        0,
+                        _pinBuffer.length - 1,
+                      );
+                      _error = null;
+                    }),
                   ),
-                  if (_error != null) ...[
-                    const SizedBox(height: Spacing.sm),
-                    Text(
-                      _error!,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                    ),
-                  ],
+                  if (_error != null) ...[const SizedBox(height: Spacing.xs)],
                   const SizedBox(height: Spacing.sm),
                   PrimaryActionButton(
                     label: _isSubmitting
                         ? 'Saving setup...'
-                        : 'Continue to dashboard',
+                        : _pinStep == 0
+                        ? 'Continue to confirm PIN'
+                        : 'Save PIN and continue',
                     icon: Icons.arrow_forward,
-                    onPressed: _isSubmitting ? null : _completeSetup,
+                    onPressed: _isSubmitting || !isValidTeacherPin(_pinBuffer)
+                        ? null
+                        : _advancePinStep,
                   ),
                 ],
               ),

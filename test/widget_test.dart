@@ -30,64 +30,85 @@ void main() {
     expect(find.text('Continue as student'), findsOneWidget);
   });
 
-  testWidgets('student setup registers a device and starts its beacon', (
-    tester,
-  ) async {
-    final database = AppDatabase(NativeDatabase.memory());
-    final ble = MockBleService();
-    final session = TeacherSession();
-    final router = createAppRouter(session: session);
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          appDatabaseProvider.overrideWithValue(database),
-          bleServiceProvider.overrideWithValue(ble),
-        ],
-        child: MaterialApp.router(routerConfig: router),
-      ),
-    );
-    await tester.pumpAndSettle();
+  testWidgets(
+    'student setup registers a device and offers background attendance',
+    (tester) async {
+      final database = AppDatabase(NativeDatabase.memory());
+      final ble = MockBleService();
+      final session = TeacherSession();
+      final applicationSession = ApplicationSession(
+        database: database,
+        teacherSession: session,
+      );
+      await applicationSession.initialize(teacherPinExists: false);
+      final router = createAppRouter(
+        session: session,
+        applicationSession: applicationSession,
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appDatabaseProvider.overrideWithValue(database),
+            applicationSessionProvider.overrideWithValue(applicationSession),
+            bleServiceProvider.overrideWithValue(ble),
+          ],
+          child: MaterialApp.router(routerConfig: router),
+        ),
+      );
+      await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Continue as student'));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextFormField).at(0), 'María Santos');
-    await tester.enterText(find.byType(TextFormField).at(1), 'S-001');
-    await tester.tap(find.text('Complete registration'));
-    await tester.pumpAndSettle();
+      await tester.tap(find.text('Continue as student'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextFormField).at(0), 'María Santos');
+      await tester.enterText(find.byType(TextFormField).at(1), 'S-001');
+      await tester.tap(find.text('Complete registration'));
+      await tester.pumpAndSettle();
 
-    expect(find.text('No device registered'), findsOneWidget);
-    await tester.tap(find.text('Register this device'));
-    await tester.pumpAndSettle();
-    final student = await database.studentDao.getCurrent();
-    expect(student, isNotNull);
-    final device = await database.deviceDao.getStudent(student!.id);
-    expect(device, isNotNull);
-    expect(device!.bleUuid, matches(RegExp(r'^[0-9a-f-]{36}$')));
-    expect(find.text('Start attendance beacon'), findsOneWidget);
+      expect(find.text('No device registered'), findsOneWidget);
+      await tester.tap(find.text('Register this device'));
+      await tester.pumpAndSettle();
+      final student = await database.studentDao.getCurrent();
+      expect(student, isNotNull);
+      final device = await database.deviceDao.getStudent(student!.id);
+      expect(device, isNotNull);
+      expect(device!.bleUuid, matches(RegExp(r'^[0-9a-f-]{36}$')));
+      expect(find.text('Enable Background Attendance'), findsOneWidget);
+      expect(find.text('Start attendance beacon'), findsNothing);
 
-    await tester.ensureVisible(find.text('Start attendance beacon'));
-    await tester.tap(find.text('Start attendance beacon'));
-    await tester.pumpAndSettle();
-    expect(ble.advertisedServiceUuid, device.bleUuid);
-    expect(find.text('Beacon Active'), findsOneWidget);
-    expect(find.text('Stop attendance beacon'), findsOneWidget);
-
-    await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pump(const Duration(milliseconds: 1));
-    router.dispose();
-    await ble.dispose();
-    await database.close();
-  });
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(milliseconds: 1));
+      router.dispose();
+      applicationSession.dispose();
+      await ble.dispose();
+      await database.close();
+    },
+  );
 
   testWidgets('teacher unlock rejects a wrong PIN and accepts the stored PIN', (
     tester,
   ) async {
     final database = AppDatabase(NativeDatabase.memory());
+    await database.teacherDao.save(
+      TeachersCompanion.insert(
+        id: 'unlock-teacher',
+        updatedAt: DateTime(2026, 9, 26),
+        syncStatus: SyncStatus.synced,
+        name: 'Ana Reyes',
+      ),
+    );
     final pins = _WidgetPinService('2468');
     final session = TeacherSession(state: TeacherSessionState.locked);
+    final applicationSession = ApplicationSession(
+      database: database,
+      teacherSession: session,
+    );
+    await applicationSession.initialize(teacherPinExists: true);
     final ble = MockBleService();
     addTearDown(ble.dispose);
-    final router = createAppRouter(session: session);
+    final router = createAppRouter(
+      session: session,
+      applicationSession: applicationSession,
+    );
 
     await tester.pumpWidget(
       ProviderScope(
@@ -95,6 +116,7 @@ void main() {
           appDatabaseProvider.overrideWithValue(database),
           teacherPinServiceProvider.overrideWithValue(pins),
           teacherSessionProvider.overrideWithValue(session),
+          applicationSessionProvider.overrideWithValue(applicationSession),
           bleServiceProvider.overrideWithValue(ble),
         ],
         child: MaterialApp.router(routerConfig: router),
@@ -102,13 +124,25 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(TextField).first, '1111');
+    for (final digit in '1111'.split('')) {
+      final button = find.byKey(ValueKey('pin_digit_$digit'));
+      await tester.ensureVisible(button);
+      await tester.tap(button);
+      await tester.pumpAndSettle();
+    }
+    await tester.ensureVisible(find.text('Continue'));
     await tester.tap(find.text('Continue'));
     await tester.pumpAndSettle();
-    expect(find.text('That PIN does not match. Try again.'), findsOneWidget);
+    expect(find.text('Incorrect PIN. Please try again.'), findsOneWidget);
     expect(session.state, TeacherSessionState.locked);
 
-    await tester.enterText(find.byType(TextField).first, '2468');
+    for (final digit in '2468'.split('')) {
+      final button = find.byKey(ValueKey('pin_digit_$digit'));
+      await tester.ensureVisible(button);
+      await tester.tap(button);
+      await tester.pumpAndSettle();
+    }
+    await tester.ensureVisible(find.text('Continue'));
     await tester.tap(find.text('Continue'));
     await tester.pumpAndSettle();
     expect(session.state, TeacherSessionState.authenticated);
@@ -116,6 +150,8 @@ void main() {
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 1));
+    router.dispose();
+    applicationSession.dispose();
     await database.close();
   });
 
@@ -158,6 +194,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Teacher sign in'), findsOneWidget);
 
+    await tester.ensureVisible(find.text('Continue as a student'));
     await tester.tap(find.text('Continue as a student'));
     await tester.pumpAndSettle();
 
@@ -192,14 +229,21 @@ void main() {
       room: 'Room 1',
       scheduleStart: now,
       scheduleEnd: now.add(const Duration(hours: 1)),
+      scheduleDays: Weekday.values.toSet(),
     );
     await DriftStudentRepository(database).addStudentToClass(
       name: 'Maria Santos',
       studentNumber: 'W-001',
       classId: section.id,
     );
-    final attendance = DriftAttendanceRepository(database);
-    final session = await attendance.startSession(section.id);
+    final attendance = DriftAttendanceRepository(
+      database,
+      canAccessOffering: _allowAttendance,
+    );
+    final session = await attendance.startSession(
+      section.id,
+      manualOverride: true,
+    );
     await attendance.finishScan(session.id);
     final ble = MockBleService();
     addTearDown(ble.dispose);
@@ -208,6 +252,7 @@ void main() {
       ProviderScope(
         overrides: [
           appDatabaseProvider.overrideWithValue(database),
+          attendanceRepositoryProvider.overrideWithValue(attendance),
           bleServiceProvider.overrideWithValue(ble),
         ],
         child: MaterialApp(
@@ -338,3 +383,5 @@ class _WidgetPinService implements TeacherPinService {
   @override
   Future<bool> verifyPin(String value) async => value == pin;
 }
+
+Future<bool> _allowAttendance(String offeringId) async => true;

@@ -65,7 +65,6 @@ class _DeviceRegistrationScreenState
     final isBusy = ref.watch(deviceRegistrationControllerProvider);
     final beaconStateAsync = ref.watch(bleAdvertisingStateProvider);
     final beaconState = beaconStateAsync.asData?.value;
-    final isAdvertising = beaconState == BleAdvertisingState.active;
     final backgroundAsync = ref.watch(backgroundAttendanceStateProvider);
     final backgroundState = backgroundAsync.asData?.value;
     final backgroundActive =
@@ -201,6 +200,18 @@ class _DeviceRegistrationScreenState
                                     ref.invalidate(
                                       backgroundAttendanceStateProvider,
                                     );
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                backgroundActive
+                                                    ? 'Background attendance stopped.'
+                                                    : 'Background attendance enabled.',
+                                              ),
+                                            ),
+                                          );
+                                    }
                                   } catch (_) {
                                     if (context.mounted) {
                                       setState(
@@ -285,54 +296,6 @@ class _DeviceRegistrationScreenState
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: Spacing.md),
-                  PrimaryActionButton(
-                    label: backgroundActive
-                        ? 'Background Attendance Active'
-                        : isBusy
-                        ? (isAdvertising
-                              ? 'Stopping beacon...'
-                              : 'Starting beacon...')
-                        : isAdvertising
-                        ? 'Stop attendance beacon'
-                        : 'Start attendance beacon',
-                    icon: isAdvertising
-                        ? Icons.bluetooth_disabled
-                        : Icons.bluetooth_searching,
-                    onPressed: isBusy || backgroundActive
-                        ? null
-                        : () async {
-                            try {
-                              final controller = ref.read(
-                                deviceRegistrationControllerProvider.notifier,
-                              );
-                              if (isAdvertising) {
-                                await controller.stopBeacon();
-                              } else {
-                                await controller.startBeacon(device.bleUuid);
-                              }
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      isAdvertising
-                                          ? 'Attendance beacon stopped.'
-                                          : 'Attendance beacon is active.',
-                                    ),
-                                  ),
-                                );
-                              }
-                            } catch (_) {
-                              if (context.mounted) {
-                                setState(
-                                  () => _deviceError = _bleErrorMessage(
-                                    beaconState,
-                                  ),
-                                );
-                              }
-                            }
-                          },
                   ),
                   if (_deviceError != null) ...[
                     const SizedBox(height: Spacing.sm),
@@ -525,14 +488,3 @@ String _backgroundAttendanceMessage(BackgroundAttendanceState? state) =>
       BackgroundAttendanceStatus.inactive || null =>
         'Your phone is not currently available for background attendance.',
     };
-
-String _bleErrorMessage(BleAdvertisingState? state) => switch (state) {
-  BleAdvertisingState.bluetoothOff =>
-    'Bluetooth is off. Turn it on and try again.',
-  BleAdvertisingState.permissionRequired => 'Bluetooth permission is required. Grant access in app settings and try again.',
-  BleAdvertisingState.unsupported =>
-    'This phone does not support BLE advertising.',
-  BleAdvertisingState.unknown || null => 'We could not determine the Bluetooth state. Check Bluetooth and try again.',
-  BleAdvertisingState.active || BleAdvertisingState.stopped =>
-    'We could not start or stop the beacon. Try again.',
-};

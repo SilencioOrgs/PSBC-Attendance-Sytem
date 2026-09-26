@@ -6,8 +6,14 @@ import '../../../domain/subject_invitation.dart';
 import '../../../services/storage/app_database.dart';
 
 class DriftEnrollmentRepository implements EnrollmentRepository {
-  DriftEnrollmentRepository(this._database);
+  DriftEnrollmentRepository(
+    this._database, {
+    Future<bool> Function(String studentId)? canEnroll,
+  }) : _canEnroll = canEnroll ?? _allowEnrollment;
   final AppDatabase _database;
+  final Future<bool> Function(String studentId) _canEnroll;
+
+  static Future<bool> _allowEnrollment(String studentId) async => true;
 
   @override
   Future<int> addFromInvitation({
@@ -15,6 +21,9 @@ class DriftEnrollmentRepository implements EnrollmentRepository {
     required SubjectInvitation invitation,
     required Set<String> selectedOfferingIds,
   }) async {
+    if (!await _canEnroll(studentId)) {
+      throw const PermissionDeniedException();
+    }
     if (await _database.studentDao.getOne(studentId) == null) {
       throw StateError('The student profile is no longer available.');
     }

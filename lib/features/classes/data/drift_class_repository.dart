@@ -6,8 +6,19 @@ import '../../../core/utils/section_code.dart';
 import '../../../services/storage/app_database.dart';
 
 class DriftClassRepository implements ClassRepository {
-  DriftClassRepository(this._db);
+  DriftClassRepository(
+    this._db, {
+    Future<bool> Function(String? classId)? canManage,
+  }) : _canManage = canManage ?? _allowManagement;
   final AppDatabase _db;
+  final Future<bool> Function(String? classId) _canManage;
+
+  static Future<bool> _allowManagement(String? classId) async => true;
+
+  Future<void> _assertCanManage([String? classId]) async {
+    if (!await _canManage(classId)) throw const PermissionDeniedException();
+  }
+
   @override
   Future<List<ClassSection>> getClasses() => _db.classDao.getClasses();
   @override
@@ -47,6 +58,7 @@ class DriftClassRepository implements ClassRepository {
     required DateTime scheduleEnd,
     Set<Weekday> scheduleDays = const {},
   }) async {
+    await _assertCanManage();
     final parsed = parseSectionCode('GRADE$gradeLevel-$sectionLabel');
     if (gradeLevel <= 0 ||
         parsed == null ||
@@ -97,6 +109,7 @@ class DriftClassRepository implements ClassRepository {
 
   @override
   Future<ClassSection> updateClass(ClassSection section) async {
+    await _assertCanManage(section.id);
     final parsed = parseSectionCode(
       'GRADE${section.gradeLevel}-${section.sectionLabel}',
     );
@@ -148,5 +161,8 @@ class DriftClassRepository implements ClassRepository {
   }
 
   @override
-  Future<void> deleteClass(String classId) => _db.classDao.deleteClass(classId);
+  Future<void> deleteClass(String classId) async {
+    await _assertCanManage(classId);
+    await _db.classDao.deleteClass(classId);
+  }
 }

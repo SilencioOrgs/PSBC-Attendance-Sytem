@@ -448,6 +448,13 @@ class ClassDetailsScreen extends ConsumerWidget {
                                       manualOverride: override,
                                     );
                                 if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Attendance session started.',
+                                      ),
+                                    ),
+                                  );
                                   context.pushNamed(
                                     AppRoutes.bleScanner,
                                     pathParameters: {'sessionId': created.id},
@@ -467,6 +474,15 @@ class ClassDetailsScreen extends ConsumerWidget {
                                 }
                               }
                             },
+                    ),
+                    const SizedBox(height: Spacing.sm),
+                    SecondaryActionButton(
+                      label: 'Create Attendance Officer QR',
+                      icon: Icons.qr_code_2,
+                      onPressed: () => context.pushNamed(
+                        AppRoutes.teacherAttendanceAccessQr,
+                        pathParameters: {'classId': classId},
+                      ),
                     ),
                     const SizedBox(height: Spacing.sm),
                     SecondaryActionButton(

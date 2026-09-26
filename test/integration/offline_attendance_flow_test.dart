@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:attendance_system_paete/core/auth/teacher_session.dart';
+import 'package:attendance_system_paete/core/auth/application_session.dart';
 import 'package:attendance_system_paete/core/providers/repository_providers.dart';
 import 'package:attendance_system_paete/domain/models.dart';
 import 'package:attendance_system_paete/features/attendance/presentation/providers/attendance_controller.dart';
@@ -33,6 +34,7 @@ void main() {
     final sessionState = TeacherSession();
     await sessionState.initialize(pinService);
     final ble = MockBleService();
+    ApplicationSession? reopenedApplicationSession;
     var container = ProviderContainer(
       overrides: [
         appDatabaseProvider.overrideWithValue(database),
@@ -44,6 +46,7 @@ void main() {
 
     addTearDown(() async {
       container.dispose();
+      reopenedApplicationSession?.dispose();
       await ble.dispose();
       await database.close();
       if (await databaseFile.exists()) await databaseFile.delete();
@@ -62,6 +65,7 @@ void main() {
           room: 'Room 1',
           scheduleStart: now,
           scheduleEnd: now.add(const Duration(hours: 1)),
+          scheduleDays: Weekday.values.toSet(),
         );
     final students = container.read(studentRepositoryProvider);
     final presentStudent = await students.addStudentToClass(
@@ -89,7 +93,10 @@ void main() {
 
     final attendance = container.read(attendanceRepositoryProvider);
     final controller = container.read(attendanceControllerProvider.notifier);
-    final session = await controller.prepareSession(section.id);
+    final session = await controller.prepareSession(
+      section.id,
+      manualOverride: true,
+    );
     await controller.start(session.id);
     expect(ble.lastRoster.map((student) => student.id), {
       presentStudent.id,
@@ -149,9 +156,18 @@ void main() {
     container.dispose();
     await database.close();
     database = AppDatabase(NativeDatabase(databaseFile));
+    reopenedApplicationSession = ApplicationSession(
+      database: database,
+      teacherSession: sessionState,
+    );
+    await reopenedApplicationSession.initialize(teacherPinExists: true);
+    await reopenedApplicationSession.selectTeacher();
     container = ProviderContainer(
       overrides: [
         appDatabaseProvider.overrideWithValue(database),
+        applicationSessionProvider.overrideWithValue(
+          reopenedApplicationSession,
+        ),
         teacherPinServiceProvider.overrideWithValue(pinService),
         teacherSessionProvider.overrideWithValue(sessionState),
         bleServiceProvider.overrideWithValue(ble),

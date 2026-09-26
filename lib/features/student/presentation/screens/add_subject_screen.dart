@@ -149,6 +149,28 @@ class _AddSubjectScreenState extends ConsumerState<AddSubjectScreen> {
                 const SizedBox(height: Spacing.sm),
                 const Text('Choose the subjects you want to add.'),
                 const SizedBox(height: Spacing.sm),
+                Row(
+                  children: [
+                    TextButton(
+                      onPressed: _processing
+                          ? null
+                          : () => setState(() {
+                              _selected
+                                ..clear()
+                                ..addAll(
+                                  _invitation!.offerings.map((item) => item.id),
+                                );
+                            }),
+                      child: const Text('Select All'),
+                    ),
+                    TextButton(
+                      onPressed: _processing || _selected.isEmpty
+                          ? null
+                          : () => setState(_selected.clear),
+                      child: const Text('Clear All'),
+                    ),
+                  ],
+                ),
                 ..._invitation!.offerings.map(
                   (offering) => CheckboxListTile(
                     value: _selected.contains(offering.id),

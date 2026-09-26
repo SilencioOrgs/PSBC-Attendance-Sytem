@@ -60,6 +60,13 @@ class WelcomeScreen extends ConsumerWidget {
               icon: Icons.person_outline,
               onPressed: () => context.goNamed(AppRoutes.studentSetup),
             ),
+            const SizedBox(height: Spacing.sm),
+            TextButton.icon(
+              onPressed: () =>
+                  context.pushNamed(AppRoutes.attendanceAccessImport),
+              icon: const Icon(Icons.qr_code_scanner),
+              label: const Text('Scan Attendance Officer QR'),
+            ),
           ],
         ),
       ),

@@ -8,6 +8,8 @@ import '../../../../core/widgets/app_widgets.dart';
 import '../../../../core/utils/iterable_extensions.dart';
 import '../../../../domain/models.dart';
 import '../../../attendance/presentation/providers/attendance_provider.dart';
+import '../../../attendance/presentation/providers/attendance_access_provider.dart';
+import '../../../../core/providers/repository_providers.dart';
 import '../../../classes/presentation/providers/class_provider.dart';
 import '../../../classes/presentation/screens/class_screens.dart';
 import '../providers/teacher_provider.dart';
@@ -20,6 +22,8 @@ class TeacherHomeScreen extends ConsumerWidget {
     final teacher = ref.watch(teacherProvider);
     final classes = ref.watch(classListProvider);
     final sessions = ref.watch(attendanceHistoryProvider);
+    final hasAttendanceAccess =
+        ref.watch(attendanceAccessAvailableProvider).value ?? false;
     return PageScaffold(
       title: 'Home',
       body: SingleChildScrollView(
@@ -44,6 +48,20 @@ class TeacherHomeScreen extends ConsumerWidget {
               style: Theme.of(context).textTheme.bodyMedium
                   ?.copyWith(color: AppColors.muted),
             ),
+            if (hasAttendanceAccess)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () async {
+                    await ref
+                        .read(applicationSessionProvider)
+                        .selectAttendanceOfficer();
+                    if (context.mounted) context.go('/attendance-officer');
+                  },
+                  icon: const Icon(Icons.fact_check_outlined),
+                  label: const Text('Open Attendance Officer'),
+                ),
+              ),
             const SizedBox(height: Spacing.lg),
             sessions.when(
               data: (list) {

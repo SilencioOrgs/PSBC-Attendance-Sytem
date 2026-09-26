@@ -1,5 +1,7 @@
 import 'models.dart';
 import 'subject_invitation.dart';
+import 'attendance_window_policy.dart';
+import 'attendance_access_invitation.dart';
 
 /// User-facing repository validation failures shared across feature workflows.
 sealed class RepositoryException implements Exception {
@@ -53,6 +55,22 @@ class ActiveAttendanceSessionException extends RepositoryException {
       );
 
   final String sessionId;
+}
+
+class AttendanceWindowException extends RepositoryException {
+  const AttendanceWindowException(this.status)
+    : super('Attendance cannot start outside the scheduled window.');
+
+  final AttendanceWindowStatus status;
+}
+
+class PermissionDeniedException extends RepositoryException {
+  const PermissionDeniedException()
+    : super('You do not have permission to perform this action.');
+}
+
+class AttendancePermissionDeniedException extends PermissionDeniedException {
+  const AttendancePermissionDeniedException() : super();
 }
 
 class EmptyClassRosterException extends RepositoryException {
@@ -142,6 +160,34 @@ abstract interface class EnrollmentRepository {
     required SubjectInvitation invitation,
     required Set<String> selectedOfferingIds,
   });
+}
+
+class AttendanceAccessImportResult {
+  const AttendanceAccessImportResult({
+    required this.grant,
+    required this.invitation,
+    required this.alreadyExists,
+  });
+
+  final AttendanceAccessGrant grant;
+  final AttendanceAccessInvitation invitation;
+  final bool alreadyExists;
+}
+
+abstract interface class AttendanceAccessRepository {
+  Future<AttendanceAccessImportResult> importInvitation(
+    AttendanceAccessInvitation invitation,
+  );
+  Future<bool> hasAnyAccess();
+  Stream<List<AttendanceAccessGrant>> watchGrants();
+  Future<AttendanceAccessGrant?> findForOffering(String localOfferingId);
+  Future<AttendanceAccessGrant?> findForSourceOffering(
+    String teacherId,
+    String sourceOfferingId,
+  );
+  Stream<List<Student>> watchRoster(String localOfferingId);
+  Future<List<Student>> getRoster(String localOfferingId);
+  Future<List<Device>> getDevices(String localOfferingId);
 }
 
 abstract interface class AttendanceRepository {

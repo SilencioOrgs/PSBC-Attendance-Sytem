@@ -22,4 +22,9 @@ abstract final class AppRoutes {
   static const studentProfile = 'studentProfile';
   static const shareSubjects = 'shareSubjects';
   static const addSubject = 'addSubject';
+  static const teacherAttendanceAccessQr = 'teacherAttendanceAccessQr';
+  static const attendanceAccessImport = 'attendanceAccessImport';
+  static const attendanceOfficerHome = 'attendanceOfficerHome';
+  static const attendanceOfficerScanner = 'attendanceOfficerScanner';
+  static const attendanceOfficerResults = 'attendanceOfficerResults';
 }

@@ -4702,6 +4702,555 @@ class AppSessionPreferencesCompanion
   }
 }
 
+class $AttendanceAccessGrantsTable extends AttendanceAccessGrants
+    with TableInfo<$AttendanceAccessGrantsTable, AttendanceAccessGrantRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $AttendanceAccessGrantsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _invitationIdMeta = const VerificationMeta(
+    'invitationId',
+  );
+  @override
+  late final GeneratedColumn<String> invitationId = GeneratedColumn<String>(
+    'invitation_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sourceTeacherIdMeta = const VerificationMeta(
+    'sourceTeacherId',
+  );
+  @override
+  late final GeneratedColumn<String> sourceTeacherId = GeneratedColumn<String>(
+    'source_teacher_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sourceOfferingIdMeta = const VerificationMeta(
+    'sourceOfferingId',
+  );
+  @override
+  late final GeneratedColumn<String> sourceOfferingId = GeneratedColumn<String>(
+    'source_offering_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _localOfferingIdMeta = const VerificationMeta(
+    'localOfferingId',
+  );
+  @override
+  late final GeneratedColumn<String> localOfferingId = GeneratedColumn<String>(
+    'local_offering_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _subjectMeta = const VerificationMeta(
+    'subject',
+  );
+  @override
+  late final GeneratedColumn<String> subject = GeneratedColumn<String>(
+    'subject',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sectionCodeMeta = const VerificationMeta(
+    'sectionCode',
+  );
+  @override
+  late final GeneratedColumn<String> sectionCode = GeneratedColumn<String>(
+    'section_code',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _payloadMeta = const VerificationMeta(
+    'payload',
+  );
+  @override
+  late final GeneratedColumn<String> payload = GeneratedColumn<String>(
+    'payload',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _grantedAtMeta = const VerificationMeta(
+    'grantedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> grantedAt = GeneratedColumn<DateTime>(
+    'granted_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    invitationId,
+    sourceTeacherId,
+    sourceOfferingId,
+    localOfferingId,
+    subject,
+    sectionCode,
+    payload,
+    grantedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'attendance_access_grants';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<AttendanceAccessGrantRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('invitation_id')) {
+      context.handle(
+        _invitationIdMeta,
+        invitationId.isAcceptableOrUnknown(
+          data['invitation_id']!,
+          _invitationIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_invitationIdMeta);
+    }
+    if (data.containsKey('source_teacher_id')) {
+      context.handle(
+        _sourceTeacherIdMeta,
+        sourceTeacherId.isAcceptableOrUnknown(
+          data['source_teacher_id']!,
+          _sourceTeacherIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_sourceTeacherIdMeta);
+    }
+    if (data.containsKey('source_offering_id')) {
+      context.handle(
+        _sourceOfferingIdMeta,
+        sourceOfferingId.isAcceptableOrUnknown(
+          data['source_offering_id']!,
+          _sourceOfferingIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_sourceOfferingIdMeta);
+    }
+    if (data.containsKey('local_offering_id')) {
+      context.handle(
+        _localOfferingIdMeta,
+        localOfferingId.isAcceptableOrUnknown(
+          data['local_offering_id']!,
+          _localOfferingIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_localOfferingIdMeta);
+    }
+    if (data.containsKey('subject')) {
+      context.handle(
+        _subjectMeta,
+        subject.isAcceptableOrUnknown(data['subject']!, _subjectMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_subjectMeta);
+    }
+    if (data.containsKey('section_code')) {
+      context.handle(
+        _sectionCodeMeta,
+        sectionCode.isAcceptableOrUnknown(
+          data['section_code']!,
+          _sectionCodeMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_sectionCodeMeta);
+    }
+    if (data.containsKey('payload')) {
+      context.handle(
+        _payloadMeta,
+        payload.isAcceptableOrUnknown(data['payload']!, _payloadMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_payloadMeta);
+    }
+    if (data.containsKey('granted_at')) {
+      context.handle(
+        _grantedAtMeta,
+        grantedAt.isAcceptableOrUnknown(data['granted_at']!, _grantedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_grantedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {invitationId};
+  @override
+  AttendanceAccessGrantRow map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return AttendanceAccessGrantRow(
+      invitationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}invitation_id'],
+      )!,
+      sourceTeacherId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_teacher_id'],
+      )!,
+      sourceOfferingId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_offering_id'],
+      )!,
+      localOfferingId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}local_offering_id'],
+      )!,
+      subject: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}subject'],
+      )!,
+      sectionCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}section_code'],
+      )!,
+      payload: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payload'],
+      )!,
+      grantedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}granted_at'],
+      )!,
+    );
+  }
+
+  @override
+  $AttendanceAccessGrantsTable createAlias(String alias) {
+    return $AttendanceAccessGrantsTable(attachedDatabase, alias);
+  }
+}
+
+class AttendanceAccessGrantRow extends DataClass
+    implements Insertable<AttendanceAccessGrantRow> {
+  final String invitationId;
+  final String sourceTeacherId;
+  final String sourceOfferingId;
+  final String localOfferingId;
+  final String subject;
+  final String sectionCode;
+  final String payload;
+  final DateTime grantedAt;
+  const AttendanceAccessGrantRow({
+    required this.invitationId,
+    required this.sourceTeacherId,
+    required this.sourceOfferingId,
+    required this.localOfferingId,
+    required this.subject,
+    required this.sectionCode,
+    required this.payload,
+    required this.grantedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['invitation_id'] = Variable<String>(invitationId);
+    map['source_teacher_id'] = Variable<String>(sourceTeacherId);
+    map['source_offering_id'] = Variable<String>(sourceOfferingId);
+    map['local_offering_id'] = Variable<String>(localOfferingId);
+    map['subject'] = Variable<String>(subject);
+    map['section_code'] = Variable<String>(sectionCode);
+    map['payload'] = Variable<String>(payload);
+    map['granted_at'] = Variable<DateTime>(grantedAt);
+    return map;
+  }
+
+  AttendanceAccessGrantsCompanion toCompanion(bool nullToAbsent) {
+    return AttendanceAccessGrantsCompanion(
+      invitationId: Value(invitationId),
+      sourceTeacherId: Value(sourceTeacherId),
+      sourceOfferingId: Value(sourceOfferingId),
+      localOfferingId: Value(localOfferingId),
+      subject: Value(subject),
+      sectionCode: Value(sectionCode),
+      payload: Value(payload),
+      grantedAt: Value(grantedAt),
+    );
+  }
+
+  factory AttendanceAccessGrantRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return AttendanceAccessGrantRow(
+      invitationId: serializer.fromJson<String>(json['invitationId']),
+      sourceTeacherId: serializer.fromJson<String>(json['sourceTeacherId']),
+      sourceOfferingId: serializer.fromJson<String>(json['sourceOfferingId']),
+      localOfferingId: serializer.fromJson<String>(json['localOfferingId']),
+      subject: serializer.fromJson<String>(json['subject']),
+      sectionCode: serializer.fromJson<String>(json['sectionCode']),
+      payload: serializer.fromJson<String>(json['payload']),
+      grantedAt: serializer.fromJson<DateTime>(json['grantedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'invitationId': serializer.toJson<String>(invitationId),
+      'sourceTeacherId': serializer.toJson<String>(sourceTeacherId),
+      'sourceOfferingId': serializer.toJson<String>(sourceOfferingId),
+      'localOfferingId': serializer.toJson<String>(localOfferingId),
+      'subject': serializer.toJson<String>(subject),
+      'sectionCode': serializer.toJson<String>(sectionCode),
+      'payload': serializer.toJson<String>(payload),
+      'grantedAt': serializer.toJson<DateTime>(grantedAt),
+    };
+  }
+
+  AttendanceAccessGrantRow copyWith({
+    String? invitationId,
+    String? sourceTeacherId,
+    String? sourceOfferingId,
+    String? localOfferingId,
+    String? subject,
+    String? sectionCode,
+    String? payload,
+    DateTime? grantedAt,
+  }) => AttendanceAccessGrantRow(
+    invitationId: invitationId ?? this.invitationId,
+    sourceTeacherId: sourceTeacherId ?? this.sourceTeacherId,
+    sourceOfferingId: sourceOfferingId ?? this.sourceOfferingId,
+    localOfferingId: localOfferingId ?? this.localOfferingId,
+    subject: subject ?? this.subject,
+    sectionCode: sectionCode ?? this.sectionCode,
+    payload: payload ?? this.payload,
+    grantedAt: grantedAt ?? this.grantedAt,
+  );
+  AttendanceAccessGrantRow copyWithCompanion(
+    AttendanceAccessGrantsCompanion data,
+  ) {
+    return AttendanceAccessGrantRow(
+      invitationId: data.invitationId.present
+          ? data.invitationId.value
+          : this.invitationId,
+      sourceTeacherId: data.sourceTeacherId.present
+          ? data.sourceTeacherId.value
+          : this.sourceTeacherId,
+      sourceOfferingId: data.sourceOfferingId.present
+          ? data.sourceOfferingId.value
+          : this.sourceOfferingId,
+      localOfferingId: data.localOfferingId.present
+          ? data.localOfferingId.value
+          : this.localOfferingId,
+      subject: data.subject.present ? data.subject.value : this.subject,
+      sectionCode: data.sectionCode.present
+          ? data.sectionCode.value
+          : this.sectionCode,
+      payload: data.payload.present ? data.payload.value : this.payload,
+      grantedAt: data.grantedAt.present ? data.grantedAt.value : this.grantedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AttendanceAccessGrantRow(')
+          ..write('invitationId: $invitationId, ')
+          ..write('sourceTeacherId: $sourceTeacherId, ')
+          ..write('sourceOfferingId: $sourceOfferingId, ')
+          ..write('localOfferingId: $localOfferingId, ')
+          ..write('subject: $subject, ')
+          ..write('sectionCode: $sectionCode, ')
+          ..write('payload: $payload, ')
+          ..write('grantedAt: $grantedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    invitationId,
+    sourceTeacherId,
+    sourceOfferingId,
+    localOfferingId,
+    subject,
+    sectionCode,
+    payload,
+    grantedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is AttendanceAccessGrantRow &&
+          other.invitationId == this.invitationId &&
+          other.sourceTeacherId == this.sourceTeacherId &&
+          other.sourceOfferingId == this.sourceOfferingId &&
+          other.localOfferingId == this.localOfferingId &&
+          other.subject == this.subject &&
+          other.sectionCode == this.sectionCode &&
+          other.payload == this.payload &&
+          other.grantedAt == this.grantedAt);
+}
+
+class AttendanceAccessGrantsCompanion
+    extends UpdateCompanion<AttendanceAccessGrantRow> {
+  final Value<String> invitationId;
+  final Value<String> sourceTeacherId;
+  final Value<String> sourceOfferingId;
+  final Value<String> localOfferingId;
+  final Value<String> subject;
+  final Value<String> sectionCode;
+  final Value<String> payload;
+  final Value<DateTime> grantedAt;
+  final Value<int> rowid;
+  const AttendanceAccessGrantsCompanion({
+    this.invitationId = const Value.absent(),
+    this.sourceTeacherId = const Value.absent(),
+    this.sourceOfferingId = const Value.absent(),
+    this.localOfferingId = const Value.absent(),
+    this.subject = const Value.absent(),
+    this.sectionCode = const Value.absent(),
+    this.payload = const Value.absent(),
+    this.grantedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  AttendanceAccessGrantsCompanion.insert({
+    required String invitationId,
+    required String sourceTeacherId,
+    required String sourceOfferingId,
+    required String localOfferingId,
+    required String subject,
+    required String sectionCode,
+    required String payload,
+    required DateTime grantedAt,
+    this.rowid = const Value.absent(),
+  }) : invitationId = Value(invitationId),
+       sourceTeacherId = Value(sourceTeacherId),
+       sourceOfferingId = Value(sourceOfferingId),
+       localOfferingId = Value(localOfferingId),
+       subject = Value(subject),
+       sectionCode = Value(sectionCode),
+       payload = Value(payload),
+       grantedAt = Value(grantedAt);
+  static Insertable<AttendanceAccessGrantRow> custom({
+    Expression<String>? invitationId,
+    Expression<String>? sourceTeacherId,
+    Expression<String>? sourceOfferingId,
+    Expression<String>? localOfferingId,
+    Expression<String>? subject,
+    Expression<String>? sectionCode,
+    Expression<String>? payload,
+    Expression<DateTime>? grantedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (invitationId != null) 'invitation_id': invitationId,
+      if (sourceTeacherId != null) 'source_teacher_id': sourceTeacherId,
+      if (sourceOfferingId != null) 'source_offering_id': sourceOfferingId,
+      if (localOfferingId != null) 'local_offering_id': localOfferingId,
+      if (subject != null) 'subject': subject,
+      if (sectionCode != null) 'section_code': sectionCode,
+      if (payload != null) 'payload': payload,
+      if (grantedAt != null) 'granted_at': grantedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  AttendanceAccessGrantsCompanion copyWith({
+    Value<String>? invitationId,
+    Value<String>? sourceTeacherId,
+    Value<String>? sourceOfferingId,
+    Value<String>? localOfferingId,
+    Value<String>? subject,
+    Value<String>? sectionCode,
+    Value<String>? payload,
+    Value<DateTime>? grantedAt,
+    Value<int>? rowid,
+  }) {
+    return AttendanceAccessGrantsCompanion(
+      invitationId: invitationId ?? this.invitationId,
+      sourceTeacherId: sourceTeacherId ?? this.sourceTeacherId,
+      sourceOfferingId: sourceOfferingId ?? this.sourceOfferingId,
+      localOfferingId: localOfferingId ?? this.localOfferingId,
+      subject: subject ?? this.subject,
+      sectionCode: sectionCode ?? this.sectionCode,
+      payload: payload ?? this.payload,
+      grantedAt: grantedAt ?? this.grantedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (invitationId.present) {
+      map['invitation_id'] = Variable<String>(invitationId.value);
+    }
+    if (sourceTeacherId.present) {
+      map['source_teacher_id'] = Variable<String>(sourceTeacherId.value);
+    }
+    if (sourceOfferingId.present) {
+      map['source_offering_id'] = Variable<String>(sourceOfferingId.value);
+    }
+    if (localOfferingId.present) {
+      map['local_offering_id'] = Variable<String>(localOfferingId.value);
+    }
+    if (subject.present) {
+      map['subject'] = Variable<String>(subject.value);
+    }
+    if (sectionCode.present) {
+      map['section_code'] = Variable<String>(sectionCode.value);
+    }
+    if (payload.present) {
+      map['payload'] = Variable<String>(payload.value);
+    }
+    if (grantedAt.present) {
+      map['granted_at'] = Variable<DateTime>(grantedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AttendanceAccessGrantsCompanion(')
+          ..write('invitationId: $invitationId, ')
+          ..write('sourceTeacherId: $sourceTeacherId, ')
+          ..write('sourceOfferingId: $sourceOfferingId, ')
+          ..write('localOfferingId: $localOfferingId, ')
+          ..write('subject: $subject, ')
+          ..write('sectionCode: $sectionCode, ')
+          ..write('payload: $payload, ')
+          ..write('grantedAt: $grantedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -4719,6 +5268,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   );
   late final $AppSessionPreferencesTable appSessionPreferences =
       $AppSessionPreferencesTable(this);
+  late final $AttendanceAccessGrantsTable attendanceAccessGrants =
+      $AttendanceAccessGrantsTable(this);
   late final Index classOfferingIdentityUnique = Index(
     'class_offering_identity_unique',
     'CREATE UNIQUE INDEX class_offering_identity_unique ON class_sections (teacher_id, section_code, lower(subject))',
@@ -4731,6 +5282,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'attendance_records_session_student_unique',
     'CREATE UNIQUE INDEX attendance_records_session_student_unique ON attendance_records (session_id, student_id)',
   );
+  late final Index attendanceAccessSourceClassUnique = Index(
+    'attendance_access_source_class_unique',
+    'CREATE UNIQUE INDEX attendance_access_source_class_unique ON attendance_access_grants (source_teacher_id, source_offering_id)',
+  );
   late final TeacherDao teacherDao = TeacherDao(this as AppDatabase);
   late final StudentDao studentDao = StudentDao(this as AppDatabase);
   late final ClassDao classDao = ClassDao(this as AppDatabase);
@@ -4739,6 +5294,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final DeviceDao deviceDao = DeviceDao(this as AppDatabase);
   late final SettingsDao settingsDao = SettingsDao(this as AppDatabase);
   late final AppSessionDao appSessionDao = AppSessionDao(this as AppDatabase);
+  late final AttendanceAccessDao attendanceAccessDao = AttendanceAccessDao(
+    this as AppDatabase,
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -4753,9 +5311,11 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     devices,
     appSettingsRows,
     appSessionPreferences,
+    attendanceAccessGrants,
     classOfferingIdentityUnique,
     enrollmentsStudentClassUnique,
     attendanceRecordsSessionStudentUnique,
+    attendanceAccessSourceClassUnique,
   ];
 }
 
@@ -8662,6 +9222,304 @@ typedef $$AppSessionPreferencesTableProcessedTableManager =
       AppSessionPreferencesRow,
       PrefetchHooks Function()
     >;
+typedef $$AttendanceAccessGrantsTableCreateCompanionBuilder =
+    AttendanceAccessGrantsCompanion Function({
+      required String invitationId,
+      required String sourceTeacherId,
+      required String sourceOfferingId,
+      required String localOfferingId,
+      required String subject,
+      required String sectionCode,
+      required String payload,
+      required DateTime grantedAt,
+      Value<int> rowid,
+    });
+typedef $$AttendanceAccessGrantsTableUpdateCompanionBuilder =
+    AttendanceAccessGrantsCompanion Function({
+      Value<String> invitationId,
+      Value<String> sourceTeacherId,
+      Value<String> sourceOfferingId,
+      Value<String> localOfferingId,
+      Value<String> subject,
+      Value<String> sectionCode,
+      Value<String> payload,
+      Value<DateTime> grantedAt,
+      Value<int> rowid,
+    });
+
+class $$AttendanceAccessGrantsTableFilterComposer
+    extends Composer<_$AppDatabase, $AttendanceAccessGrantsTable> {
+  $$AttendanceAccessGrantsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get invitationId => $composableBuilder(
+    column: $table.invitationId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceTeacherId => $composableBuilder(
+    column: $table.sourceTeacherId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceOfferingId => $composableBuilder(
+    column: $table.sourceOfferingId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get localOfferingId => $composableBuilder(
+    column: $table.localOfferingId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get subject => $composableBuilder(
+    column: $table.subject,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sectionCode => $composableBuilder(
+    column: $table.sectionCode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get grantedAt => $composableBuilder(
+    column: $table.grantedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$AttendanceAccessGrantsTableOrderingComposer
+    extends Composer<_$AppDatabase, $AttendanceAccessGrantsTable> {
+  $$AttendanceAccessGrantsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get invitationId => $composableBuilder(
+    column: $table.invitationId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sourceTeacherId => $composableBuilder(
+    column: $table.sourceTeacherId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sourceOfferingId => $composableBuilder(
+    column: $table.sourceOfferingId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get localOfferingId => $composableBuilder(
+    column: $table.localOfferingId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get subject => $composableBuilder(
+    column: $table.subject,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sectionCode => $composableBuilder(
+    column: $table.sectionCode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get grantedAt => $composableBuilder(
+    column: $table.grantedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$AttendanceAccessGrantsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $AttendanceAccessGrantsTable> {
+  $$AttendanceAccessGrantsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get invitationId => $composableBuilder(
+    column: $table.invitationId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get sourceTeacherId => $composableBuilder(
+    column: $table.sourceTeacherId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get sourceOfferingId => $composableBuilder(
+    column: $table.sourceOfferingId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get localOfferingId => $composableBuilder(
+    column: $table.localOfferingId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get subject =>
+      $composableBuilder(column: $table.subject, builder: (column) => column);
+
+  GeneratedColumn<String> get sectionCode => $composableBuilder(
+    column: $table.sectionCode,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get payload =>
+      $composableBuilder(column: $table.payload, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get grantedAt =>
+      $composableBuilder(column: $table.grantedAt, builder: (column) => column);
+}
+
+class $$AttendanceAccessGrantsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $AttendanceAccessGrantsTable,
+          AttendanceAccessGrantRow,
+          $$AttendanceAccessGrantsTableFilterComposer,
+          $$AttendanceAccessGrantsTableOrderingComposer,
+          $$AttendanceAccessGrantsTableAnnotationComposer,
+          $$AttendanceAccessGrantsTableCreateCompanionBuilder,
+          $$AttendanceAccessGrantsTableUpdateCompanionBuilder,
+          (
+            AttendanceAccessGrantRow,
+            BaseReferences<
+              _$AppDatabase,
+              $AttendanceAccessGrantsTable,
+              AttendanceAccessGrantRow
+            >,
+          ),
+          AttendanceAccessGrantRow,
+          PrefetchHooks Function()
+        > {
+  $$AttendanceAccessGrantsTableTableManager(
+    _$AppDatabase db,
+    $AttendanceAccessGrantsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$AttendanceAccessGrantsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$AttendanceAccessGrantsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$AttendanceAccessGrantsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> invitationId = const Value.absent(),
+                Value<String> sourceTeacherId = const Value.absent(),
+                Value<String> sourceOfferingId = const Value.absent(),
+                Value<String> localOfferingId = const Value.absent(),
+                Value<String> subject = const Value.absent(),
+                Value<String> sectionCode = const Value.absent(),
+                Value<String> payload = const Value.absent(),
+                Value<DateTime> grantedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => AttendanceAccessGrantsCompanion(
+                invitationId: invitationId,
+                sourceTeacherId: sourceTeacherId,
+                sourceOfferingId: sourceOfferingId,
+                localOfferingId: localOfferingId,
+                subject: subject,
+                sectionCode: sectionCode,
+                payload: payload,
+                grantedAt: grantedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String invitationId,
+                required String sourceTeacherId,
+                required String sourceOfferingId,
+                required String localOfferingId,
+                required String subject,
+                required String sectionCode,
+                required String payload,
+                required DateTime grantedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => AttendanceAccessGrantsCompanion.insert(
+                invitationId: invitationId,
+                sourceTeacherId: sourceTeacherId,
+                sourceOfferingId: sourceOfferingId,
+                localOfferingId: localOfferingId,
+                subject: subject,
+                sectionCode: sectionCode,
+                payload: payload,
+                grantedAt: grantedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<
+                    $AttendanceAccessGrantsTable,
+                    AttendanceAccessGrantRow
+                  >(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $AttendanceAccessGrantsTable,
+                    AttendanceAccessGrantRow
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$AttendanceAccessGrantsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $AttendanceAccessGrantsTable,
+      AttendanceAccessGrantRow,
+      $$AttendanceAccessGrantsTableFilterComposer,
+      $$AttendanceAccessGrantsTableOrderingComposer,
+      $$AttendanceAccessGrantsTableAnnotationComposer,
+      $$AttendanceAccessGrantsTableCreateCompanionBuilder,
+      $$AttendanceAccessGrantsTableUpdateCompanionBuilder,
+      (
+        AttendanceAccessGrantRow,
+        BaseReferences<
+          _$AppDatabase,
+          $AttendanceAccessGrantsTable,
+          AttendanceAccessGrantRow
+        >,
+      ),
+      AttendanceAccessGrantRow,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -8684,6 +9542,11 @@ class $AppDatabaseManager {
       $$AppSettingsRowsTableTableManager(_db, _db.appSettingsRows);
   $$AppSessionPreferencesTableTableManager get appSessionPreferences =>
       $$AppSessionPreferencesTableTableManager(_db, _db.appSessionPreferences);
+  $$AttendanceAccessGrantsTableTableManager get attendanceAccessGrants =>
+      $$AttendanceAccessGrantsTableTableManager(
+        _db,
+        _db.attendanceAccessGrants,
+      );
 }
 
 mixin _$TeacherDaoMixin on DatabaseAccessor<AppDatabase> {
@@ -8856,5 +9719,21 @@ class AppSessionDaoManager {
       $$AppSessionPreferencesTableTableManager(
         _db.attachedDatabase,
         _db.appSessionPreferences,
+      );
+}
+
+mixin _$AttendanceAccessDaoMixin on DatabaseAccessor<AppDatabase> {
+  $AttendanceAccessGrantsTable get attendanceAccessGrants =>
+      attachedDatabase.attendanceAccessGrants;
+  AttendanceAccessDaoManager get managers => AttendanceAccessDaoManager(this);
+}
+
+class AttendanceAccessDaoManager {
+  final _$AttendanceAccessDaoMixin _db;
+  AttendanceAccessDaoManager(this._db);
+  $$AttendanceAccessGrantsTableTableManager get attendanceAccessGrants =>
+      $$AttendanceAccessGrantsTableTableManager(
+        _db.attachedDatabase,
+        _db.attendanceAccessGrants,
       );
 }

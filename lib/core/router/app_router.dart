@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/attendance/presentation/screens/attendance_screens.dart';
+import '../../features/attendance/presentation/screens/attendance_access_screens.dart';
 import '../../features/classes/presentation/screens/class_screens.dart';
 import '../../features/classes/presentation/screens/class_creation_screen.dart';
 import '../../features/classes/presentation/screens/share_subjects_screen.dart';
@@ -79,6 +80,23 @@ GoRouter createAppRouter({
         path: '/student/add-subject',
         name: AppRoutes.addSubject,
         builder: (context, state) => const AddSubjectScreen(),
+      ),
+      GoRoute(
+        path: '/attendance-access/import',
+        name: AppRoutes.attendanceAccessImport,
+        builder: (context, state) => const AttendanceAccessImportScreen(),
+      ),
+      GoRoute(
+        path: '/teacher/share-attendance/:classId',
+        name: AppRoutes.teacherAttendanceAccessQr,
+        builder: (context, state) => TeacherAttendanceAccessQrScreen(
+          offeringId: state.pathParameters['classId'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: '/attendance-officer',
+        name: AppRoutes.attendanceOfficerHome,
+        builder: (context, state) => const AttendanceOfficerHomeScreen(),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) => _RoleNavigationShell(
@@ -228,6 +246,22 @@ GoRouter createAppRouter({
         name: AppRoutes.attendanceResults,
         builder: (context, state) => AttendanceResultsScreen(
           sessionId: state.pathParameters['sessionId'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: '/attendance-officer/scanner/:sessionId',
+        name: AppRoutes.attendanceOfficerScanner,
+        builder: (context, state) => BleScannerScreen(
+          sessionId: state.pathParameters['sessionId'] ?? '',
+          isAttendanceOfficer: true,
+        ),
+      ),
+      GoRoute(
+        path: '/attendance-officer/results/:sessionId',
+        name: AppRoutes.attendanceOfficerResults,
+        builder: (context, state) => AttendanceResultsScreen(
+          sessionId: state.pathParameters['sessionId'] ?? '',
+          isAttendanceOfficer: true,
         ),
       ),
     ],

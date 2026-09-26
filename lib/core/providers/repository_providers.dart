@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../../features/attendance/data/drift_attendance_repository.dart';
+import '../../features/attendance/data/drift_attendance_access_repository.dart';
 import '../../features/classes/data/drift_class_repository.dart';
 import '../../features/device/data/drift_device_repository.dart';
 import '../../features/settings/data/drift_settings_repository.dart';
@@ -24,9 +25,20 @@ final appDatabaseProvider = Provider<AppDatabase>((ref) {
   return database;
 });
 
-final teacherPinServiceProvider = Provider<TeacherPinService>(
-  (ref) => SecureTeacherPinService(const FlutterSecureStorage()),
-);
+final teacherPinServiceProvider = Provider<TeacherPinService>((ref) {
+  final pins = SecureTeacherPinService(const FlutterSecureStorage());
+  return RoleGuardedTeacherPinService(
+    pins,
+    canManage: () =>
+        ref.read(applicationSessionProvider).entry ==
+            ApplicationEntry.teacherSetup ||
+        ref.read(applicationSessionProvider).entry == ApplicationEntry.teacher,
+    canVerify: () =>
+        ref.read(applicationSessionProvider).entry ==
+            ApplicationEntry.teacherLocked ||
+        ref.read(applicationSessionProvider).entry == ApplicationEntry.teacher,
+  );
+});
 
 final teacherSessionProvider = Provider<TeacherSession>(
   (ref) => TeacherSession(state: TeacherSessionState.setupRequired),
@@ -50,27 +62,145 @@ final teacherRepositoryProvider = Provider<TeacherRepository>(
 );
 
 final classRepositoryProvider = Provider<ClassRepository>(
-  (ref) => DriftClassRepository(ref.watch(appDatabaseProvider)),
+  (ref) => DriftClassRepository(
+    ref.watch(appDatabaseProvider),
+    canManage: (classId) async {
+      if (ref.read(applicationSessionProvider).entry !=
+              ApplicationEntry.teacher ||
+          ref.read(teacherSessionProvider).state !=
+              TeacherSessionState.authenticated) {
+        return false;
+      }
+      final teacher = await ref
+          .read(appDatabaseProvider)
+          .teacherDao
+          .getTeacherOrNull();
+      if (teacher == null) return false;
+      if (classId == null) return true;
+      return (await ref.read(appDatabaseProvider).classDao.getClass(classId))
+              ?.teacherId ==
+          teacher.id;
+    },
+  ),
 );
 
 final studentRepositoryProvider = Provider<StudentRepository>(
-  (ref) => DriftStudentRepository(ref.watch(appDatabaseProvider)),
+  (ref) => DriftStudentRepository(
+    ref.watch(appDatabaseProvider),
+    canRegisterProfile: () async {
+      final entry = ref.read(applicationSessionProvider).entry;
+      return entry == ApplicationEntry.welcome ||
+          entry == ApplicationEntry.student ||
+          entry == ApplicationEntry.teacherSetup;
+    },
+    canManage: (classId, studentId) async {
+      if (ref.read(applicationSessionProvider).entry !=
+              ApplicationEntry.teacher ||
+          ref.read(teacherSessionProvider).state !=
+              TeacherSessionState.authenticated) {
+        return false;
+      }
+      final teacher = await ref
+          .read(appDatabaseProvider)
+          .teacherDao
+          .getTeacherOrNull();
+      if (teacher == null) return false;
+      if (classId != null &&
+          (await ref.read(appDatabaseProvider).classDao.getClass(classId))
+                  ?.teacherId !=
+              teacher.id) {
+        return false;
+      }
+      if (studentId != null) {
+        final offerings = await ref
+            .read(appDatabaseProvider)
+            .classDao
+            .getStudentOfferings(studentId);
+        if (!offerings.any((offering) => offering.teacherId == teacher.id)) {
+          return false;
+        }
+      }
+      return true;
+    },
+  ),
 );
 
 final enrollmentRepositoryProvider = Provider<EnrollmentRepository>(
-  (ref) => DriftEnrollmentRepository(ref.watch(appDatabaseProvider)),
+  (ref) => DriftEnrollmentRepository(
+    ref.watch(appDatabaseProvider),
+    canEnroll: (studentId) async {
+      final session = ref.read(applicationSessionProvider);
+      return session.entry == ApplicationEntry.student &&
+          session.currentStudentId == studentId;
+    },
+  ),
 );
 
 final attendanceRepositoryProvider = Provider<AttendanceRepository>(
-  (ref) => DriftAttendanceRepository(ref.watch(appDatabaseProvider)),
+  (ref) => DriftAttendanceRepository(
+    ref.watch(appDatabaseProvider),
+    canAccessOffering: (offeringId) async {
+      final session = ref.read(applicationSessionProvider);
+      final entry = session.entry;
+      if (entry == ApplicationEntry.teacher &&
+          ref.read(teacherSessionProvider).state ==
+              TeacherSessionState.authenticated) {
+        final offering = await ref
+            .read(classRepositoryProvider)
+            .getClass(offeringId);
+        return offering != null &&
+            (await ref.read(appDatabaseProvider).teacherDao.getTeacherOrNull())
+                    ?.id ==
+                offering.teacherId;
+      }
+      if (entry == ApplicationEntry.attendanceOfficer) {
+        return await ref
+                .read(attendanceAccessRepositoryProvider)
+                .findForOffering(offeringId) !=
+            null;
+      }
+      return false;
+    },
+  ),
 );
 
-final deviceRepositoryProvider = Provider<DeviceRepository>(
-  (ref) => DriftDeviceRepository(ref.watch(appDatabaseProvider)),
+final attendanceAccessRepositoryProvider = Provider<AttendanceAccessRepository>(
+  (ref) => DriftAttendanceAccessRepository(ref.watch(appDatabaseProvider)),
 );
+
+final deviceRepositoryProvider = Provider<DeviceRepository>((ref) {
+  final database = ref.watch(appDatabaseProvider);
+  return DriftDeviceRepository(
+    database,
+    canManage: (studentId, {required ownerRegistration}) async {
+      final session = ref.read(applicationSessionProvider);
+      if (session.entry == ApplicationEntry.student &&
+          ownerRegistration &&
+          session.currentStudentId == studentId) {
+        return true;
+      }
+      if (session.entry != ApplicationEntry.teacher ||
+          ref.read(teacherSessionProvider).state !=
+              TeacherSessionState.authenticated) {
+        return false;
+      }
+      final teacher = await database.teacherDao.getTeacherOrNull();
+      final offerings = await database.classDao.getStudentOfferings(studentId);
+      return teacher != null &&
+          offerings.any((offering) => offering.teacherId == teacher.id);
+    },
+  );
+});
 
 final settingsRepositoryProvider = Provider<SettingsRepository>(
-  (ref) => DriftSettingsRepository(ref.watch(appDatabaseProvider)),
+  (ref) => DriftSettingsRepository(
+    ref.watch(appDatabaseProvider),
+    canManage: () async =>
+        ref.read(applicationSessionProvider).entry ==
+            ApplicationEntry.teacher &&
+        ref.read(teacherSessionProvider).state ==
+            TeacherSessionState.authenticated,
+  ),
 );
 
 final teacherAuthServiceProvider = Provider<TeacherAuthService>(

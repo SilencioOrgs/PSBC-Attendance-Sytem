@@ -107,6 +107,28 @@ class Enrollment {
   String get classId => classOfferingId;
 }
 
+class AttendanceAccessGrant {
+  const AttendanceAccessGrant({
+    required this.invitationId,
+    required this.sourceTeacherId,
+    required this.sourceOfferingId,
+    required this.localOfferingId,
+    required this.subject,
+    required this.sectionCode,
+    required this.payload,
+    required this.grantedAt,
+  });
+
+  final String invitationId;
+  final String sourceTeacherId;
+  final String sourceOfferingId;
+  final String localOfferingId;
+  final String subject;
+  final String sectionCode;
+  final String payload;
+  final DateTime grantedAt;
+}
+
 class AttendanceSession {
   const AttendanceSession({
     required this.id,

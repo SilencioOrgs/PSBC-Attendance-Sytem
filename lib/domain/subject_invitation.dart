@@ -37,7 +37,10 @@ class SubjectInvitationOffering {
     'endMinutesOfDay': endMinutesOfDay,
   };
 
-  factory SubjectInvitationOffering.fromJson(Object? value) {
+  factory SubjectInvitationOffering.fromJson(
+    Object? value, {
+    bool allowNoSchedule = false,
+  }) {
     if (value is! Map<String, Object?>) {
       throw const FormatException('Invalid subject details.');
     }
@@ -66,7 +69,7 @@ class SubjectInvitationOffering {
       endMinutesOfDay: _requiredInt(value, 'endMinutesOfDay'),
     );
     if (offering.gradeLevel < 1 ||
-        days.isEmpty ||
+        (!allowNoSchedule && days.isEmpty) ||
         offering.startMinutesOfDay < 0 ||
         offering.startMinutesOfDay >= 1440 ||
         offering.endMinutesOfDay < 1 ||

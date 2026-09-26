@@ -5,10 +5,10 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/providers/repository_providers.dart';
 import '../../../../core/router/route_names.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../core/utils/input_formatters.dart';
 import '../../../../core/utils/teacher_pin.dart';
 import '../../../../core/widgets/app_widgets.dart';
 import '../providers/teacher_provider.dart';
+import '../widgets/pin_keypad.dart';
 
 class TeacherUnlockScreen extends ConsumerStatefulWidget {
   const TeacherUnlockScreen({super.key});
@@ -18,7 +18,7 @@ class TeacherUnlockScreen extends ConsumerStatefulWidget {
 }
 
 class _TeacherUnlockScreenState extends ConsumerState<TeacherUnlockScreen> {
-  final _pin = TextEditingController();
+  String _pin = '';
   String? _error;
   bool _checking = false;
 
@@ -36,14 +36,8 @@ class _TeacherUnlockScreenState extends ConsumerState<TeacherUnlockScreen> {
     }
   }
 
-  @override
-  void dispose() {
-    _pin.dispose();
-    super.dispose();
-  }
-
   Future<void> _unlock() async {
-    if (!isValidTeacherPin(_pin.text)) {
+    if (!isValidTeacherPin(_pin)) {
       setState(() => _error = 'Enter your 4 to 6 digit PIN.');
       return;
     }
@@ -54,10 +48,18 @@ class _TeacherUnlockScreenState extends ConsumerState<TeacherUnlockScreen> {
     try {
       final allowed = await ref
           .read(teacherPinUnlockProvider.notifier)
-          .unlock(_pin.text);
-      if (allowed && mounted) context.goNamed(AppRoutes.teacherHome);
+          .unlock(_pin);
+      if (allowed && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Teacher sign in successful.')),
+        );
+        context.goNamed(AppRoutes.teacherHome);
+      }
       if (!allowed && mounted) {
-        setState(() => _error = 'That PIN does not match. Try again.');
+        setState(() {
+          _pin = '';
+          _error = 'Incorrect PIN. Please try again.';
+        });
       }
     } catch (_) {
       if (mounted) {
@@ -87,24 +89,24 @@ class _TeacherUnlockScreenState extends ConsumerState<TeacherUnlockScreen> {
                 ?.copyWith(color: AppColors.muted),
           ),
           const SizedBox(height: Spacing.lg),
-          TextField(
-            controller: _pin,
-            obscureText: true,
-            keyboardType: TextInputType.number,
-            maxLength: 6,
-            inputFormatters: const [DigitsOnlyPinFormatter()],
-            decoration: InputDecoration(
-              labelText: 'Teacher PIN',
-              prefixIcon: const Icon(Icons.lock_outline),
-              errorText: _error,
-            ),
-            onSubmitted: (_) => _unlock(),
+          PinKeypad(
+            pin: _pin,
+            enabled: !_checking,
+            helperText: _error ?? 'Use 4 to 6 digits.',
+            onDigit: (digit) => setState(() {
+              _pin += digit;
+              _error = null;
+            }),
+            onDelete: () => setState(() {
+              _pin = _pin.substring(0, _pin.length - 1);
+              _error = null;
+            }),
           ),
           const SizedBox(height: Spacing.md),
           PrimaryActionButton(
             label: _checking ? 'Checking...' : 'Continue',
             icon: Icons.lock_open_outlined,
-            onPressed: _checking ? null : _unlock,
+            onPressed: _checking || !isValidTeacherPin(_pin) ? null : _unlock,
           ),
           const SizedBox(height: Spacing.md),
           Center(

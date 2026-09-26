@@ -3,11 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/router/route_names.dart';
+import '../../../../core/providers/repository_providers.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_widgets.dart';
 import '../../../../domain/models.dart';
 import '../../../../domain/repositories.dart';
 import '../../../attendance/presentation/providers/attendance_provider.dart';
+import '../../../attendance/presentation/providers/attendance_access_provider.dart';
 import '../../../device/presentation/providers/device_provider.dart';
 import '../providers/student_provider.dart';
 
@@ -181,6 +183,8 @@ class StudentHomeScreen extends ConsumerWidget {
     final classListAsync = ref.watch(currentStudentOfferingsProvider);
     final sessionAsync = ref.watch(todaySessionProvider);
     final recordsAsync = ref.watch(myAttendanceProvider);
+    final hasAttendanceAccess =
+        ref.watch(attendanceAccessAvailableProvider).value ?? false;
     return PageScaffold(
       title: 'Home',
       body: SingleChildScrollView(
@@ -205,6 +209,23 @@ class StudentHomeScreen extends ConsumerWidget {
               style: Theme.of(context).textTheme.bodyMedium
                   ?.copyWith(color: AppColors.muted),
             ),
+            const SizedBox(height: Spacing.sm),
+            TextButton.icon(
+              onPressed: () => context.push('/attendance-access/import'),
+              icon: const Icon(Icons.qr_code_scanner),
+              label: const Text('Scan Attendance Officer QR'),
+            ),
+            if (hasAttendanceAccess)
+              TextButton.icon(
+                onPressed: () async {
+                  await ref
+                      .read(applicationSessionProvider)
+                      .selectAttendanceOfficer();
+                  if (context.mounted) context.go('/attendance-officer');
+                },
+                icon: const Icon(Icons.fact_check_outlined),
+                label: const Text('Open Attendance Officer'),
+              ),
             const SizedBox(height: Spacing.lg),
             sessionAsync.when(
               data: (session) => recordsAsync.when(

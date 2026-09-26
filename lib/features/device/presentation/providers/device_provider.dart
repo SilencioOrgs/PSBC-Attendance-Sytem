@@ -15,7 +15,7 @@ final bleAdvertisingStateProvider = StreamProvider<BleAdvertisingState>(
 );
 
 final backgroundAttendanceStateProvider =
-    StreamProvider<BackgroundAttendanceState>(
+    StreamProvider.autoDispose<BackgroundAttendanceState>(
       (ref) => ref.watch(backgroundAttendanceServiceProvider).watchState(),
     );
 

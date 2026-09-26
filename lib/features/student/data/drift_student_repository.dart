@@ -1,24 +1,78 @@
 import 'package:drift/drift.dart';
 
 import '../../../core/utils/ble_identity.dart';
+import '../../../core/utils/iterable_extensions.dart';
+import '../../../domain/attendance_access_invitation.dart';
 import '../../../domain/models.dart';
 import '../../../domain/repositories.dart';
 import '../../../services/storage/app_database.dart';
 
 class DriftStudentRepository implements StudentRepository {
-  DriftStudentRepository(this._db);
+  DriftStudentRepository(
+    this._db, {
+    Future<bool> Function(String? classId, String? studentId)? canManage,
+    Future<bool> Function()? canRegisterProfile,
+  }) : _canManage = canManage ?? _allowManagement,
+       _canRegisterProfile = canRegisterProfile ?? _allowProfileRegistration;
   final AppDatabase _db;
+  final Future<bool> Function(String? classId, String? studentId) _canManage;
+  final Future<bool> Function() _canRegisterProfile;
+
+  static Future<bool> _allowManagement(
+    String? classId,
+    String? studentId,
+  ) async => true;
+  static Future<bool> _allowProfileRegistration() async => true;
+
+  Future<void> _assertCanManage({String? classId, String? studentId}) async {
+    if (!await _canManage(classId, studentId)) {
+      throw const PermissionDeniedException();
+    }
+  }
 
   @override
-  Future<List<Student>> getStudents() => _db.studentDao.getAll();
+  Future<List<Student>> getStudents() async => (await _db.studentDao.getAll())
+      .where((student) => !student.id.startsWith('attendance:'))
+      .toList(growable: false);
   @override
-  Stream<List<Student>> watchStudents() => _db.studentDao.watchAll();
+  Stream<List<Student>> watchStudents() => _db.studentDao.watchAll().map(
+    (students) => students
+        .where((student) => !student.id.startsWith('attendance:'))
+        .toList(growable: false),
+  );
   @override
-  Future<Student?> getStudent(String studentId) =>
-      _db.studentDao.getOne(studentId);
+  Future<Student?> getStudent(String studentId) async {
+    final local = await _db.studentDao.getOne(studentId);
+    if (local == null || !studentId.startsWith('attendance:')) return local;
+    for (final grant in await _db.attendanceAccessDao.getAll()) {
+      if (grant.localOfferingId.isEmpty) continue;
+      final source = AttendanceAccessInvitation.decode(grant.payload).roster
+          .where(
+            (item) =>
+                _attendanceStudentId(grant.localOfferingId, item.id) ==
+                studentId,
+          )
+          .firstOrNull;
+      if (source != null) {
+        return Student(
+          id: local.id,
+          updatedAt: local.updatedAt,
+          syncStatus: local.syncStatus,
+          name: source.name,
+          studentNumber: source.studentNumber,
+          deviceRegistered: source.bleUuid != null,
+        );
+      }
+    }
+    return local;
+  }
+
   @override
-  Stream<Student?> watchStudent(String studentId) =>
-      _db.studentDao.watchOne(studentId);
+  Stream<Student?> watchStudent(String studentId) => _db.studentDao
+      .watchOne(studentId)
+      .asyncMap(
+        (student) async => student == null ? null : await getStudent(studentId),
+      );
   @override
   Future<Student?> getCurrentStudent() => _db.studentDao.getCurrent();
   @override
@@ -30,6 +84,9 @@ class DriftStudentRepository implements StudentRepository {
     required String studentNumber,
     String? sectionCode,
   }) async {
+    if (!await _canRegisterProfile()) {
+      throw const PermissionDeniedException();
+    }
     if (name.trim().isEmpty || studentNumber.trim().isEmpty) {
       throw const ClassValidationException();
     }
@@ -78,6 +135,7 @@ class DriftStudentRepository implements StudentRepository {
     required String classId,
     String? bleUuid,
   }) async {
+    await _assertCanManage(classId: classId);
     if (name.trim().isEmpty || studentNumber.trim().isEmpty) {
       throw const ClassValidationException();
     }
@@ -169,6 +227,7 @@ class DriftStudentRepository implements StudentRepository {
     required String name,
     required String studentNumber,
   }) async {
+    await _assertCanManage(studentId: studentId);
     if (name.trim().isEmpty || studentNumber.trim().isEmpty) {
       throw const ClassValidationException();
     }
@@ -202,5 +261,11 @@ class DriftStudentRepository implements StudentRepository {
   Future<void> removeStudentFromClass({
     required String studentId,
     required String classId,
-  }) => _db.enrollmentDao.deletePair(studentId, classId);
+  }) async {
+    await _assertCanManage(classId: classId, studentId: studentId);
+    await _db.enrollmentDao.deletePair(studentId, classId);
+  }
 }
+
+String _attendanceStudentId(String localOfferingId, String sourceStudentId) =>
+    'attendance:$localOfferingId:$sourceStudentId';

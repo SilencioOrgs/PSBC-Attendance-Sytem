@@ -22,6 +22,11 @@ final attendanceRecordStudentsProvider =
     FutureProvider.family<List<Student>, String>((ref, sessionId) async {
       final attendance = ref.watch(attendanceRepositoryProvider);
       final students = ref.watch(studentRepositoryProvider);
+      final access = ref.watch(attendanceAccessRepositoryProvider);
+      final session = await attendance.getSession(sessionId);
+      if (session == null) return const <Student>[];
+      final grant = await access.findForOffering(session.classOfferingId);
+      if (grant != null) return access.getRoster(session.classOfferingId);
       final records = await attendance.getRecords(sessionId);
       final resolved = <Student>[];
       for (final record in records) {
@@ -37,12 +42,18 @@ final attendanceRosterProvider = StreamProvider.family<List<Student>, String>((
 ) {
   final sessions = ref.watch(attendanceRepositoryProvider);
   final classes = ref.watch(classRepositoryProvider);
+  final access = ref.watch(attendanceAccessRepositoryProvider);
   return sessions
       .watchSession(sessionId)
       .asyncExpand(
         (session) => session == null
             ? Stream.value(const <Student>[])
-            : classes.watchStudents(session.classOfferingId),
+            : Stream.fromFuture(access.findForOffering(session.classOfferingId))
+                  .asyncExpand(
+                    (grant) => grant == null
+                        ? classes.watchStudents(session.classOfferingId)
+                        : access.watchRoster(session.classOfferingId),
+                  ),
       );
 });
 

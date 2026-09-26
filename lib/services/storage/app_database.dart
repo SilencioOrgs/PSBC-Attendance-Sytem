@@ -198,6 +198,25 @@ class AppSessionPreferences extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+@TableIndex(
+  name: 'attendance_access_source_class_unique',
+  columns: {#sourceTeacherId, #sourceOfferingId},
+  unique: true,
+)
+@DataClassName('AttendanceAccessGrantRow')
+class AttendanceAccessGrants extends Table {
+  TextColumn get invitationId => text()();
+  TextColumn get sourceTeacherId => text()();
+  TextColumn get sourceOfferingId => text()();
+  TextColumn get localOfferingId => text()();
+  TextColumn get subject => text()();
+  TextColumn get sectionCode => text()();
+  TextColumn get payload => text()();
+  DateTimeColumn get grantedAt => dateTime()();
+  @override
+  Set<Column> get primaryKey => {invitationId};
+}
+
 @DriftDatabase(
   tables: [
     Teachers,
@@ -209,6 +228,7 @@ class AppSessionPreferences extends Table {
     Devices,
     AppSettingsRows,
     AppSessionPreferences,
+    AttendanceAccessGrants,
   ],
   daos: [
     TeacherDao,
@@ -219,6 +239,7 @@ class AppSessionPreferences extends Table {
     DeviceDao,
     SettingsDao,
     AppSessionDao,
+    AttendanceAccessDao,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -226,7 +247,7 @@ class AppDatabase extends _$AppDatabase {
     : super(executor ?? driftDatabase(name: 'classattend'));
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -298,6 +319,7 @@ class AppDatabase extends _$AppDatabase {
           );
         }
       }
+      if (from < 4) await m.createTable(attendanceAccessGrants);
     },
     beforeOpen: (details) async => customStatement('PRAGMA foreign_keys = ON'),
   );
@@ -1050,6 +1072,43 @@ class AppSessionDao extends DatabaseAccessor<AppDatabase>
       updatedAt: DateTime.now(),
     ),
   );
+}
+
+@DriftAccessor(tables: [AttendanceAccessGrants])
+class AttendanceAccessDao extends DatabaseAccessor<AppDatabase>
+    with _$AttendanceAccessDaoMixin {
+  AttendanceAccessDao(super.db);
+
+  Future<AttendanceAccessGrantRow?> byInvitationId(String id) => (select(
+    attendanceAccessGrants,
+  )..where((row) => row.invitationId.equals(id))).getSingleOrNull();
+
+  Future<AttendanceAccessGrantRow?> bySourceOffering(
+    String teacherId,
+    String offeringId,
+  ) =>
+      (select(attendanceAccessGrants)..where(
+            (row) =>
+                row.sourceTeacherId.equals(teacherId) &
+                row.sourceOfferingId.equals(offeringId),
+          ))
+          .getSingleOrNull();
+
+  Future<AttendanceAccessGrantRow?> byLocalOffering(String offeringId) =>
+      (select(attendanceAccessGrants)
+            ..where((row) => row.localOfferingId.equals(offeringId)))
+          .getSingleOrNull();
+
+  Future<List<AttendanceAccessGrantRow>> getAll() => (select(
+    attendanceAccessGrants,
+  )..orderBy([(row) => OrderingTerm.asc(row.grantedAt)])).get();
+
+  Stream<List<AttendanceAccessGrantRow>> watchAll() => (select(
+    attendanceAccessGrants,
+  )..orderBy([(row) => OrderingTerm.asc(row.grantedAt)])).watch();
+
+  Future<void> insert(AttendanceAccessGrantsCompanion grant) =>
+      into(attendanceAccessGrants).insert(grant);
 }
 
 String newDatabaseId() => const Uuid().v4();

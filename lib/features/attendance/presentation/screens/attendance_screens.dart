@@ -15,9 +15,14 @@ import '../providers/attendance_controller.dart';
 
 /// Full-screen BLE scan flow, outside either bottom navigation shell.
 class BleScannerScreen extends ConsumerStatefulWidget {
-  const BleScannerScreen({super.key, required this.sessionId});
+  const BleScannerScreen({
+    super.key,
+    required this.sessionId,
+    this.isAttendanceOfficer = false,
+  });
 
   final String sessionId;
+  final bool isAttendanceOfficer;
 
   @override
   ConsumerState<BleScannerScreen> createState() => _BleScannerScreenState();
@@ -84,7 +89,13 @@ class _BleScannerScreenState extends ConsumerState<BleScannerScreen> {
       await ref
           .read(attendanceControllerProvider.notifier)
           .cancel(widget.sessionId);
-      if (mounted) context.goNamed(AppRoutes.teacherClasses);
+      if (mounted) {
+        context.go(
+          widget.isAttendanceOfficer
+              ? '/attendance-officer'
+              : '/teacher/classes',
+        );
+      }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -108,9 +119,10 @@ class _BleScannerScreenState extends ConsumerState<BleScannerScreen> {
   Widget build(BuildContext context) {
     ref.listen(attendanceControllerProvider, (previous, next) {
       if (previous?.isComplete != true && next.isComplete && mounted) {
-        context.goNamed(
-          AppRoutes.attendanceResults,
-          pathParameters: {'sessionId': widget.sessionId},
+        context.go(
+          widget.isAttendanceOfficer
+              ? '/attendance-officer/results/${widget.sessionId}'
+              : '/teacher/results/${widget.sessionId}',
         );
       }
     });
@@ -266,9 +278,14 @@ class _BleScannerScreenState extends ConsumerState<BleScannerScreen> {
 
 /// Review each student and explicitly save the teacher-approved state.
 class AttendanceResultsScreen extends ConsumerStatefulWidget {
-  const AttendanceResultsScreen({super.key, required this.sessionId});
+  const AttendanceResultsScreen({
+    super.key,
+    required this.sessionId,
+    this.isAttendanceOfficer = false,
+  });
 
   final String sessionId;
+  final bool isAttendanceOfficer;
 
   @override
   ConsumerState<AttendanceResultsScreen> createState() =>
@@ -308,7 +325,9 @@ class _AttendanceResultsScreenState
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('Attendance saved.')));
-      context.goNamed(AppRoutes.teacherHome);
+      context.go(
+        widget.isAttendanceOfficer ? '/attendance-officer' : '/teacher',
+      );
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -348,7 +367,13 @@ class _AttendanceResultsScreenState
       await ref
           .read(attendanceControllerProvider.notifier)
           .cancel(widget.sessionId);
-      if (mounted) context.goNamed(AppRoutes.teacherAttendance);
+      if (mounted) {
+        context.go(
+          widget.isAttendanceOfficer
+              ? '/attendance-officer'
+              : '/teacher/attendance',
+        );
+      }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

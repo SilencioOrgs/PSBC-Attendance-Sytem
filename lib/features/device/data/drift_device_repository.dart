@@ -4,8 +4,32 @@ import '../../../core/utils/ble_identity.dart';
 import '../../../services/storage/app_database.dart';
 
 class DriftDeviceRepository implements DeviceRepository {
-  DriftDeviceRepository(this._db);
+  DriftDeviceRepository(
+    this._db, {
+    Future<bool> Function(String studentId, {required bool ownerRegistration})?
+    canManage,
+  }) : _canManage = canManage ?? _allowManagement;
   final AppDatabase _db;
+  final Future<bool> Function(
+    String studentId, {
+    required bool ownerRegistration,
+  })
+  _canManage;
+
+  static Future<bool> _allowManagement(
+    String studentId, {
+    required bool ownerRegistration,
+  }) async => true;
+
+  Future<void> _assertCanManage(
+    String studentId, {
+    required bool ownerRegistration,
+  }) async {
+    if (!await _canManage(studentId, ownerRegistration: ownerRegistration)) {
+      throw const PermissionDeniedException();
+    }
+  }
+
   @override
   Future<List<Device>> getDevices() => _db.deviceDao.getAll();
   @override
@@ -29,6 +53,7 @@ class DriftDeviceRepository implements DeviceRepository {
     String deviceName, {
     String? bleUuid,
   }) async {
+    await _assertCanManage(studentId, ownerRegistration: true);
     try {
       return await _db.transaction(() async {
         final existing = await _db.deviceDao.getStudent(studentId);
@@ -75,6 +100,7 @@ class DriftDeviceRepository implements DeviceRepository {
     String deviceName, {
     required String bleUuid,
   }) async {
+    await _assertCanManage(studentId, ownerRegistration: false);
     final uuid = normalizeBleIdentity(bleUuid);
     if (uuid == null) throw const InvalidBleUuidException();
     final id = newDatabaseId();
@@ -93,8 +119,10 @@ class DriftDeviceRepository implements DeviceRepository {
   }
 
   @override
-  Future<void> removeDevice(String studentId) =>
-      _db.deviceDao.deleteStudentDevice(studentId);
+  Future<void> removeDevice(String studentId) async {
+    await _assertCanManage(studentId, ownerRegistration: false);
+    await _db.deviceDao.deleteStudentDevice(studentId);
+  }
 
   Future<Device> _ensureDeviceIdentity(Device device) async {
     // Re-read inside the transaction: a concurrent registration/repair may

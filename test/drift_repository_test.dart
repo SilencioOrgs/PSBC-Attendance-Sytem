@@ -50,6 +50,9 @@ void main() {
         room: 'Room 1',
         scheduleStart: now,
         scheduleEnd: now.add(const Duration(minutes: 90)),
+        scheduleDays: const Value(127),
+        startMinutesOfDay: const Value(0),
+        endMinutesOfDay: const Value(1439),
         bleBeaconId: 'test-beacon',
         teacherId: _teacherId,
       ),
@@ -308,13 +311,12 @@ void main() {
         ),
         isNull,
       );
-      final overrideSession = await DriftAttendanceRepository(database)
+      final overrideSession = await _attendance(database)
           .startSession(firstOffering.id, manualOverride: true);
       expect(overrideSession.classOfferingId, firstOffering.id);
       expect(overrideSession.manualOverride, isTrue);
       expect(
-        (await DriftAttendanceRepository(database)
-                .getRecords(overrideSession.id))
+        (await _attendance(database).getRecords(overrideSession.id))
             .map((record) => record.studentId),
         [firstEnrollment.id],
       );
@@ -324,7 +326,7 @@ void main() {
   test(
     'attendance review keeps undetected students unconfirmed until save',
     () async {
-      final repository = DriftAttendanceRepository(database);
+      final repository = _attendance(database);
       final session = await repository.startSession(_classId);
       final initial = await repository.getRecords(session.id);
       expect(initial, hasLength(1));
@@ -351,7 +353,7 @@ void main() {
   test(
     'attendance finalization rolls back when a critical write fails',
     () async {
-      final repository = DriftAttendanceRepository(database);
+      final repository = _attendance(database);
       final session = await repository.startSession(_classId);
       await repository.finishScan(session.id);
       expect(
@@ -399,7 +401,8 @@ void main() {
         subject: 'English',
         room: 'Room 2',
         scheduleStart: DateTime(2000, 1, 1, 10),
-        scheduleEnd: DateTime(2000, 1, 1, 11),
+        scheduleEnd: DateTime(2000, 1, 1, 23, 59),
+        scheduleDays: Weekday.values.toSet(),
       );
       expect(created.sectionCode, 'GRADE11-HUMSS A');
       final updatedClass = await classes.updateClass(
@@ -416,7 +419,10 @@ void main() {
           sectionLabel: created.sectionLabel,
           sectionCode: created.sectionCode,
           scheduleStart: DateTime(2000, 1, 1, 10),
-          scheduleEnd: DateTime(2000, 1, 1, 11),
+          scheduleEnd: DateTime(2000, 1, 1, 23, 59),
+          scheduleDays: Weekday.values.toSet(),
+          startMinutesOfDay: 0,
+          endMinutesOfDay: 1439,
           teacherId: created.teacherId,
         ),
       );
@@ -428,7 +434,8 @@ void main() {
           subject: 'English 2',
           room: 'Room 2',
           scheduleStart: DateTime(2000, 1, 1, 10),
-          scheduleEnd: DateTime(2000, 1, 1, 11),
+          scheduleEnd: DateTime(2000, 1, 1, 23, 59),
+          scheduleDays: Weekday.values.toSet(),
         ),
         throwsA(isA<DuplicateClassException>()),
       );
@@ -457,8 +464,7 @@ void main() {
         studentNumber: 'T-004',
       );
       expect((await classes.getStudents(created.id)).single.name, 'Juan Cruz');
-      final session = await DriftAttendanceRepository(database)
-          .startSession(created.id);
+      final session = await _attendance(database).startSession(created.id);
       await students.removeStudentFromClass(
         studentId: added.id,
         classId: created.id,
@@ -468,10 +474,7 @@ void main() {
       await classes.deleteClass(created.id);
       expect(await classes.getClass(created.id), isNull);
       expect(await classes.getStudents(created.id), isEmpty);
-      expect(
-        await DriftAttendanceRepository(database).getSession(session.id),
-        isNull,
-      );
+      expect(await _attendance(database).getSession(session.id), isNull);
     },
   );
 
@@ -607,5 +610,10 @@ void main() {
 /// The actual concrete repository is the public Drift implementation; this
 /// named subclass keeps the test constructor type readable.
 class DriftAttendanceRepositoryForTest extends DriftAttendanceRepository {
-  DriftAttendanceRepositoryForTest(super.db);
+  DriftAttendanceRepositoryForTest(super.db) : super(canAccessOffering: _allow);
 }
+
+DriftAttendanceRepository _attendance(AppDatabase database) =>
+    DriftAttendanceRepository(database, canAccessOffering: _allow);
+
+Future<bool> _allow(String offeringId) async => true;

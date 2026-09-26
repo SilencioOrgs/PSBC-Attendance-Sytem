@@ -111,13 +111,19 @@ class AttendanceController extends Notifier<AttendanceWorkflow> {
           session.status != AttendanceSessionStatus.scanning) {
         throw StateError('This attendance session is not open for scanning.');
       }
-      final roster = await ref
-          .read(classRepositoryProvider)
-          .getStudents(session.classOfferingId);
+      final access = ref.read(attendanceAccessRepositoryProvider);
+      final grant = await access.findForOffering(session.classOfferingId);
+      final roster = grant == null
+          ? await ref
+                .read(classRepositoryProvider)
+                .getStudents(session.classOfferingId)
+          : await access.getRoster(session.classOfferingId);
       if (roster.isEmpty) {
         throw const EmptyClassRosterException();
       }
-      final devices = await ref.read(deviceRepositoryProvider).getDevices();
+      final devices = grant == null
+          ? await ref.read(deviceRepositoryProvider).getDevices()
+          : await access.getDevices(session.classOfferingId);
       final settings = await ref.read(settingsRepositoryProvider).getSettings();
       if (isReviewSession) {
         await ref.read(attendanceRepositoryProvider).resumeScan(sessionId);

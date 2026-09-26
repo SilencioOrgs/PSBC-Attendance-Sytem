@@ -24,6 +24,18 @@ Future<void> main() async {
   );
   await applicationSession.initialize(
     teacherPinExists: await pinService.hasPin(),
+    attendanceAccessExists: await database.attendanceAccessDao.getAll().then(
+      (grants) => grants.isNotEmpty,
+    ),
+  );
+  final guardedPinService = RoleGuardedTeacherPinService(
+    pinService,
+    canManage: () =>
+        applicationSession.entry == ApplicationEntry.teacherSetup ||
+        applicationSession.entry == ApplicationEntry.teacher,
+    canVerify: () =>
+        applicationSession.entry == ApplicationEntry.teacherLocked ||
+        applicationSession.entry == ApplicationEntry.teacher,
   );
   final router = createAppRouter(
     session: teacherSession,
@@ -33,7 +45,7 @@ Future<void> main() async {
     ProviderScope(
       overrides: [
         appDatabaseProvider.overrideWithValue(database),
-        teacherPinServiceProvider.overrideWithValue(pinService),
+        teacherPinServiceProvider.overrideWithValue(guardedPinService),
         teacherSessionProvider.overrideWithValue(teacherSession),
         applicationSessionProvider.overrideWithValue(applicationSession),
         bleServiceProvider.overrideWithValue(ProductionBleService()),

@@ -5,8 +5,12 @@ import '../../../domain/repositories.dart';
 import '../../../services/storage/app_database.dart';
 
 class DriftSettingsRepository implements SettingsRepository {
-  DriftSettingsRepository(this._db);
+  DriftSettingsRepository(this._db, {Future<bool> Function()? canManage})
+    : _canManage = canManage ?? _allowManagement;
   final AppDatabase _db;
+  final Future<bool> Function() _canManage;
+
+  static Future<bool> _allowManagement() async => true;
   AppSettings _fallback() => AppSettings(
     id: '00000000-0000-4000-8000-000000000001',
     updatedAt: DateTime.now(),
@@ -25,6 +29,7 @@ class DriftSettingsRepository implements SettingsRepository {
   );
   @override
   Future<AppSettings> saveSettings(AppSettings settings) async {
+    if (!await _canManage()) throw const PermissionDeniedException();
     final now = DateTime.now();
     await _db.settingsDao.save(
       AppSettingsRowsCompanion.insert(

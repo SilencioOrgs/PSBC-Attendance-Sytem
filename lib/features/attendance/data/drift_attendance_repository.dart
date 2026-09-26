@@ -2,16 +2,43 @@ import 'package:drift/drift.dart';
 
 import '../../../domain/models.dart';
 import '../../../domain/repositories.dart';
+import '../../../domain/attendance_window_policy.dart';
+import '../../../domain/attendance_access_invitation.dart';
 import '../../../services/storage/app_database.dart';
 
 class DriftAttendanceRepository implements AttendanceRepository {
-  DriftAttendanceRepository(this._db);
+  DriftAttendanceRepository(
+    this._db, {
+    DateTime Function()? clock,
+    this._windowPolicy = const AttendanceWindowPolicy(),
+    Future<bool> Function(String offeringId)? canAccessOffering,
+  }) : _clock = clock ?? DateTime.now,
+       _canAccessOffering = canAccessOffering ?? _denyAccess;
   final AppDatabase _db;
+  final DateTime Function() _clock;
+  final Future<bool> Function(String offeringId) _canAccessOffering;
+  final AttendanceWindowPolicy _windowPolicy;
+
+  static Future<bool> _denyAccess(String offeringId) async => false;
+
+  Future<void> _assertAccess(String offeringId) async {
+    if (!await _canAccessOffering(offeringId)) {
+      throw const AttendancePermissionDeniedException();
+    }
+  }
+
+  Future<void> _assertSessionAccess(String sessionId) async {
+    final session = await _db.attendanceDao.getSession(sessionId);
+    if (session == null) throw const NoActiveAttendanceSessionException();
+    await _assertAccess(session.classOfferingId);
+  }
+
   @override
   Future<AttendanceSession> startSession(
     String classId, {
     bool manualOverride = false,
   }) async {
+    await _assertAccess(classId);
     final activeSession = (await _db.attendanceDao.getSessions())
         .where(
           (session) =>
@@ -24,9 +51,27 @@ class DriftAttendanceRepository implements AttendanceRepository {
     }
     final section = await _db.classDao.getClass(classId);
     if (section == null) throw const ClassSectionNotFoundException();
-    final roster = await _db.classDao.getStudents(classId);
+    final now = _clock();
+    final window = _windowPolicy.evaluate(section, now);
+    if (!window.isScheduled && !manualOverride) {
+      throw AttendanceWindowException(window.status);
+    }
+    final accessGrant = await _db.attendanceAccessDao.byLocalOffering(classId);
+    final roster = accessGrant == null
+        ? await _db.classDao.getStudents(classId)
+        : AttendanceAccessInvitation.decode(accessGrant.payload).roster
+              .map(
+                (student) => Student(
+                  id: _accessStudentId(classId, student.id),
+                  updatedAt: accessGrant.grantedAt,
+                  syncStatus: SyncStatus.synced,
+                  name: student.name,
+                  studentNumber: student.studentNumber,
+                  deviceRegistered: student.bleUuid != null,
+                ),
+              )
+              .toList(growable: false);
     if (roster.isEmpty) throw const EmptyClassRosterException();
-    final now = DateTime.now();
     final id = newDatabaseId();
     final session = AttendanceSessionsCompanion.insert(
       id: id,
@@ -48,28 +93,66 @@ class DriftAttendanceRepository implements AttendanceRepository {
   }
 
   @override
-  Future<AttendanceSession?> getTodaySession() => _db.attendanceDao.getLatest();
+  Future<AttendanceSession?> getTodaySession() async {
+    final session = await _db.attendanceDao.getLatest();
+    if (session == null || !await _canAccessOffering(session.classOfferingId)) {
+      return null;
+    }
+    return session;
+  }
+
   @override
   Stream<AttendanceSession?> watchTodaySession() =>
-      _db.attendanceDao.watchLatest();
+      _db.attendanceDao.watchLatest().asyncMap((session) async {
+        if (session == null ||
+            !await _canAccessOffering(session.classOfferingId)) {
+          return null;
+        }
+        return session;
+      });
   @override
-  Future<List<AttendanceSession>> getSessions() =>
-      _db.attendanceDao.getSessions();
+  Future<List<AttendanceSession>> getSessions() async => [
+    for (final session in await _db.attendanceDao.getSessions())
+      if (await _canAccessOffering(session.classOfferingId)) session,
+  ];
   @override
   Stream<List<AttendanceSession>> watchSessions() =>
-      _db.attendanceDao.watchSessions();
+      _db.attendanceDao.watchSessions().asyncMap(
+        (sessions) async => [
+          for (final session in sessions)
+            if (await _canAccessOffering(session.classOfferingId)) session,
+        ],
+      );
   @override
-  Future<AttendanceSession?> getSession(String sessionId) =>
-      _db.attendanceDao.getSession(sessionId);
+  Future<AttendanceSession?> getSession(String sessionId) async {
+    final session = await _db.attendanceDao.getSession(sessionId);
+    if (session == null || !await _canAccessOffering(session.classOfferingId)) {
+      return null;
+    }
+    return session;
+  }
+
   @override
   Stream<AttendanceSession?> watchSession(String sessionId) =>
-      _db.attendanceDao.watchSession(sessionId);
+      _db.attendanceDao.watchSession(sessionId).asyncMap((session) async {
+        if (session == null ||
+            !await _canAccessOffering(session.classOfferingId)) {
+          return null;
+        }
+        return session;
+      });
   @override
-  Future<List<AttendanceRecord>> getRecords(String sessionId) =>
-      _db.attendanceDao.getRecords(sessionId);
+  Future<List<AttendanceRecord>> getRecords(String sessionId) async {
+    await _assertSessionAccess(sessionId);
+    return _db.attendanceDao.getRecords(sessionId);
+  }
+
   @override
   Stream<List<AttendanceRecord>> watchRecords(String sessionId) =>
-      _db.attendanceDao.watchRecords(sessionId);
+      _db.attendanceDao.watchRecords(sessionId).asyncMap((records) async {
+        await _assertSessionAccess(sessionId);
+        return records;
+      });
   @override
   Future<List<AttendanceRecord>> getStudentRecords(String studentId) =>
       _db.attendanceDao.getStudentRecords(studentId);
@@ -82,6 +165,7 @@ class DriftAttendanceRepository implements AttendanceRepository {
     String sessionId,
     String studentId,
   ) async {
+    await _assertSessionAccess(sessionId);
     final existing = (await _db.attendanceDao.getRecords(sessionId))
         .where((record) => record.studentId == studentId)
         .firstOrNull;
@@ -101,22 +185,39 @@ class DriftAttendanceRepository implements AttendanceRepository {
   }
 
   @override
-  Future<void> markDetected(String sessionId, String studentId, {int? rssi}) =>
-      _db.attendanceDao.markDetected(sessionId, studentId, rssi: rssi);
+  Future<void> markDetected(
+    String sessionId,
+    String studentId, {
+    int? rssi,
+  }) async {
+    await _assertSessionAccess(sessionId);
+    await _db.attendanceDao.markDetected(sessionId, studentId, rssi: rssi);
+  }
 
   @override
-  Future<void> finishScan(String sessionId) =>
-      _db.attendanceDao.finishScan(sessionId);
+  Future<void> finishScan(String sessionId) async {
+    await _assertSessionAccess(sessionId);
+    await _db.attendanceDao.finishScan(sessionId);
+  }
 
   @override
-  Future<void> resumeScan(String sessionId) =>
-      _db.attendanceDao.resumeScan(sessionId);
+  Future<void> resumeScan(String sessionId) async {
+    await _assertSessionAccess(sessionId);
+    await _db.attendanceDao.resumeScan(sessionId);
+  }
 
   @override
-  Future<void> cancelSession(String sessionId) =>
-      _db.attendanceDao.cancelSession(sessionId);
+  Future<void> cancelSession(String sessionId) async {
+    await _assertSessionAccess(sessionId);
+    await _db.attendanceDao.cancelSession(sessionId);
+  }
 
   @override
-  Future<void> completeSession(String sessionId) =>
-      _db.attendanceDao.completeSession(sessionId);
+  Future<void> completeSession(String sessionId) async {
+    await _assertSessionAccess(sessionId);
+    await _db.attendanceDao.completeSession(sessionId);
+  }
 }
+
+String _accessStudentId(String localOfferingId, String sourceStudentId) =>
+    'attendance:$localOfferingId:$sourceStudentId';

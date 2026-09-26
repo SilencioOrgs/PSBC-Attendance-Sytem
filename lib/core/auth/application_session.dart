@@ -10,6 +10,7 @@ enum ApplicationEntry {
   teacherSetup,
   teacherLocked,
   teacher,
+  attendanceOfficer,
 }
 
 /// Resolves the persisted local profiles once before routing and restores the last role.
@@ -23,23 +24,42 @@ class ApplicationSession extends ChangeNotifier {
   ApplicationEntry entry = ApplicationEntry.uninitialized;
   String? currentStudentId;
 
-  Future<void> initialize({required bool teacherPinExists}) async {
+  Future<void> initialize({
+    required bool teacherPinExists,
+    bool attendanceAccessExists = false,
+  }) async {
     final teacher = await database.teacherDao.getTeacherOrNull();
     final student = await database.studentDao.getCurrent();
     currentStudentId = student?.id;
     if (teacher == null && student == null) {
-      entry = ApplicationEntry.welcome;
+      entry = attendanceAccessExists
+          ? ApplicationEntry.attendanceOfficer
+          : ApplicationEntry.welcome;
     } else if (teacher == null) {
-      entry = ApplicationEntry.student;
-      await _saveRole('student');
+      final prefs = await database.appSessionDao.getPreferences();
+      entry =
+          attendanceAccessExists && prefs?.lastActiveRole == 'attendanceOfficer'
+          ? ApplicationEntry.attendanceOfficer
+          : ApplicationEntry.student;
+      await _saveRole(
+        entry == ApplicationEntry.attendanceOfficer
+            ? 'attendanceOfficer'
+            : 'student',
+      );
     } else if (student == null) {
-      entry = teacherPinExists
+      final prefs = await database.appSessionDao.getPreferences();
+      entry =
+          attendanceAccessExists && prefs?.lastActiveRole == 'attendanceOfficer'
+          ? ApplicationEntry.attendanceOfficer
+          : teacherPinExists
           ? ApplicationEntry.teacherLocked
           : ApplicationEntry.teacherSetup;
     } else {
       final prefs = await database.appSessionDao.getPreferences();
       final lastRole = prefs?.lastActiveRole;
-      if (lastRole == 'student') {
+      if (lastRole == 'attendanceOfficer' && attendanceAccessExists) {
+        entry = ApplicationEntry.attendanceOfficer;
+      } else if (lastRole == 'student') {
         entry = ApplicationEntry.student;
       } else {
         entry = teacherPinExists
@@ -57,6 +77,7 @@ class ApplicationSession extends ChangeNotifier {
     ApplicationEntry.teacherSetup => '/teacher/setup',
     ApplicationEntry.teacherLocked => '/teacher/unlock',
     ApplicationEntry.teacher => '/teacher',
+    ApplicationEntry.attendanceOfficer => '/attendance-officer',
   };
 
   String? redirect(String path) {
@@ -64,11 +85,16 @@ class ApplicationSession extends ChangeNotifier {
     if (entry == ApplicationEntry.welcome) {
       return path == '/welcome' ||
               path == '/student/setup' ||
-              path == '/teacher/setup'
+              path == '/teacher/setup' ||
+              path == '/attendance-access/import'
           ? null
           : '/welcome';
     }
-    if (path == '/roles') return null;
+    if (path == '/roles' || path == '/attendance-access/import') return null;
+    if (entry == ApplicationEntry.attendanceOfficer) {
+      if (path.startsWith('/attendance-officer')) return null;
+      return '/attendance-officer';
+    }
     if (entry == ApplicationEntry.student) {
       if (path.startsWith('/student')) return null;
       return '/student';
@@ -112,6 +138,15 @@ class ApplicationSession extends ChangeNotifier {
           : ApplicationEntry.teacherLocked;
     }
     await _saveRole('teacher');
+    notifyListeners();
+  }
+
+  Future<void> selectAttendanceOfficer() async {
+    if ((await database.attendanceAccessDao.getAll()).isEmpty) {
+      throw StateError('No attendance access has been imported.');
+    }
+    entry = ApplicationEntry.attendanceOfficer;
+    await _saveRole('attendanceOfficer');
     notifyListeners();
   }
 

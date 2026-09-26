@@ -29,7 +29,10 @@ void main() {
         DriftTeacherRepository(database, pins),
         pins,
         ble,
-        DriftAttendanceRepository(database),
+        DriftAttendanceRepository(
+          database,
+          canAccessOffering: _allowAttendance,
+        ),
       );
 
       expect(session.state, TeacherSessionState.locked);
@@ -49,7 +52,10 @@ void main() {
     final session = TeacherSession();
     await session.initialize(pins);
     final teachers = DriftTeacherRepository(database, pins);
-    final attendance = DriftAttendanceRepository(database);
+    final attendance = DriftAttendanceRepository(
+      database,
+      canAccessOffering: _allowAttendance,
+    );
     final ble = MockBleService();
     addTearDown(ble.dispose);
     final auth = TeacherAuthService(session, teachers, pins, ble, attendance);
@@ -71,13 +77,17 @@ void main() {
       room: 'Room 1',
       scheduleStart: DateTime(2026, 9, 24, 8),
       scheduleEnd: DateTime(2026, 9, 24, 9),
+      scheduleDays: Weekday.values.toSet(),
     );
     await DriftStudentRepository(database).addStudentToClass(
       name: 'Miguel Santos',
       studentNumber: 'T-001',
       classId: section.id,
     );
-    final activeSession = await attendance.startSession(section.id);
+    final activeSession = await attendance.startSession(
+      section.id,
+      manualOverride: true,
+    );
 
     await expectLater(
       auth.logout(),
@@ -108,6 +118,8 @@ void main() {
     expect(reopenedSession.state, TeacherSessionState.locked);
   });
 }
+
+Future<bool> _allowAttendance(String offeringId) async => true;
 
 class _MemoryPinService implements TeacherPinService {
   String? _pin;
