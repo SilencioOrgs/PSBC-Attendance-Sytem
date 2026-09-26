@@ -41,6 +41,10 @@ class AttendanceWorkflow {
       state == AttendanceWorkflowState.review ||
       state == AttendanceWorkflowState.completed ||
       state == AttendanceWorkflowState.cancelled;
+
+  bool hasJustEnteredReview(AttendanceWorkflow? previous) =>
+      state == AttendanceWorkflowState.review &&
+      previous?.state != AttendanceWorkflowState.review;
 }
 
 final attendanceControllerProvider =

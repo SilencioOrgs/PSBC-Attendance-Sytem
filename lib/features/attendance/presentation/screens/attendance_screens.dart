@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/router/route_names.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_widgets.dart';
+import '../../../../core/widgets/app_feedback.dart';
 import '../../../../domain/models.dart';
 import '../../../reports/models/report_models.dart';
 import '../../../reports/presentation/providers/report_export_provider.dart';
@@ -56,11 +57,7 @@ class _BleScannerScreenState extends ConsumerState<BleScannerScreen> {
         await ref.read(attendanceControllerProvider.notifier).stopForReview();
       } catch (_) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Unable to stop this scan. Try again.'),
-            ),
-          );
+          AppFeedback.error(context, 'Unable to stop this scan. Try again.');
         }
       }
     }
@@ -110,11 +107,7 @@ class _BleScannerScreenState extends ConsumerState<BleScannerScreen> {
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Unable to cancel this attendance session.'),
-          ),
-        );
+        AppFeedback.error(context, 'Unable to cancel this attendance session.');
       }
     }
   }
@@ -130,7 +123,7 @@ class _BleScannerScreenState extends ConsumerState<BleScannerScreen> {
   @override
   Widget build(BuildContext context) {
     ref.listen(attendanceControllerProvider, (previous, next) {
-      if (previous?.isComplete != true && next.isComplete && mounted) {
+      if (next.hasJustEnteredReview(previous) && mounted) {
         context.go(
           widget.isAttendanceOfficer
               ? '/attendance-officer/results/${widget.sessionId}'
@@ -335,19 +328,15 @@ class _AttendanceResultsScreenState
           .read(attendanceControllerProvider.notifier)
           .finalize(widget.sessionId);
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Attendance saved.')));
+      AppFeedback.success(context, 'Attendance saved.');
       context.go(
         widget.isAttendanceOfficer ? '/attendance-officer' : '/teacher',
       );
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Unable to save attendance. Your local data is still safe.',
-          ),
-        ),
+      AppFeedback.error(
+        context,
+        'Unable to save attendance. Your local data is still safe.',
       );
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -388,9 +377,7 @@ class _AttendanceResultsScreenState
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unable to cancel attendance.')),
-        );
+        AppFeedback.error(context, 'Unable to cancel attendance.');
       }
     }
   }

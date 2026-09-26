@@ -13,6 +13,12 @@ enum AttendanceRecordStatus {
 
 enum Weekday { monday, tuesday, wednesday, thursday, friday, saturday, sunday }
 
+enum AutomaticReportMode { off, daily, weekly }
+
+enum AutoReportRunStatus { running, succeeded, failed }
+
+enum AutoReportExecutionStatus { pending, succeeded, failed }
+
 class Teacher {
   const Teacher({
     required this.id,
@@ -236,6 +242,10 @@ class AppSettings {
     required this.vibrationEnabled,
     required this.scanDurationSeconds,
     this.rssiThreshold = -75,
+    this.automaticReportMode = AutomaticReportMode.off,
+    this.automaticReportHour = 17,
+    this.automaticReportMinute = 0,
+    this.automaticReportWeekday = Weekday.friday,
   });
   final String id;
   final DateTime updatedAt;
@@ -244,6 +254,52 @@ class AppSettings {
   final bool vibrationEnabled;
   final int scanDurationSeconds;
   final int rssiThreshold;
+  final AutomaticReportMode automaticReportMode;
+  final int automaticReportHour;
+  final int automaticReportMinute;
+  final Weekday automaticReportWeekday;
+}
+
+class AutoReportRun {
+  const AutoReportRun({
+    required this.id,
+    required this.mode,
+    required this.occurrenceAt,
+    required this.windowStart,
+    required this.windowEnd,
+    required this.attemptedAt,
+    required this.status,
+    required this.generatedCount,
+    required this.failedCount,
+  });
+
+  final String id;
+  final AutomaticReportMode mode;
+  final DateTime occurrenceAt;
+  final DateTime windowStart;
+  final DateTime windowEnd;
+  final DateTime attemptedAt;
+  final AutoReportRunStatus status;
+  final int generatedCount;
+  final int failedCount;
+}
+
+class AutoReportExecution {
+  const AutoReportExecution({
+    required this.id,
+    required this.runId,
+    required this.sessionId,
+    required this.attemptedAt,
+    required this.status,
+    this.fileName,
+  });
+
+  final String id;
+  final String runId;
+  final String sessionId;
+  final DateTime attemptedAt;
+  final AutoReportExecutionStatus status;
+  final String? fileName;
 }
 
 class BleScanUpdate {

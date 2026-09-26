@@ -5,14 +5,15 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/providers/repository_providers.dart';
 import '../../../../core/router/route_names.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../core/utils/input_formatters.dart';
 import '../../../../core/utils/teacher_pin.dart';
 import '../../../../core/widgets/app_widgets.dart';
+import '../../../../core/widgets/app_feedback.dart';
 import '../../../../domain/models.dart';
 import '../../../../domain/repositories.dart';
 import '../../../authentication/application/teacher_auth_service.dart';
 import '../../../device/presentation/providers/device_provider.dart';
 import '../../../teacher/presentation/providers/teacher_provider.dart';
+import '../../../teacher/presentation/widgets/pin_keypad.dart';
 import '../providers/settings_provider.dart';
 
 /// Teacher Settings tab with local attendance preferences.
@@ -222,6 +223,8 @@ class TeacherSettingsScreen extends ConsumerWidget {
           const SizedBox(height: Spacing.lg),
           Text('Data & Reports', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: Spacing.sm),
+          _automaticReportsCard(context, ref, settingsAsync),
+          const SizedBox(height: Spacing.sm),
           SectionCard(
             padding: EdgeInsets.zero,
             child: Column(
@@ -283,6 +286,10 @@ class TeacherSettingsScreen extends ConsumerWidget {
     bool? soundEnabled,
     bool? vibrationEnabled,
     int? scanDurationSeconds,
+    AutomaticReportMode? automaticReportMode,
+    int? automaticReportHour,
+    int? automaticReportMinute,
+    Weekday? automaticReportWeekday,
   }) => ref
       .read(settingsControllerProvider.notifier)
       .save(
@@ -295,8 +302,233 @@ class TeacherSettingsScreen extends ConsumerWidget {
           scanDurationSeconds:
               scanDurationSeconds ?? settings.scanDurationSeconds,
           rssiThreshold: settings.rssiThreshold,
+          automaticReportMode:
+              automaticReportMode ?? settings.automaticReportMode,
+          automaticReportHour:
+              automaticReportHour ?? settings.automaticReportHour,
+          automaticReportMinute:
+              automaticReportMinute ?? settings.automaticReportMinute,
+          automaticReportWeekday:
+              automaticReportWeekday ?? settings.automaticReportWeekday,
         ),
       );
+
+  static Widget _automaticReportsCard(
+    BuildContext context,
+    WidgetRef ref,
+    AsyncValue<AppSettings> settingsAsync,
+  ) => SectionCard(
+    padding: EdgeInsets.zero,
+    child: settingsAsync.when(
+      data: (settings) => Column(
+        children: [
+          ListTile(
+            leading: const Icon(Icons.picture_as_pdf_outlined),
+            title: const Text('Automatic attendance PDFs'),
+            subtitle: const Text(
+              'Save completed attendance sessions in the background',
+            ),
+            trailing: DropdownButton<AutomaticReportMode>(
+              value: settings.automaticReportMode,
+              underline: const SizedBox.shrink(),
+              onChanged: (mode) {
+                if (mode != null) {
+                  _save(ref, settings, automaticReportMode: mode);
+                }
+              },
+              items: const [
+                DropdownMenuItem(
+                  value: AutomaticReportMode.off,
+                  child: Text('Off'),
+                ),
+                DropdownMenuItem(
+                  value: AutomaticReportMode.daily,
+                  child: Text('Daily'),
+                ),
+                DropdownMenuItem(
+                  value: AutomaticReportMode.weekly,
+                  child: Text('Weekly'),
+                ),
+              ],
+            ),
+          ),
+          if (settings.automaticReportMode != AutomaticReportMode.off) ...[
+            const Divider(height: 1, indent: Spacing.md, endIndent: Spacing.md),
+            ListTile(
+              leading: const Icon(Icons.schedule_outlined),
+              title: const Text('Run time'),
+              subtitle: Text(
+                _formatTime(
+                  context,
+                  TimeOfDay(
+                    hour: settings.automaticReportHour,
+                    minute: settings.automaticReportMinute,
+                  ),
+                ),
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _chooseReportTime(context, ref, settings),
+            ),
+            if (settings.automaticReportMode == AutomaticReportMode.weekly) ...[
+              const Divider(
+                height: 1,
+                indent: Spacing.md,
+                endIndent: Spacing.md,
+              ),
+              ListTile(
+                leading: const Icon(Icons.calendar_today_outlined),
+                title: const Text('Run day'),
+                subtitle: Text(_weekdayName(settings.automaticReportWeekday)),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _chooseReportWeekday(context, ref, settings),
+              ),
+            ],
+          ],
+          const Divider(height: 1, indent: Spacing.md, endIndent: Spacing.md),
+          ref
+              .watch(latestAutomaticReportRunProvider)
+              .when(
+                data: (run) => ListTile(
+                  leading: Icon(
+                    run?.status == AutoReportRunStatus.failed
+                        ? Icons.error_outline
+                        : Icons.folder_outlined,
+                    color: run?.status == AutoReportRunStatus.failed
+                        ? AppColors.danger
+                        : null,
+                  ),
+                  title: Text(switch (run?.status) {
+                    AutoReportRunStatus.failed => 'Last run needs attention',
+                    AutoReportRunStatus.running => 'Creating attendance PDFs',
+                    AutoReportRunStatus.succeeded => 'Last run completed',
+                    null => 'No automatic reports yet',
+                  }),
+                  subtitle: Text(switch (run?.status) {
+                    AutoReportRunStatus.failed =>
+                      '${run!.failedCount} report${run.failedCount == 1 ? '' : 's'} could not be saved',
+                    AutoReportRunStatus.running =>
+                      'The background job is in progress',
+                    AutoReportRunStatus.succeeded =>
+                      '${run!.generatedCount} PDF${run.generatedCount == 1 ? '' : 's'} saved · ${_formatDate(run.attemptedAt)}',
+                    null => 'Saved files go to Downloads/ClassAttend/Attendance Reports',
+                  }),
+                  trailing: run?.status == AutoReportRunStatus.failed
+                      ? TextButton(
+                          onPressed: () => _retryAutomaticReports(context, ref),
+                          child: const Text('Retry'),
+                        )
+                      : null,
+                ),
+                loading: () => const ListTile(
+                  leading: Icon(Icons.folder_outlined),
+                  title: Text('Checking report status'),
+                ),
+                error: (error, stack) => const ListTile(
+                  leading: Icon(Icons.folder_outlined),
+                  title: Text('Report status unavailable'),
+                ),
+              ),
+        ],
+      ),
+      loading: () => const Padding(
+        padding: EdgeInsets.all(Spacing.md),
+        child: LinearProgressIndicator(),
+      ),
+      error: (error, stack) => const Padding(
+        padding: EdgeInsets.all(Spacing.md),
+        child: Text('Report settings are unavailable.'),
+      ),
+    ),
+  );
+
+  static Future<void> _chooseReportTime(
+    BuildContext context,
+    WidgetRef ref,
+    AppSettings settings,
+  ) async {
+    final selected = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(
+        hour: settings.automaticReportHour,
+        minute: settings.automaticReportMinute,
+      ),
+    );
+    if (selected != null) {
+      await _save(
+        ref,
+        settings,
+        automaticReportHour: selected.hour,
+        automaticReportMinute: selected.minute,
+      );
+    }
+  }
+
+  static Future<void> _chooseReportWeekday(
+    BuildContext context,
+    WidgetRef ref,
+    AppSettings settings,
+  ) async {
+    final selected = await showModalBottomSheet<Weekday>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final day in Weekday.values)
+              ListTile(
+                title: Text(_weekdayName(day)),
+                trailing: day == settings.automaticReportWeekday
+                    ? const Icon(Icons.check, color: AppColors.primary)
+                    : null,
+                onTap: () => Navigator.pop(context, day),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (selected != null) {
+      await _save(ref, settings, automaticReportWeekday: selected);
+    }
+  }
+
+  static Future<void> _retryAutomaticReports(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    try {
+      final completed = await ref
+          .read(settingsControllerProvider.notifier)
+          .retryFailedAutomaticReport();
+      if (!context.mounted) return;
+      if (completed) {
+        AppFeedback.success(context, 'Attendance reports saved to Downloads.');
+      } else {
+        AppFeedback.error(
+          context,
+          'Some reports still could not be saved. Try again later.',
+        );
+      }
+    } catch (_) {
+      if (!context.mounted) return;
+      AppFeedback.error(context, 'Unable to retry attendance reports.');
+    }
+  }
+
+  static String _weekdayName(Weekday weekday) => switch (weekday) {
+    Weekday.monday => 'Monday',
+    Weekday.tuesday => 'Tuesday',
+    Weekday.wednesday => 'Wednesday',
+    Weekday.thursday => 'Thursday',
+    Weekday.friday => 'Friday',
+    Weekday.saturday => 'Saturday',
+    Weekday.sunday => 'Sunday',
+  };
+
+  static String _formatTime(BuildContext context, TimeOfDay time) =>
+      MaterialLocalizations.of(context).formatTimeOfDay(time);
+
+  static String _formatDate(DateTime date) =>
+      '${date.month}/${date.day}/${date.year}';
 
   static Future<void> _logout(BuildContext context, WidgetRef ref) async {
     final accepted = await showDialog<bool>(
@@ -324,127 +556,120 @@ class TeacherSettingsScreen extends ConsumerWidget {
       await ref.read(settingsControllerProvider.notifier).logout();
     } on ActiveAttendanceSessionException catch (error) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text(
-              'Attendance is still active. Review or cancel it before logging out.',
-            ),
-            action: SnackBarAction(
-              label: 'Review',
-              onPressed: () => context.pushNamed(
-                AppRoutes.attendanceResults,
-                pathParameters: {'sessionId': error.sessionId},
-              ),
+        AppFeedback.error(
+          context,
+          'Attendance is still active. Review or cancel it before logging out.',
+          action: SnackBarAction(
+            label: 'Review',
+            onPressed: () => context.pushNamed(
+              AppRoutes.attendanceResults,
+              pathParameters: {'sessionId': error.sessionId},
             ),
           ),
         );
       }
     } catch (_) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unable to log out. Try again.')),
-        );
+        AppFeedback.error(context, 'Unable to log out. Try again.');
       }
     }
   }
 
   static Future<void> _changePin(BuildContext context, WidgetRef ref) async {
-    final currentPin = TextEditingController();
-    final newPin = TextEditingController();
-    final confirmPin = TextEditingController();
-    final formKey = GlobalKey<FormState>();
     final values = await showDialog<List<String>>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Change teacher PIN'),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: currentPin,
-                obscureText: true,
-                keyboardType: TextInputType.number,
-                maxLength: 6,
-                inputFormatters: const [DigitsOnlyPinFormatter()],
-                decoration: const InputDecoration(labelText: 'Current PIN'),
-                validator: (value) => !isValidTeacherPin(value ?? '')
-                    ? 'Enter your current 4 to 6 digit PIN.'
-                    : null,
+      builder: (dialogContext) {
+        var stage = 0;
+        var currentPin = '';
+        var newPin = '';
+        var activePin = '';
+        String? helperText;
+        return StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Text('Change teacher PIN'),
+            content: SizedBox(
+              width: 320,
+              child: PinKeypad(
+                title: switch (stage) {
+                  0 => 'Enter current PIN',
+                  1 => 'Choose a new PIN',
+                  _ => 'Confirm the new PIN',
+                },
+                pin: activePin,
+                helperText: helperText,
+                onDigit: (digit) => setDialogState(() {
+                  activePin += digit;
+                  helperText = null;
+                }),
+                onDelete: () => setDialogState(() {
+                  if (activePin.isNotEmpty) {
+                    activePin = activePin.substring(0, activePin.length - 1);
+                  }
+                  helperText = null;
+                }),
               ),
-              TextFormField(
-                controller: newPin,
-                obscureText: true,
-                keyboardType: TextInputType.number,
-                maxLength: 6,
-                inputFormatters: const [DigitsOnlyPinFormatter()],
-                decoration: const InputDecoration(labelText: 'New PIN'),
-                validator: (value) => !isValidTeacherPin(value ?? '')
-                    ? 'Use 4 to 6 digits.'
-                    : null,
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Cancel'),
               ),
-              TextFormField(
-                controller: confirmPin,
-                obscureText: true,
-                keyboardType: TextInputType.number,
-                maxLength: 6,
-                inputFormatters: const [DigitsOnlyPinFormatter()],
-                decoration: const InputDecoration(labelText: 'Confirm new PIN'),
-                validator: (value) =>
-                    value != newPin.text ? 'The PINs do not match.' : null,
+              FilledButton(
+                onPressed: () {
+                  if (!isValidTeacherPin(activePin)) {
+                    setDialogState(() {
+                      helperText = 'Enter 4 to 6 digits.';
+                    });
+                    return;
+                  }
+                  if (stage == 0) {
+                    currentPin = activePin;
+                    stage = 1;
+                    activePin = '';
+                    helperText = null;
+                    setDialogState(() {});
+                    return;
+                  }
+                  if (stage == 1) {
+                    newPin = activePin;
+                    stage = 2;
+                    activePin = '';
+                    helperText = null;
+                    setDialogState(() {});
+                    return;
+                  }
+                  if (activePin != newPin) {
+                    setDialogState(() {
+                      helperText = 'The PINs do not match.';
+                      activePin = '';
+                    });
+                    return;
+                  }
+                  Navigator.pop(dialogContext, [currentPin, newPin]);
+                },
+                child: Text(stage == 2 ? 'Save PIN' : 'Continue'),
               ),
             ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (formKey.currentState?.validate() != true) return;
-              Navigator.pop(context, [currentPin.text, newPin.text]);
-            },
-            child: const Text('Save PIN'),
-          ),
-        ],
-      ),
+        );
+      },
     );
-    if (values == null) {
-      currentPin.dispose();
-      newPin.dispose();
-      confirmPin.dispose();
-      return;
-    }
+    if (values == null) return;
     try {
       await ref
           .read(settingsControllerProvider.notifier)
           .changePin(currentPin: values[0], newPin: values[1]);
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Teacher PIN updated.')));
+        AppFeedback.success(context, 'Teacher PIN updated.');
       }
     } on InvalidTeacherPinException {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('The current PIN does not match.')),
-        );
+        AppFeedback.error(context, 'The current PIN does not match.');
       }
     } catch (_) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Unable to update your PIN. Try again.'),
-          ),
-        );
+        AppFeedback.error(context, 'Unable to update your PIN. Try again.');
       }
-    } finally {
-      currentPin.dispose();
-      newPin.dispose();
-      confirmPin.dispose();
     }
   }
 

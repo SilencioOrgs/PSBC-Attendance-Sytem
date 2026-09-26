@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/app_feedback.dart';
 import '../../../../core/widgets/app_widgets.dart';
 import '../../../../domain/repositories.dart';
 import '../../../../domain/models.dart';
@@ -108,12 +109,9 @@ class _ClassCreationScreenState extends ConsumerState<ClassCreationScreen> {
         );
       }
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            widget.initialSection == null ? 'Class created.' : 'Class updated.',
-          ),
-        ),
+      AppFeedback.success(
+        context,
+        widget.initialSection == null ? 'Class created.' : 'Class updated.',
       );
       context.pop();
     } on RepositoryException catch (error) {

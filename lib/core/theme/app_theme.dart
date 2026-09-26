@@ -2,21 +2,21 @@ import 'package:flutter/material.dart';
 
 /// Central palette for ClassAttend.
 abstract final class AppColors {
-  static const primary = Color(0xFF185ABC);
-  static const primarySoft = Color(0xFFE2ECFF);
+  static const primary = Color(0xFFC45A1A);
+  static const primarySoft = Color(0xFFFBE8DC);
   static const ink = Color(0xFF1A2433);
   static const muted = Color(0xFF667085);
-  static const canvas = Color(0xFFF7F9FC);
+  static const canvas = Color(0xFFFFF9F5);
   static const surface = Color(0xFFFFFFFF);
-  static const border = Color(0xFFE2E7EF);
+  static const border = Color(0xFFEBDDD3);
   static const success = Color(0xFF15825D);
   static const successSoft = Color(0xFFE1F4EC);
   static const warning = Color(0xFFAA6B08);
   static const warningSoft = Color(0xFFFFF2D9);
   static const danger = Color(0xFFB83C47);
   static const dangerSoft = Color(0xFFFCE9EB);
-  static const teal = Color(0xFF167D88);
-  static const tealSoft = Color(0xFFE2F4F4);
+  static const teal = Color(0xFF8B471F);
+  static const tealSoft = Color(0xFFF6E7DC);
 }
 
 /// Named layout spacing tokens.
@@ -144,6 +144,31 @@ abstract final class AppTheme {
         labelTextStyle: WidgetStatePropertyAll(textTheme.labelSmall),
         height: 72,
       ),
+      pageTransitionsTheme: PageTransitionsTheme(
+        builders: {
+          for (final platform in TargetPlatform.values)
+            platform: const _FadePageTransitionsBuilder(),
+        },
+      ),
+    );
+  }
+}
+
+class _FadePageTransitionsBuilder extends PageTransitionsBuilder {
+  const _FadePageTransitionsBuilder();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    if (MediaQuery.of(context).disableAnimations) return child;
+    return FadeTransition(
+      opacity: CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+      child: child,
     );
   }
 }

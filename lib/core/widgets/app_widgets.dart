@@ -351,7 +351,28 @@ class _BleRadarIndicatorState extends State<BleRadarIndicator>
   late final AnimationController _controller = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1800),
-  )..repeat();
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncAnimation();
+  }
+
+  @override
+  void didUpdateWidget(covariant BleRadarIndicator oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncAnimation();
+  }
+
+  void _syncAnimation() {
+    if (widget.isScanning && !MediaQuery.of(context).disableAnimations) {
+      _controller.repeat();
+    } else {
+      _controller.stop();
+      _controller.value = 0;
+    }
+  }
 
   @override
   void dispose() {
@@ -368,7 +389,10 @@ class _BleRadarIndicatorState extends State<BleRadarIndicator>
         builder: (context, constraints) => AnimatedBuilder(
           animation: _controller,
           builder: (context, _) {
-            final pulse = widget.isScanning ? _controller.value : 0.45;
+            final pulse =
+                widget.isScanning && !MediaQuery.of(context).disableAnimations
+                ? _controller.value
+                : 0.45;
             final diameter = constraints.maxWidth;
             return Stack(
               alignment: Alignment.center,

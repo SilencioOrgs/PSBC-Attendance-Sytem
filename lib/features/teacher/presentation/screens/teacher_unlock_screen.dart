@@ -7,6 +7,7 @@ import '../../../../core/router/route_names.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/teacher_pin.dart';
 import '../../../../core/widgets/app_widgets.dart';
+import '../../../../core/widgets/app_feedback.dart';
 import '../providers/teacher_provider.dart';
 import '../widgets/pin_keypad.dart';
 
@@ -50,9 +51,7 @@ class _TeacherUnlockScreenState extends ConsumerState<TeacherUnlockScreen> {
           .read(teacherPinUnlockProvider.notifier)
           .unlock(_pin);
       if (allowed && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Teacher sign in successful.')),
-        );
+        AppFeedback.success(context, 'Teacher sign in successful.');
         context.goNamed(AppRoutes.teacherHome);
       }
       if (!allowed && mounted) {

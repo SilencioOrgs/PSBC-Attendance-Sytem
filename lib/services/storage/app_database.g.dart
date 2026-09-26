@@ -3918,6 +3918,55 @@ class $AppSettingsRowsTable extends AppSettingsRows
     ),
   );
   @override
+  late final GeneratedColumnWithTypeConverter<
+    domain.AutomaticReportMode,
+    String
+  >
+  automaticReportMode =
+      GeneratedColumn<String>(
+        'automatic_report_mode',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('off'),
+      ).withConverter<domain.AutomaticReportMode>(
+        $AppSettingsRowsTable.$converterautomaticReportMode,
+      );
+  static const VerificationMeta _automaticReportHourMeta =
+      const VerificationMeta('automaticReportHour');
+  @override
+  late final GeneratedColumn<int> automaticReportHour = GeneratedColumn<int>(
+    'automatic_report_hour',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(17),
+  );
+  static const VerificationMeta _automaticReportMinuteMeta =
+      const VerificationMeta('automaticReportMinute');
+  @override
+  late final GeneratedColumn<int> automaticReportMinute = GeneratedColumn<int>(
+    'automatic_report_minute',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _automaticReportWeekdayMeta =
+      const VerificationMeta('automaticReportWeekday');
+  @override
+  late final GeneratedColumn<int> automaticReportWeekday = GeneratedColumn<int>(
+    'automatic_report_weekday',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(4),
+  );
+  @override
   List<GeneratedColumn> get $columns => [
     id,
     updatedAt,
@@ -3927,6 +3976,10 @@ class $AppSettingsRowsTable extends AppSettingsRows
     rssiThreshold,
     soundEnabled,
     vibrationEnabled,
+    automaticReportMode,
+    automaticReportHour,
+    automaticReportMinute,
+    automaticReportWeekday,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -4006,6 +4059,33 @@ class $AppSettingsRowsTable extends AppSettingsRows
     } else if (isInserting) {
       context.missing(_vibrationEnabledMeta);
     }
+    if (data.containsKey('automatic_report_hour')) {
+      context.handle(
+        _automaticReportHourMeta,
+        automaticReportHour.isAcceptableOrUnknown(
+          data['automatic_report_hour']!,
+          _automaticReportHourMeta,
+        ),
+      );
+    }
+    if (data.containsKey('automatic_report_minute')) {
+      context.handle(
+        _automaticReportMinuteMeta,
+        automaticReportMinute.isAcceptableOrUnknown(
+          data['automatic_report_minute']!,
+          _automaticReportMinuteMeta,
+        ),
+      );
+    }
+    if (data.containsKey('automatic_report_weekday')) {
+      context.handle(
+        _automaticReportWeekdayMeta,
+        automaticReportWeekday.isAcceptableOrUnknown(
+          data['automatic_report_weekday']!,
+          _automaticReportWeekdayMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -4049,6 +4129,25 @@ class $AppSettingsRowsTable extends AppSettingsRows
         DriftSqlType.bool,
         data['${effectivePrefix}vibration_enabled'],
       )!,
+      automaticReportMode: $AppSettingsRowsTable.$converterautomaticReportMode
+          .fromSql(
+            attachedDatabase.typeMapping.read(
+              DriftSqlType.string,
+              data['${effectivePrefix}automatic_report_mode'],
+            )!,
+          ),
+      automaticReportHour: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}automatic_report_hour'],
+      )!,
+      automaticReportMinute: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}automatic_report_minute'],
+      )!,
+      automaticReportWeekday: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}automatic_report_weekday'],
+      )!,
     );
   }
 
@@ -4059,6 +4158,8 @@ class $AppSettingsRowsTable extends AppSettingsRows
 
   static TypeConverter<domain.SyncStatus, String> $convertersyncStatus =
       const SyncStatusConverter();
+  static TypeConverter<domain.AutomaticReportMode, String>
+  $converterautomaticReportMode = const AutomaticReportModeConverter();
 }
 
 class AppSettingsDataRow extends DataClass
@@ -4071,6 +4172,10 @@ class AppSettingsDataRow extends DataClass
   final int rssiThreshold;
   final bool soundEnabled;
   final bool vibrationEnabled;
+  final domain.AutomaticReportMode automaticReportMode;
+  final int automaticReportHour;
+  final int automaticReportMinute;
+  final int automaticReportWeekday;
   const AppSettingsDataRow({
     required this.id,
     required this.updatedAt,
@@ -4080,6 +4185,10 @@ class AppSettingsDataRow extends DataClass
     required this.rssiThreshold,
     required this.soundEnabled,
     required this.vibrationEnabled,
+    required this.automaticReportMode,
+    required this.automaticReportHour,
+    required this.automaticReportMinute,
+    required this.automaticReportWeekday,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -4096,6 +4205,16 @@ class AppSettingsDataRow extends DataClass
     map['rssi_threshold'] = Variable<int>(rssiThreshold);
     map['sound_enabled'] = Variable<bool>(soundEnabled);
     map['vibration_enabled'] = Variable<bool>(vibrationEnabled);
+    {
+      map['automatic_report_mode'] = Variable<String>(
+        $AppSettingsRowsTable.$converterautomaticReportMode.toSql(
+          automaticReportMode,
+        ),
+      );
+    }
+    map['automatic_report_hour'] = Variable<int>(automaticReportHour);
+    map['automatic_report_minute'] = Variable<int>(automaticReportMinute);
+    map['automatic_report_weekday'] = Variable<int>(automaticReportWeekday);
     return map;
   }
 
@@ -4109,6 +4228,10 @@ class AppSettingsDataRow extends DataClass
       rssiThreshold: Value(rssiThreshold),
       soundEnabled: Value(soundEnabled),
       vibrationEnabled: Value(vibrationEnabled),
+      automaticReportMode: Value(automaticReportMode),
+      automaticReportHour: Value(automaticReportHour),
+      automaticReportMinute: Value(automaticReportMinute),
+      automaticReportWeekday: Value(automaticReportWeekday),
     );
   }
 
@@ -4128,6 +4251,18 @@ class AppSettingsDataRow extends DataClass
       rssiThreshold: serializer.fromJson<int>(json['rssiThreshold']),
       soundEnabled: serializer.fromJson<bool>(json['soundEnabled']),
       vibrationEnabled: serializer.fromJson<bool>(json['vibrationEnabled']),
+      automaticReportMode: serializer.fromJson<domain.AutomaticReportMode>(
+        json['automaticReportMode'],
+      ),
+      automaticReportHour: serializer.fromJson<int>(
+        json['automaticReportHour'],
+      ),
+      automaticReportMinute: serializer.fromJson<int>(
+        json['automaticReportMinute'],
+      ),
+      automaticReportWeekday: serializer.fromJson<int>(
+        json['automaticReportWeekday'],
+      ),
     );
   }
   @override
@@ -4142,6 +4277,12 @@ class AppSettingsDataRow extends DataClass
       'rssiThreshold': serializer.toJson<int>(rssiThreshold),
       'soundEnabled': serializer.toJson<bool>(soundEnabled),
       'vibrationEnabled': serializer.toJson<bool>(vibrationEnabled),
+      'automaticReportMode': serializer.toJson<domain.AutomaticReportMode>(
+        automaticReportMode,
+      ),
+      'automaticReportHour': serializer.toJson<int>(automaticReportHour),
+      'automaticReportMinute': serializer.toJson<int>(automaticReportMinute),
+      'automaticReportWeekday': serializer.toJson<int>(automaticReportWeekday),
     };
   }
 
@@ -4154,6 +4295,10 @@ class AppSettingsDataRow extends DataClass
     int? rssiThreshold,
     bool? soundEnabled,
     bool? vibrationEnabled,
+    domain.AutomaticReportMode? automaticReportMode,
+    int? automaticReportHour,
+    int? automaticReportMinute,
+    int? automaticReportWeekday,
   }) => AppSettingsDataRow(
     id: id ?? this.id,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -4163,6 +4308,11 @@ class AppSettingsDataRow extends DataClass
     rssiThreshold: rssiThreshold ?? this.rssiThreshold,
     soundEnabled: soundEnabled ?? this.soundEnabled,
     vibrationEnabled: vibrationEnabled ?? this.vibrationEnabled,
+    automaticReportMode: automaticReportMode ?? this.automaticReportMode,
+    automaticReportHour: automaticReportHour ?? this.automaticReportHour,
+    automaticReportMinute: automaticReportMinute ?? this.automaticReportMinute,
+    automaticReportWeekday:
+        automaticReportWeekday ?? this.automaticReportWeekday,
   );
   AppSettingsDataRow copyWithCompanion(AppSettingsRowsCompanion data) {
     return AppSettingsDataRow(
@@ -4186,6 +4336,18 @@ class AppSettingsDataRow extends DataClass
       vibrationEnabled: data.vibrationEnabled.present
           ? data.vibrationEnabled.value
           : this.vibrationEnabled,
+      automaticReportMode: data.automaticReportMode.present
+          ? data.automaticReportMode.value
+          : this.automaticReportMode,
+      automaticReportHour: data.automaticReportHour.present
+          ? data.automaticReportHour.value
+          : this.automaticReportHour,
+      automaticReportMinute: data.automaticReportMinute.present
+          ? data.automaticReportMinute.value
+          : this.automaticReportMinute,
+      automaticReportWeekday: data.automaticReportWeekday.present
+          ? data.automaticReportWeekday.value
+          : this.automaticReportWeekday,
     );
   }
 
@@ -4199,7 +4361,11 @@ class AppSettingsDataRow extends DataClass
           ..write('scanDurationSeconds: $scanDurationSeconds, ')
           ..write('rssiThreshold: $rssiThreshold, ')
           ..write('soundEnabled: $soundEnabled, ')
-          ..write('vibrationEnabled: $vibrationEnabled')
+          ..write('vibrationEnabled: $vibrationEnabled, ')
+          ..write('automaticReportMode: $automaticReportMode, ')
+          ..write('automaticReportHour: $automaticReportHour, ')
+          ..write('automaticReportMinute: $automaticReportMinute, ')
+          ..write('automaticReportWeekday: $automaticReportWeekday')
           ..write(')'))
         .toString();
   }
@@ -4214,6 +4380,10 @@ class AppSettingsDataRow extends DataClass
     rssiThreshold,
     soundEnabled,
     vibrationEnabled,
+    automaticReportMode,
+    automaticReportHour,
+    automaticReportMinute,
+    automaticReportWeekday,
   );
   @override
   bool operator ==(Object other) =>
@@ -4226,7 +4396,11 @@ class AppSettingsDataRow extends DataClass
           other.scanDurationSeconds == this.scanDurationSeconds &&
           other.rssiThreshold == this.rssiThreshold &&
           other.soundEnabled == this.soundEnabled &&
-          other.vibrationEnabled == this.vibrationEnabled);
+          other.vibrationEnabled == this.vibrationEnabled &&
+          other.automaticReportMode == this.automaticReportMode &&
+          other.automaticReportHour == this.automaticReportHour &&
+          other.automaticReportMinute == this.automaticReportMinute &&
+          other.automaticReportWeekday == this.automaticReportWeekday);
 }
 
 class AppSettingsRowsCompanion extends UpdateCompanion<AppSettingsDataRow> {
@@ -4238,6 +4412,10 @@ class AppSettingsRowsCompanion extends UpdateCompanion<AppSettingsDataRow> {
   final Value<int> rssiThreshold;
   final Value<bool> soundEnabled;
   final Value<bool> vibrationEnabled;
+  final Value<domain.AutomaticReportMode> automaticReportMode;
+  final Value<int> automaticReportHour;
+  final Value<int> automaticReportMinute;
+  final Value<int> automaticReportWeekday;
   final Value<int> rowid;
   const AppSettingsRowsCompanion({
     this.id = const Value.absent(),
@@ -4248,6 +4426,10 @@ class AppSettingsRowsCompanion extends UpdateCompanion<AppSettingsDataRow> {
     this.rssiThreshold = const Value.absent(),
     this.soundEnabled = const Value.absent(),
     this.vibrationEnabled = const Value.absent(),
+    this.automaticReportMode = const Value.absent(),
+    this.automaticReportHour = const Value.absent(),
+    this.automaticReportMinute = const Value.absent(),
+    this.automaticReportWeekday = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   AppSettingsRowsCompanion.insert({
@@ -4259,6 +4441,10 @@ class AppSettingsRowsCompanion extends UpdateCompanion<AppSettingsDataRow> {
     required int rssiThreshold,
     required bool soundEnabled,
     required bool vibrationEnabled,
+    this.automaticReportMode = const Value.absent(),
+    this.automaticReportHour = const Value.absent(),
+    this.automaticReportMinute = const Value.absent(),
+    this.automaticReportWeekday = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        updatedAt = Value(updatedAt),
@@ -4276,6 +4462,10 @@ class AppSettingsRowsCompanion extends UpdateCompanion<AppSettingsDataRow> {
     Expression<int>? rssiThreshold,
     Expression<bool>? soundEnabled,
     Expression<bool>? vibrationEnabled,
+    Expression<String>? automaticReportMode,
+    Expression<int>? automaticReportHour,
+    Expression<int>? automaticReportMinute,
+    Expression<int>? automaticReportWeekday,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -4288,6 +4478,14 @@ class AppSettingsRowsCompanion extends UpdateCompanion<AppSettingsDataRow> {
       if (rssiThreshold != null) 'rssi_threshold': rssiThreshold,
       if (soundEnabled != null) 'sound_enabled': soundEnabled,
       if (vibrationEnabled != null) 'vibration_enabled': vibrationEnabled,
+      if (automaticReportMode != null)
+        'automatic_report_mode': automaticReportMode,
+      if (automaticReportHour != null)
+        'automatic_report_hour': automaticReportHour,
+      if (automaticReportMinute != null)
+        'automatic_report_minute': automaticReportMinute,
+      if (automaticReportWeekday != null)
+        'automatic_report_weekday': automaticReportWeekday,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -4301,6 +4499,10 @@ class AppSettingsRowsCompanion extends UpdateCompanion<AppSettingsDataRow> {
     Value<int>? rssiThreshold,
     Value<bool>? soundEnabled,
     Value<bool>? vibrationEnabled,
+    Value<domain.AutomaticReportMode>? automaticReportMode,
+    Value<int>? automaticReportHour,
+    Value<int>? automaticReportMinute,
+    Value<int>? automaticReportWeekday,
     Value<int>? rowid,
   }) {
     return AppSettingsRowsCompanion(
@@ -4312,6 +4514,12 @@ class AppSettingsRowsCompanion extends UpdateCompanion<AppSettingsDataRow> {
       rssiThreshold: rssiThreshold ?? this.rssiThreshold,
       soundEnabled: soundEnabled ?? this.soundEnabled,
       vibrationEnabled: vibrationEnabled ?? this.vibrationEnabled,
+      automaticReportMode: automaticReportMode ?? this.automaticReportMode,
+      automaticReportHour: automaticReportHour ?? this.automaticReportHour,
+      automaticReportMinute:
+          automaticReportMinute ?? this.automaticReportMinute,
+      automaticReportWeekday:
+          automaticReportWeekday ?? this.automaticReportWeekday,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -4345,6 +4553,26 @@ class AppSettingsRowsCompanion extends UpdateCompanion<AppSettingsDataRow> {
     if (vibrationEnabled.present) {
       map['vibration_enabled'] = Variable<bool>(vibrationEnabled.value);
     }
+    if (automaticReportMode.present) {
+      map['automatic_report_mode'] = Variable<String>(
+        $AppSettingsRowsTable.$converterautomaticReportMode.toSql(
+          automaticReportMode.value,
+        ),
+      );
+    }
+    if (automaticReportHour.present) {
+      map['automatic_report_hour'] = Variable<int>(automaticReportHour.value);
+    }
+    if (automaticReportMinute.present) {
+      map['automatic_report_minute'] = Variable<int>(
+        automaticReportMinute.value,
+      );
+    }
+    if (automaticReportWeekday.present) {
+      map['automatic_report_weekday'] = Variable<int>(
+        automaticReportWeekday.value,
+      );
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -4362,6 +4590,10 @@ class AppSettingsRowsCompanion extends UpdateCompanion<AppSettingsDataRow> {
           ..write('rssiThreshold: $rssiThreshold, ')
           ..write('soundEnabled: $soundEnabled, ')
           ..write('vibrationEnabled: $vibrationEnabled, ')
+          ..write('automaticReportMode: $automaticReportMode, ')
+          ..write('automaticReportHour: $automaticReportHour, ')
+          ..write('automaticReportMinute: $automaticReportMinute, ')
+          ..write('automaticReportWeekday: $automaticReportWeekday, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -5658,6 +5890,1029 @@ class AttendanceAccessOfferingsCompanion
   }
 }
 
+class $AutoReportRunsTable extends AutoReportRuns
+    with TableInfo<$AutoReportRunsTable, AutoReportRunRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $AutoReportRunsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<
+    domain.AutomaticReportMode,
+    String
+  >
+  mode =
+      GeneratedColumn<String>(
+        'mode',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      ).withConverter<domain.AutomaticReportMode>(
+        $AutoReportRunsTable.$convertermode,
+      );
+  static const VerificationMeta _occurrenceAtMeta = const VerificationMeta(
+    'occurrenceAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> occurrenceAt = GeneratedColumn<DateTime>(
+    'occurrence_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _windowStartMeta = const VerificationMeta(
+    'windowStart',
+  );
+  @override
+  late final GeneratedColumn<DateTime> windowStart = GeneratedColumn<DateTime>(
+    'window_start',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _windowEndMeta = const VerificationMeta(
+    'windowEnd',
+  );
+  @override
+  late final GeneratedColumn<DateTime> windowEnd = GeneratedColumn<DateTime>(
+    'window_end',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _attemptedAtMeta = const VerificationMeta(
+    'attemptedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> attemptedAt = GeneratedColumn<DateTime>(
+    'attempted_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<
+    domain.AutoReportRunStatus,
+    String
+  >
+  status =
+      GeneratedColumn<String>(
+        'status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      ).withConverter<domain.AutoReportRunStatus>(
+        $AutoReportRunsTable.$converterstatus,
+      );
+  static const VerificationMeta _generatedCountMeta = const VerificationMeta(
+    'generatedCount',
+  );
+  @override
+  late final GeneratedColumn<int> generatedCount = GeneratedColumn<int>(
+    'generated_count',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _failedCountMeta = const VerificationMeta(
+    'failedCount',
+  );
+  @override
+  late final GeneratedColumn<int> failedCount = GeneratedColumn<int>(
+    'failed_count',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    mode,
+    occurrenceAt,
+    windowStart,
+    windowEnd,
+    attemptedAt,
+    status,
+    generatedCount,
+    failedCount,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'auto_report_runs';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<AutoReportRunRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('occurrence_at')) {
+      context.handle(
+        _occurrenceAtMeta,
+        occurrenceAt.isAcceptableOrUnknown(
+          data['occurrence_at']!,
+          _occurrenceAtMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_occurrenceAtMeta);
+    }
+    if (data.containsKey('window_start')) {
+      context.handle(
+        _windowStartMeta,
+        windowStart.isAcceptableOrUnknown(
+          data['window_start']!,
+          _windowStartMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_windowStartMeta);
+    }
+    if (data.containsKey('window_end')) {
+      context.handle(
+        _windowEndMeta,
+        windowEnd.isAcceptableOrUnknown(data['window_end']!, _windowEndMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_windowEndMeta);
+    }
+    if (data.containsKey('attempted_at')) {
+      context.handle(
+        _attemptedAtMeta,
+        attemptedAt.isAcceptableOrUnknown(
+          data['attempted_at']!,
+          _attemptedAtMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_attemptedAtMeta);
+    }
+    if (data.containsKey('generated_count')) {
+      context.handle(
+        _generatedCountMeta,
+        generatedCount.isAcceptableOrUnknown(
+          data['generated_count']!,
+          _generatedCountMeta,
+        ),
+      );
+    }
+    if (data.containsKey('failed_count')) {
+      context.handle(
+        _failedCountMeta,
+        failedCount.isAcceptableOrUnknown(
+          data['failed_count']!,
+          _failedCountMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  AutoReportRunRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return AutoReportRunRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      mode: $AutoReportRunsTable.$convertermode.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}mode'],
+        )!,
+      ),
+      occurrenceAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}occurrence_at'],
+      )!,
+      windowStart: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}window_start'],
+      )!,
+      windowEnd: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}window_end'],
+      )!,
+      attemptedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}attempted_at'],
+      )!,
+      status: $AutoReportRunsTable.$converterstatus.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}status'],
+        )!,
+      ),
+      generatedCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}generated_count'],
+      )!,
+      failedCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}failed_count'],
+      )!,
+    );
+  }
+
+  @override
+  $AutoReportRunsTable createAlias(String alias) {
+    return $AutoReportRunsTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<domain.AutomaticReportMode, String> $convertermode =
+      const AutomaticReportModeConverter();
+  static TypeConverter<domain.AutoReportRunStatus, String> $converterstatus =
+      const AutoReportRunStatusConverter();
+}
+
+class AutoReportRunRow extends DataClass
+    implements Insertable<AutoReportRunRow> {
+  final String id;
+  final domain.AutomaticReportMode mode;
+  final DateTime occurrenceAt;
+  final DateTime windowStart;
+  final DateTime windowEnd;
+  final DateTime attemptedAt;
+  final domain.AutoReportRunStatus status;
+  final int generatedCount;
+  final int failedCount;
+  const AutoReportRunRow({
+    required this.id,
+    required this.mode,
+    required this.occurrenceAt,
+    required this.windowStart,
+    required this.windowEnd,
+    required this.attemptedAt,
+    required this.status,
+    required this.generatedCount,
+    required this.failedCount,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    {
+      map['mode'] = Variable<String>(
+        $AutoReportRunsTable.$convertermode.toSql(mode),
+      );
+    }
+    map['occurrence_at'] = Variable<DateTime>(occurrenceAt);
+    map['window_start'] = Variable<DateTime>(windowStart);
+    map['window_end'] = Variable<DateTime>(windowEnd);
+    map['attempted_at'] = Variable<DateTime>(attemptedAt);
+    {
+      map['status'] = Variable<String>(
+        $AutoReportRunsTable.$converterstatus.toSql(status),
+      );
+    }
+    map['generated_count'] = Variable<int>(generatedCount);
+    map['failed_count'] = Variable<int>(failedCount);
+    return map;
+  }
+
+  AutoReportRunsCompanion toCompanion(bool nullToAbsent) {
+    return AutoReportRunsCompanion(
+      id: Value(id),
+      mode: Value(mode),
+      occurrenceAt: Value(occurrenceAt),
+      windowStart: Value(windowStart),
+      windowEnd: Value(windowEnd),
+      attemptedAt: Value(attemptedAt),
+      status: Value(status),
+      generatedCount: Value(generatedCount),
+      failedCount: Value(failedCount),
+    );
+  }
+
+  factory AutoReportRunRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return AutoReportRunRow(
+      id: serializer.fromJson<String>(json['id']),
+      mode: serializer.fromJson<domain.AutomaticReportMode>(json['mode']),
+      occurrenceAt: serializer.fromJson<DateTime>(json['occurrenceAt']),
+      windowStart: serializer.fromJson<DateTime>(json['windowStart']),
+      windowEnd: serializer.fromJson<DateTime>(json['windowEnd']),
+      attemptedAt: serializer.fromJson<DateTime>(json['attemptedAt']),
+      status: serializer.fromJson<domain.AutoReportRunStatus>(json['status']),
+      generatedCount: serializer.fromJson<int>(json['generatedCount']),
+      failedCount: serializer.fromJson<int>(json['failedCount']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'mode': serializer.toJson<domain.AutomaticReportMode>(mode),
+      'occurrenceAt': serializer.toJson<DateTime>(occurrenceAt),
+      'windowStart': serializer.toJson<DateTime>(windowStart),
+      'windowEnd': serializer.toJson<DateTime>(windowEnd),
+      'attemptedAt': serializer.toJson<DateTime>(attemptedAt),
+      'status': serializer.toJson<domain.AutoReportRunStatus>(status),
+      'generatedCount': serializer.toJson<int>(generatedCount),
+      'failedCount': serializer.toJson<int>(failedCount),
+    };
+  }
+
+  AutoReportRunRow copyWith({
+    String? id,
+    domain.AutomaticReportMode? mode,
+    DateTime? occurrenceAt,
+    DateTime? windowStart,
+    DateTime? windowEnd,
+    DateTime? attemptedAt,
+    domain.AutoReportRunStatus? status,
+    int? generatedCount,
+    int? failedCount,
+  }) => AutoReportRunRow(
+    id: id ?? this.id,
+    mode: mode ?? this.mode,
+    occurrenceAt: occurrenceAt ?? this.occurrenceAt,
+    windowStart: windowStart ?? this.windowStart,
+    windowEnd: windowEnd ?? this.windowEnd,
+    attemptedAt: attemptedAt ?? this.attemptedAt,
+    status: status ?? this.status,
+    generatedCount: generatedCount ?? this.generatedCount,
+    failedCount: failedCount ?? this.failedCount,
+  );
+  AutoReportRunRow copyWithCompanion(AutoReportRunsCompanion data) {
+    return AutoReportRunRow(
+      id: data.id.present ? data.id.value : this.id,
+      mode: data.mode.present ? data.mode.value : this.mode,
+      occurrenceAt: data.occurrenceAt.present
+          ? data.occurrenceAt.value
+          : this.occurrenceAt,
+      windowStart: data.windowStart.present
+          ? data.windowStart.value
+          : this.windowStart,
+      windowEnd: data.windowEnd.present ? data.windowEnd.value : this.windowEnd,
+      attemptedAt: data.attemptedAt.present
+          ? data.attemptedAt.value
+          : this.attemptedAt,
+      status: data.status.present ? data.status.value : this.status,
+      generatedCount: data.generatedCount.present
+          ? data.generatedCount.value
+          : this.generatedCount,
+      failedCount: data.failedCount.present
+          ? data.failedCount.value
+          : this.failedCount,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AutoReportRunRow(')
+          ..write('id: $id, ')
+          ..write('mode: $mode, ')
+          ..write('occurrenceAt: $occurrenceAt, ')
+          ..write('windowStart: $windowStart, ')
+          ..write('windowEnd: $windowEnd, ')
+          ..write('attemptedAt: $attemptedAt, ')
+          ..write('status: $status, ')
+          ..write('generatedCount: $generatedCount, ')
+          ..write('failedCount: $failedCount')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    mode,
+    occurrenceAt,
+    windowStart,
+    windowEnd,
+    attemptedAt,
+    status,
+    generatedCount,
+    failedCount,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is AutoReportRunRow &&
+          other.id == this.id &&
+          other.mode == this.mode &&
+          other.occurrenceAt == this.occurrenceAt &&
+          other.windowStart == this.windowStart &&
+          other.windowEnd == this.windowEnd &&
+          other.attemptedAt == this.attemptedAt &&
+          other.status == this.status &&
+          other.generatedCount == this.generatedCount &&
+          other.failedCount == this.failedCount);
+}
+
+class AutoReportRunsCompanion extends UpdateCompanion<AutoReportRunRow> {
+  final Value<String> id;
+  final Value<domain.AutomaticReportMode> mode;
+  final Value<DateTime> occurrenceAt;
+  final Value<DateTime> windowStart;
+  final Value<DateTime> windowEnd;
+  final Value<DateTime> attemptedAt;
+  final Value<domain.AutoReportRunStatus> status;
+  final Value<int> generatedCount;
+  final Value<int> failedCount;
+  final Value<int> rowid;
+  const AutoReportRunsCompanion({
+    this.id = const Value.absent(),
+    this.mode = const Value.absent(),
+    this.occurrenceAt = const Value.absent(),
+    this.windowStart = const Value.absent(),
+    this.windowEnd = const Value.absent(),
+    this.attemptedAt = const Value.absent(),
+    this.status = const Value.absent(),
+    this.generatedCount = const Value.absent(),
+    this.failedCount = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  AutoReportRunsCompanion.insert({
+    required String id,
+    required domain.AutomaticReportMode mode,
+    required DateTime occurrenceAt,
+    required DateTime windowStart,
+    required DateTime windowEnd,
+    required DateTime attemptedAt,
+    required domain.AutoReportRunStatus status,
+    this.generatedCount = const Value.absent(),
+    this.failedCount = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       mode = Value(mode),
+       occurrenceAt = Value(occurrenceAt),
+       windowStart = Value(windowStart),
+       windowEnd = Value(windowEnd),
+       attemptedAt = Value(attemptedAt),
+       status = Value(status);
+  static Insertable<AutoReportRunRow> custom({
+    Expression<String>? id,
+    Expression<String>? mode,
+    Expression<DateTime>? occurrenceAt,
+    Expression<DateTime>? windowStart,
+    Expression<DateTime>? windowEnd,
+    Expression<DateTime>? attemptedAt,
+    Expression<String>? status,
+    Expression<int>? generatedCount,
+    Expression<int>? failedCount,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (mode != null) 'mode': mode,
+      if (occurrenceAt != null) 'occurrence_at': occurrenceAt,
+      if (windowStart != null) 'window_start': windowStart,
+      if (windowEnd != null) 'window_end': windowEnd,
+      if (attemptedAt != null) 'attempted_at': attemptedAt,
+      if (status != null) 'status': status,
+      if (generatedCount != null) 'generated_count': generatedCount,
+      if (failedCount != null) 'failed_count': failedCount,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  AutoReportRunsCompanion copyWith({
+    Value<String>? id,
+    Value<domain.AutomaticReportMode>? mode,
+    Value<DateTime>? occurrenceAt,
+    Value<DateTime>? windowStart,
+    Value<DateTime>? windowEnd,
+    Value<DateTime>? attemptedAt,
+    Value<domain.AutoReportRunStatus>? status,
+    Value<int>? generatedCount,
+    Value<int>? failedCount,
+    Value<int>? rowid,
+  }) {
+    return AutoReportRunsCompanion(
+      id: id ?? this.id,
+      mode: mode ?? this.mode,
+      occurrenceAt: occurrenceAt ?? this.occurrenceAt,
+      windowStart: windowStart ?? this.windowStart,
+      windowEnd: windowEnd ?? this.windowEnd,
+      attemptedAt: attemptedAt ?? this.attemptedAt,
+      status: status ?? this.status,
+      generatedCount: generatedCount ?? this.generatedCount,
+      failedCount: failedCount ?? this.failedCount,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (mode.present) {
+      map['mode'] = Variable<String>(
+        $AutoReportRunsTable.$convertermode.toSql(mode.value),
+      );
+    }
+    if (occurrenceAt.present) {
+      map['occurrence_at'] = Variable<DateTime>(occurrenceAt.value);
+    }
+    if (windowStart.present) {
+      map['window_start'] = Variable<DateTime>(windowStart.value);
+    }
+    if (windowEnd.present) {
+      map['window_end'] = Variable<DateTime>(windowEnd.value);
+    }
+    if (attemptedAt.present) {
+      map['attempted_at'] = Variable<DateTime>(attemptedAt.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(
+        $AutoReportRunsTable.$converterstatus.toSql(status.value),
+      );
+    }
+    if (generatedCount.present) {
+      map['generated_count'] = Variable<int>(generatedCount.value);
+    }
+    if (failedCount.present) {
+      map['failed_count'] = Variable<int>(failedCount.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AutoReportRunsCompanion(')
+          ..write('id: $id, ')
+          ..write('mode: $mode, ')
+          ..write('occurrenceAt: $occurrenceAt, ')
+          ..write('windowStart: $windowStart, ')
+          ..write('windowEnd: $windowEnd, ')
+          ..write('attemptedAt: $attemptedAt, ')
+          ..write('status: $status, ')
+          ..write('generatedCount: $generatedCount, ')
+          ..write('failedCount: $failedCount, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $AutoReportExecutionsTable extends AutoReportExecutions
+    with TableInfo<$AutoReportExecutionsTable, AutoReportExecutionRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $AutoReportExecutionsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _runIdMeta = const VerificationMeta('runId');
+  @override
+  late final GeneratedColumn<String> runId = GeneratedColumn<String>(
+    'run_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES auto_report_runs (id)',
+    ),
+  );
+  static const VerificationMeta _sessionIdMeta = const VerificationMeta(
+    'sessionId',
+  );
+  @override
+  late final GeneratedColumn<String> sessionId = GeneratedColumn<String>(
+    'session_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _attemptedAtMeta = const VerificationMeta(
+    'attemptedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> attemptedAt = GeneratedColumn<DateTime>(
+    'attempted_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<
+    domain.AutoReportExecutionStatus,
+    String
+  >
+  status =
+      GeneratedColumn<String>(
+        'status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      ).withConverter<domain.AutoReportExecutionStatus>(
+        $AutoReportExecutionsTable.$converterstatus,
+      );
+  static const VerificationMeta _fileNameMeta = const VerificationMeta(
+    'fileName',
+  );
+  @override
+  late final GeneratedColumn<String> fileName = GeneratedColumn<String>(
+    'file_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    runId,
+    sessionId,
+    attemptedAt,
+    status,
+    fileName,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'auto_report_executions';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<AutoReportExecutionRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('run_id')) {
+      context.handle(
+        _runIdMeta,
+        runId.isAcceptableOrUnknown(data['run_id']!, _runIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_runIdMeta);
+    }
+    if (data.containsKey('session_id')) {
+      context.handle(
+        _sessionIdMeta,
+        sessionId.isAcceptableOrUnknown(data['session_id']!, _sessionIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sessionIdMeta);
+    }
+    if (data.containsKey('attempted_at')) {
+      context.handle(
+        _attemptedAtMeta,
+        attemptedAt.isAcceptableOrUnknown(
+          data['attempted_at']!,
+          _attemptedAtMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_attemptedAtMeta);
+    }
+    if (data.containsKey('file_name')) {
+      context.handle(
+        _fileNameMeta,
+        fileName.isAcceptableOrUnknown(data['file_name']!, _fileNameMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  AutoReportExecutionRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return AutoReportExecutionRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      runId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}run_id'],
+      )!,
+      sessionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}session_id'],
+      )!,
+      attemptedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}attempted_at'],
+      )!,
+      status: $AutoReportExecutionsTable.$converterstatus.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}status'],
+        )!,
+      ),
+      fileName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}file_name'],
+      ),
+    );
+  }
+
+  @override
+  $AutoReportExecutionsTable createAlias(String alias) {
+    return $AutoReportExecutionsTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<domain.AutoReportExecutionStatus, String>
+  $converterstatus = const AutoReportExecutionStatusConverter();
+}
+
+class AutoReportExecutionRow extends DataClass
+    implements Insertable<AutoReportExecutionRow> {
+  final String id;
+  final String runId;
+  final String sessionId;
+  final DateTime attemptedAt;
+  final domain.AutoReportExecutionStatus status;
+  final String? fileName;
+  const AutoReportExecutionRow({
+    required this.id,
+    required this.runId,
+    required this.sessionId,
+    required this.attemptedAt,
+    required this.status,
+    this.fileName,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['run_id'] = Variable<String>(runId);
+    map['session_id'] = Variable<String>(sessionId);
+    map['attempted_at'] = Variable<DateTime>(attemptedAt);
+    {
+      map['status'] = Variable<String>(
+        $AutoReportExecutionsTable.$converterstatus.toSql(status),
+      );
+    }
+    if (!nullToAbsent || fileName != null) {
+      map['file_name'] = Variable<String>(fileName);
+    }
+    return map;
+  }
+
+  AutoReportExecutionsCompanion toCompanion(bool nullToAbsent) {
+    return AutoReportExecutionsCompanion(
+      id: Value(id),
+      runId: Value(runId),
+      sessionId: Value(sessionId),
+      attemptedAt: Value(attemptedAt),
+      status: Value(status),
+      fileName: fileName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(fileName),
+    );
+  }
+
+  factory AutoReportExecutionRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return AutoReportExecutionRow(
+      id: serializer.fromJson<String>(json['id']),
+      runId: serializer.fromJson<String>(json['runId']),
+      sessionId: serializer.fromJson<String>(json['sessionId']),
+      attemptedAt: serializer.fromJson<DateTime>(json['attemptedAt']),
+      status: serializer.fromJson<domain.AutoReportExecutionStatus>(
+        json['status'],
+      ),
+      fileName: serializer.fromJson<String?>(json['fileName']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'runId': serializer.toJson<String>(runId),
+      'sessionId': serializer.toJson<String>(sessionId),
+      'attemptedAt': serializer.toJson<DateTime>(attemptedAt),
+      'status': serializer.toJson<domain.AutoReportExecutionStatus>(status),
+      'fileName': serializer.toJson<String?>(fileName),
+    };
+  }
+
+  AutoReportExecutionRow copyWith({
+    String? id,
+    String? runId,
+    String? sessionId,
+    DateTime? attemptedAt,
+    domain.AutoReportExecutionStatus? status,
+    Value<String?> fileName = const Value.absent(),
+  }) => AutoReportExecutionRow(
+    id: id ?? this.id,
+    runId: runId ?? this.runId,
+    sessionId: sessionId ?? this.sessionId,
+    attemptedAt: attemptedAt ?? this.attemptedAt,
+    status: status ?? this.status,
+    fileName: fileName.present ? fileName.value : this.fileName,
+  );
+  AutoReportExecutionRow copyWithCompanion(AutoReportExecutionsCompanion data) {
+    return AutoReportExecutionRow(
+      id: data.id.present ? data.id.value : this.id,
+      runId: data.runId.present ? data.runId.value : this.runId,
+      sessionId: data.sessionId.present ? data.sessionId.value : this.sessionId,
+      attemptedAt: data.attemptedAt.present
+          ? data.attemptedAt.value
+          : this.attemptedAt,
+      status: data.status.present ? data.status.value : this.status,
+      fileName: data.fileName.present ? data.fileName.value : this.fileName,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AutoReportExecutionRow(')
+          ..write('id: $id, ')
+          ..write('runId: $runId, ')
+          ..write('sessionId: $sessionId, ')
+          ..write('attemptedAt: $attemptedAt, ')
+          ..write('status: $status, ')
+          ..write('fileName: $fileName')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, runId, sessionId, attemptedAt, status, fileName);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is AutoReportExecutionRow &&
+          other.id == this.id &&
+          other.runId == this.runId &&
+          other.sessionId == this.sessionId &&
+          other.attemptedAt == this.attemptedAt &&
+          other.status == this.status &&
+          other.fileName == this.fileName);
+}
+
+class AutoReportExecutionsCompanion
+    extends UpdateCompanion<AutoReportExecutionRow> {
+  final Value<String> id;
+  final Value<String> runId;
+  final Value<String> sessionId;
+  final Value<DateTime> attemptedAt;
+  final Value<domain.AutoReportExecutionStatus> status;
+  final Value<String?> fileName;
+  final Value<int> rowid;
+  const AutoReportExecutionsCompanion({
+    this.id = const Value.absent(),
+    this.runId = const Value.absent(),
+    this.sessionId = const Value.absent(),
+    this.attemptedAt = const Value.absent(),
+    this.status = const Value.absent(),
+    this.fileName = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  AutoReportExecutionsCompanion.insert({
+    required String id,
+    required String runId,
+    required String sessionId,
+    required DateTime attemptedAt,
+    required domain.AutoReportExecutionStatus status,
+    this.fileName = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       runId = Value(runId),
+       sessionId = Value(sessionId),
+       attemptedAt = Value(attemptedAt),
+       status = Value(status);
+  static Insertable<AutoReportExecutionRow> custom({
+    Expression<String>? id,
+    Expression<String>? runId,
+    Expression<String>? sessionId,
+    Expression<DateTime>? attemptedAt,
+    Expression<String>? status,
+    Expression<String>? fileName,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (runId != null) 'run_id': runId,
+      if (sessionId != null) 'session_id': sessionId,
+      if (attemptedAt != null) 'attempted_at': attemptedAt,
+      if (status != null) 'status': status,
+      if (fileName != null) 'file_name': fileName,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  AutoReportExecutionsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? runId,
+    Value<String>? sessionId,
+    Value<DateTime>? attemptedAt,
+    Value<domain.AutoReportExecutionStatus>? status,
+    Value<String?>? fileName,
+    Value<int>? rowid,
+  }) {
+    return AutoReportExecutionsCompanion(
+      id: id ?? this.id,
+      runId: runId ?? this.runId,
+      sessionId: sessionId ?? this.sessionId,
+      attemptedAt: attemptedAt ?? this.attemptedAt,
+      status: status ?? this.status,
+      fileName: fileName ?? this.fileName,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (runId.present) {
+      map['run_id'] = Variable<String>(runId.value);
+    }
+    if (sessionId.present) {
+      map['session_id'] = Variable<String>(sessionId.value);
+    }
+    if (attemptedAt.present) {
+      map['attempted_at'] = Variable<DateTime>(attemptedAt.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(
+        $AutoReportExecutionsTable.$converterstatus.toSql(status.value),
+      );
+    }
+    if (fileName.present) {
+      map['file_name'] = Variable<String>(fileName.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AutoReportExecutionsCompanion(')
+          ..write('id: $id, ')
+          ..write('runId: $runId, ')
+          ..write('sessionId: $sessionId, ')
+          ..write('attemptedAt: $attemptedAt, ')
+          ..write('status: $status, ')
+          ..write('fileName: $fileName, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -5679,6 +6934,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $AttendanceAccessGrantsTable(this);
   late final $AttendanceAccessOfferingsTable attendanceAccessOfferings =
       $AttendanceAccessOfferingsTable(this);
+  late final $AutoReportRunsTable autoReportRuns = $AutoReportRunsTable(this);
+  late final $AutoReportExecutionsTable autoReportExecutions =
+      $AutoReportExecutionsTable(this);
   late final Index classOfferingIdentityUnique = Index(
     'class_offering_identity_unique',
     'CREATE UNIQUE INDEX class_offering_identity_unique ON class_sections (teacher_id, section_code, lower(subject))',
@@ -5699,6 +6957,14 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'attendance_access_offering_source_unique',
     'CREATE UNIQUE INDEX attendance_access_offering_source_unique ON attendance_access_offerings (source_offering_id)',
   );
+  late final Index autoReportOccurrenceUnique = Index(
+    'auto_report_occurrence_unique',
+    'CREATE UNIQUE INDEX auto_report_occurrence_unique ON auto_report_runs (mode, occurrence_at)',
+  );
+  late final Index autoReportSessionUnique = Index(
+    'auto_report_session_unique',
+    'CREATE UNIQUE INDEX auto_report_session_unique ON auto_report_executions (run_id, session_id)',
+  );
   late final TeacherDao teacherDao = TeacherDao(this as AppDatabase);
   late final StudentDao studentDao = StudentDao(this as AppDatabase);
   late final ClassDao classDao = ClassDao(this as AppDatabase);
@@ -5710,6 +6976,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final AttendanceAccessDao attendanceAccessDao = AttendanceAccessDao(
     this as AppDatabase,
   );
+  late final AutoReportDao autoReportDao = AutoReportDao(this as AppDatabase);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -5726,11 +6993,15 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     appSessionPreferences,
     attendanceAccessGrants,
     attendanceAccessOfferings,
+    autoReportRuns,
+    autoReportExecutions,
     classOfferingIdentityUnique,
     enrollmentsStudentClassUnique,
     attendanceRecordsSessionStudentUnique,
     attendanceAccessSourceClassUnique,
     attendanceAccessOfferingSourceUnique,
+    autoReportOccurrenceUnique,
+    autoReportSessionUnique,
   ];
 }
 
@@ -8951,6 +10222,10 @@ typedef $$AppSettingsRowsTableCreateCompanionBuilder =
       required int rssiThreshold,
       required bool soundEnabled,
       required bool vibrationEnabled,
+      Value<domain.AutomaticReportMode> automaticReportMode,
+      Value<int> automaticReportHour,
+      Value<int> automaticReportMinute,
+      Value<int> automaticReportWeekday,
       Value<int> rowid,
     });
 typedef $$AppSettingsRowsTableUpdateCompanionBuilder =
@@ -8963,6 +10238,10 @@ typedef $$AppSettingsRowsTableUpdateCompanionBuilder =
       Value<int> rssiThreshold,
       Value<bool> soundEnabled,
       Value<bool> vibrationEnabled,
+      Value<domain.AutomaticReportMode> automaticReportMode,
+      Value<int> automaticReportHour,
+      Value<int> automaticReportMinute,
+      Value<int> automaticReportWeekday,
       Value<int> rowid,
     });
 
@@ -9015,6 +10294,31 @@ class $$AppSettingsRowsTableFilterComposer
     column: $table.vibrationEnabled,
     builder: (column) => ColumnFilters(column),
   );
+
+  ColumnWithTypeConverterFilters<
+    domain.AutomaticReportMode,
+    domain.AutomaticReportMode,
+    String
+  >
+  get automaticReportMode => $composableBuilder(
+    column: $table.automaticReportMode,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<int> get automaticReportHour => $composableBuilder(
+    column: $table.automaticReportHour,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get automaticReportMinute => $composableBuilder(
+    column: $table.automaticReportMinute,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get automaticReportWeekday => $composableBuilder(
+    column: $table.automaticReportWeekday,
+    builder: (column) => ColumnFilters(column),
+  );
 }
 
 class $$AppSettingsRowsTableOrderingComposer
@@ -9065,6 +10369,26 @@ class $$AppSettingsRowsTableOrderingComposer
     column: $table.vibrationEnabled,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get automaticReportMode => $composableBuilder(
+    column: $table.automaticReportMode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get automaticReportHour => $composableBuilder(
+    column: $table.automaticReportHour,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get automaticReportMinute => $composableBuilder(
+    column: $table.automaticReportMinute,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get automaticReportWeekday => $composableBuilder(
+    column: $table.automaticReportWeekday,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$AppSettingsRowsTableAnnotationComposer
@@ -9110,6 +10434,27 @@ class $$AppSettingsRowsTableAnnotationComposer
 
   GeneratedColumn<bool> get vibrationEnabled => $composableBuilder(
     column: $table.vibrationEnabled,
+    builder: (column) => column,
+  );
+
+  GeneratedColumnWithTypeConverter<domain.AutomaticReportMode, String>
+  get automaticReportMode => $composableBuilder(
+    column: $table.automaticReportMode,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get automaticReportHour => $composableBuilder(
+    column: $table.automaticReportHour,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get automaticReportMinute => $composableBuilder(
+    column: $table.automaticReportMinute,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get automaticReportWeekday => $composableBuilder(
+    column: $table.automaticReportWeekday,
     builder: (column) => column,
   );
 }
@@ -9159,6 +10504,11 @@ class $$AppSettingsRowsTableTableManager
                 Value<int> rssiThreshold = const Value.absent(),
                 Value<bool> soundEnabled = const Value.absent(),
                 Value<bool> vibrationEnabled = const Value.absent(),
+                Value<domain.AutomaticReportMode> automaticReportMode =
+                    const Value.absent(),
+                Value<int> automaticReportHour = const Value.absent(),
+                Value<int> automaticReportMinute = const Value.absent(),
+                Value<int> automaticReportWeekday = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => AppSettingsRowsCompanion(
                 id: id,
@@ -9169,6 +10519,10 @@ class $$AppSettingsRowsTableTableManager
                 rssiThreshold: rssiThreshold,
                 soundEnabled: soundEnabled,
                 vibrationEnabled: vibrationEnabled,
+                automaticReportMode: automaticReportMode,
+                automaticReportHour: automaticReportHour,
+                automaticReportMinute: automaticReportMinute,
+                automaticReportWeekday: automaticReportWeekday,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -9181,6 +10535,11 @@ class $$AppSettingsRowsTableTableManager
                 required int rssiThreshold,
                 required bool soundEnabled,
                 required bool vibrationEnabled,
+                Value<domain.AutomaticReportMode> automaticReportMode =
+                    const Value.absent(),
+                Value<int> automaticReportHour = const Value.absent(),
+                Value<int> automaticReportMinute = const Value.absent(),
+                Value<int> automaticReportWeekday = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => AppSettingsRowsCompanion.insert(
                 id: id,
@@ -9191,6 +10550,10 @@ class $$AppSettingsRowsTableTableManager
                 rssiThreshold: rssiThreshold,
                 soundEnabled: soundEnabled,
                 vibrationEnabled: vibrationEnabled,
+                automaticReportMode: automaticReportMode,
+                automaticReportHour: automaticReportHour,
+                automaticReportMinute: automaticReportMinute,
+                automaticReportWeekday: automaticReportWeekday,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -10212,6 +11575,785 @@ typedef $$AttendanceAccessOfferingsTableProcessedTableManager =
       AttendanceAccessOfferingRow,
       PrefetchHooks Function({bool invitationId})
     >;
+typedef $$AutoReportRunsTableCreateCompanionBuilder =
+    AutoReportRunsCompanion Function({
+      required String id,
+      required domain.AutomaticReportMode mode,
+      required DateTime occurrenceAt,
+      required DateTime windowStart,
+      required DateTime windowEnd,
+      required DateTime attemptedAt,
+      required domain.AutoReportRunStatus status,
+      Value<int> generatedCount,
+      Value<int> failedCount,
+      Value<int> rowid,
+    });
+typedef $$AutoReportRunsTableUpdateCompanionBuilder =
+    AutoReportRunsCompanion Function({
+      Value<String> id,
+      Value<domain.AutomaticReportMode> mode,
+      Value<DateTime> occurrenceAt,
+      Value<DateTime> windowStart,
+      Value<DateTime> windowEnd,
+      Value<DateTime> attemptedAt,
+      Value<domain.AutoReportRunStatus> status,
+      Value<int> generatedCount,
+      Value<int> failedCount,
+      Value<int> rowid,
+    });
+
+final class $$AutoReportRunsTableReferences
+    extends
+        BaseReferences<_$AppDatabase, $AutoReportRunsTable, AutoReportRunRow> {
+  $$AutoReportRunsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static MultiTypedResultKey<
+    $AutoReportExecutionsTable,
+    List<AutoReportExecutionRow>
+  >
+  _autoReportExecutionsRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.autoReportExecutions,
+        aliasName: 'auto_report_runs__id__auto_report_executions__run_id',
+      );
+
+  $$AutoReportExecutionsTableProcessedTableManager
+  get autoReportExecutionsRefs {
+    final manager = $$AutoReportExecutionsTableTableManager(
+      $_db,
+      $_db.autoReportExecutions,
+    ).filter((f) => f.runId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _autoReportExecutionsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$AutoReportRunsTableFilterComposer
+    extends Composer<_$AppDatabase, $AutoReportRunsTable> {
+  $$AutoReportRunsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<
+    domain.AutomaticReportMode,
+    domain.AutomaticReportMode,
+    String
+  >
+  get mode => $composableBuilder(
+    column: $table.mode,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<DateTime> get occurrenceAt => $composableBuilder(
+    column: $table.occurrenceAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get windowStart => $composableBuilder(
+    column: $table.windowStart,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get windowEnd => $composableBuilder(
+    column: $table.windowEnd,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get attemptedAt => $composableBuilder(
+    column: $table.attemptedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<
+    domain.AutoReportRunStatus,
+    domain.AutoReportRunStatus,
+    String
+  >
+  get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<int> get generatedCount => $composableBuilder(
+    column: $table.generatedCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get failedCount => $composableBuilder(
+    column: $table.failedCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  Expression<bool> autoReportExecutionsRefs(
+    Expression<bool> Function($$AutoReportExecutionsTableFilterComposer f) f,
+  ) {
+    final $$AutoReportExecutionsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.autoReportExecutions,
+      getReferencedColumn: (t) => t.runId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$AutoReportExecutionsTableFilterComposer(
+            $db: $db,
+            $table: $db.autoReportExecutions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$AutoReportRunsTableOrderingComposer
+    extends Composer<_$AppDatabase, $AutoReportRunsTable> {
+  $$AutoReportRunsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get mode => $composableBuilder(
+    column: $table.mode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get occurrenceAt => $composableBuilder(
+    column: $table.occurrenceAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get windowStart => $composableBuilder(
+    column: $table.windowStart,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get windowEnd => $composableBuilder(
+    column: $table.windowEnd,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get attemptedAt => $composableBuilder(
+    column: $table.attemptedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get generatedCount => $composableBuilder(
+    column: $table.generatedCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get failedCount => $composableBuilder(
+    column: $table.failedCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$AutoReportRunsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $AutoReportRunsTable> {
+  $$AutoReportRunsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<domain.AutomaticReportMode, String>
+  get mode =>
+      $composableBuilder(column: $table.mode, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get occurrenceAt => $composableBuilder(
+    column: $table.occurrenceAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get windowStart => $composableBuilder(
+    column: $table.windowStart,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get windowEnd =>
+      $composableBuilder(column: $table.windowEnd, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get attemptedAt => $composableBuilder(
+    column: $table.attemptedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumnWithTypeConverter<domain.AutoReportRunStatus, String>
+  get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<int> get generatedCount => $composableBuilder(
+    column: $table.generatedCount,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get failedCount => $composableBuilder(
+    column: $table.failedCount,
+    builder: (column) => column,
+  );
+
+  Expression<T> autoReportExecutionsRefs<T extends Object>(
+    Expression<T> Function($$AutoReportExecutionsTableAnnotationComposer a) f,
+  ) {
+    final $$AutoReportExecutionsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.autoReportExecutions,
+          getReferencedColumn: (t) => t.runId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$AutoReportExecutionsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.autoReportExecutions,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+}
+
+class $$AutoReportRunsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $AutoReportRunsTable,
+          AutoReportRunRow,
+          $$AutoReportRunsTableFilterComposer,
+          $$AutoReportRunsTableOrderingComposer,
+          $$AutoReportRunsTableAnnotationComposer,
+          $$AutoReportRunsTableCreateCompanionBuilder,
+          $$AutoReportRunsTableUpdateCompanionBuilder,
+          (AutoReportRunRow, $$AutoReportRunsTableReferences),
+          AutoReportRunRow,
+          PrefetchHooks Function({bool autoReportExecutionsRefs})
+        > {
+  $$AutoReportRunsTableTableManager(
+    _$AppDatabase db,
+    $AutoReportRunsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$AutoReportRunsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$AutoReportRunsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$AutoReportRunsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<domain.AutomaticReportMode> mode = const Value.absent(),
+                Value<DateTime> occurrenceAt = const Value.absent(),
+                Value<DateTime> windowStart = const Value.absent(),
+                Value<DateTime> windowEnd = const Value.absent(),
+                Value<DateTime> attemptedAt = const Value.absent(),
+                Value<domain.AutoReportRunStatus> status = const Value.absent(),
+                Value<int> generatedCount = const Value.absent(),
+                Value<int> failedCount = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => AutoReportRunsCompanion(
+                id: id,
+                mode: mode,
+                occurrenceAt: occurrenceAt,
+                windowStart: windowStart,
+                windowEnd: windowEnd,
+                attemptedAt: attemptedAt,
+                status: status,
+                generatedCount: generatedCount,
+                failedCount: failedCount,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required domain.AutomaticReportMode mode,
+                required DateTime occurrenceAt,
+                required DateTime windowStart,
+                required DateTime windowEnd,
+                required DateTime attemptedAt,
+                required domain.AutoReportRunStatus status,
+                Value<int> generatedCount = const Value.absent(),
+                Value<int> failedCount = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => AutoReportRunsCompanion.insert(
+                id: id,
+                mode: mode,
+                occurrenceAt: occurrenceAt,
+                windowStart: windowStart,
+                windowEnd: windowEnd,
+                attemptedAt: attemptedAt,
+                status: status,
+                generatedCount: generatedCount,
+                failedCount: failedCount,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$AutoReportRunsTable, AutoReportRunRow>(table),
+                  $$AutoReportRunsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({autoReportExecutionsRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [
+                if (autoReportExecutionsRefs) db.autoReportExecutions,
+              ],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (autoReportExecutionsRefs)
+                    await $_getPrefetchedData<
+                      AutoReportRunRow,
+                      $AutoReportRunsTable,
+                      AutoReportExecutionRow
+                    >(
+                      currentTable: table,
+                      referencedTable: $$AutoReportRunsTableReferences
+                          ._autoReportExecutionsRefsTable(db),
+                      managerFromTypedResult: (p0) =>
+                          $$AutoReportRunsTableReferences(
+                            db,
+                            table,
+                            p0,
+                          ).autoReportExecutionsRefs,
+                      referencedItemsForCurrentItem: (item, referencedItems) =>
+                          referencedItems.where((e) => e.runId == item.id),
+                      typedResults: items,
+                    ),
+                ];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$AutoReportRunsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $AutoReportRunsTable,
+      AutoReportRunRow,
+      $$AutoReportRunsTableFilterComposer,
+      $$AutoReportRunsTableOrderingComposer,
+      $$AutoReportRunsTableAnnotationComposer,
+      $$AutoReportRunsTableCreateCompanionBuilder,
+      $$AutoReportRunsTableUpdateCompanionBuilder,
+      (AutoReportRunRow, $$AutoReportRunsTableReferences),
+      AutoReportRunRow,
+      PrefetchHooks Function({bool autoReportExecutionsRefs})
+    >;
+typedef $$AutoReportExecutionsTableCreateCompanionBuilder =
+    AutoReportExecutionsCompanion Function({
+      required String id,
+      required String runId,
+      required String sessionId,
+      required DateTime attemptedAt,
+      required domain.AutoReportExecutionStatus status,
+      Value<String?> fileName,
+      Value<int> rowid,
+    });
+typedef $$AutoReportExecutionsTableUpdateCompanionBuilder =
+    AutoReportExecutionsCompanion Function({
+      Value<String> id,
+      Value<String> runId,
+      Value<String> sessionId,
+      Value<DateTime> attemptedAt,
+      Value<domain.AutoReportExecutionStatus> status,
+      Value<String?> fileName,
+      Value<int> rowid,
+    });
+
+final class $$AutoReportExecutionsTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $AutoReportExecutionsTable,
+          AutoReportExecutionRow
+        > {
+  $$AutoReportExecutionsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $AutoReportRunsTable _runIdTable(_$AppDatabase db) => db.autoReportRuns
+      .createAlias('auto_report_executions__run_id__auto_report_runs__id');
+
+  $$AutoReportRunsTableProcessedTableManager get runId {
+    final $_column = $_itemColumn<String>('run_id')!;
+
+    final manager = $$AutoReportRunsTableTableManager(
+      $_db,
+      $_db.autoReportRuns,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_runIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$AutoReportExecutionsTableFilterComposer
+    extends Composer<_$AppDatabase, $AutoReportExecutionsTable> {
+  $$AutoReportExecutionsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sessionId => $composableBuilder(
+    column: $table.sessionId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get attemptedAt => $composableBuilder(
+    column: $table.attemptedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<
+    domain.AutoReportExecutionStatus,
+    domain.AutoReportExecutionStatus,
+    String
+  >
+  get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<String> get fileName => $composableBuilder(
+    column: $table.fileName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$AutoReportRunsTableFilterComposer get runId {
+    final $$AutoReportRunsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.runId,
+      referencedTable: $db.autoReportRuns,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$AutoReportRunsTableFilterComposer(
+            $db: $db,
+            $table: $db.autoReportRuns,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$AutoReportExecutionsTableOrderingComposer
+    extends Composer<_$AppDatabase, $AutoReportExecutionsTable> {
+  $$AutoReportExecutionsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sessionId => $composableBuilder(
+    column: $table.sessionId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get attemptedAt => $composableBuilder(
+    column: $table.attemptedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get fileName => $composableBuilder(
+    column: $table.fileName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$AutoReportRunsTableOrderingComposer get runId {
+    final $$AutoReportRunsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.runId,
+      referencedTable: $db.autoReportRuns,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$AutoReportRunsTableOrderingComposer(
+            $db: $db,
+            $table: $db.autoReportRuns,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$AutoReportExecutionsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $AutoReportExecutionsTable> {
+  $$AutoReportExecutionsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get sessionId =>
+      $composableBuilder(column: $table.sessionId, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get attemptedAt => $composableBuilder(
+    column: $table.attemptedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumnWithTypeConverter<domain.AutoReportExecutionStatus, String>
+  get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<String> get fileName =>
+      $composableBuilder(column: $table.fileName, builder: (column) => column);
+
+  $$AutoReportRunsTableAnnotationComposer get runId {
+    final $$AutoReportRunsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.runId,
+      referencedTable: $db.autoReportRuns,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$AutoReportRunsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.autoReportRuns,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$AutoReportExecutionsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $AutoReportExecutionsTable,
+          AutoReportExecutionRow,
+          $$AutoReportExecutionsTableFilterComposer,
+          $$AutoReportExecutionsTableOrderingComposer,
+          $$AutoReportExecutionsTableAnnotationComposer,
+          $$AutoReportExecutionsTableCreateCompanionBuilder,
+          $$AutoReportExecutionsTableUpdateCompanionBuilder,
+          (AutoReportExecutionRow, $$AutoReportExecutionsTableReferences),
+          AutoReportExecutionRow,
+          PrefetchHooks Function({bool runId})
+        > {
+  $$AutoReportExecutionsTableTableManager(
+    _$AppDatabase db,
+    $AutoReportExecutionsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$AutoReportExecutionsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$AutoReportExecutionsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$AutoReportExecutionsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> runId = const Value.absent(),
+                Value<String> sessionId = const Value.absent(),
+                Value<DateTime> attemptedAt = const Value.absent(),
+                Value<domain.AutoReportExecutionStatus> status =
+                    const Value.absent(),
+                Value<String?> fileName = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => AutoReportExecutionsCompanion(
+                id: id,
+                runId: runId,
+                sessionId: sessionId,
+                attemptedAt: attemptedAt,
+                status: status,
+                fileName: fileName,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String runId,
+                required String sessionId,
+                required DateTime attemptedAt,
+                required domain.AutoReportExecutionStatus status,
+                Value<String?> fileName = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => AutoReportExecutionsCompanion.insert(
+                id: id,
+                runId: runId,
+                sessionId: sessionId,
+                attemptedAt: attemptedAt,
+                status: status,
+                fileName: fileName,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<
+                    $AutoReportExecutionsTable,
+                    AutoReportExecutionRow
+                  >(table),
+                  $$AutoReportExecutionsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({runId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (runId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.runId,
+                        referencedTable: $$AutoReportExecutionsTableReferences
+                            ._runIdTable(db),
+                        referencedColumn: $$AutoReportExecutionsTableReferences
+                            ._runIdTable(db)
+                            .id,
+                      ) as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$AutoReportExecutionsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $AutoReportExecutionsTable,
+      AutoReportExecutionRow,
+      $$AutoReportExecutionsTableFilterComposer,
+      $$AutoReportExecutionsTableOrderingComposer,
+      $$AutoReportExecutionsTableAnnotationComposer,
+      $$AutoReportExecutionsTableCreateCompanionBuilder,
+      $$AutoReportExecutionsTableUpdateCompanionBuilder,
+      (AutoReportExecutionRow, $$AutoReportExecutionsTableReferences),
+      AutoReportExecutionRow,
+      PrefetchHooks Function({bool runId})
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -10244,6 +12386,10 @@ class $AppDatabaseManager {
         _db,
         _db.attendanceAccessOfferings,
       );
+  $$AutoReportRunsTableTableManager get autoReportRuns =>
+      $$AutoReportRunsTableTableManager(_db, _db.autoReportRuns);
+  $$AutoReportExecutionsTableTableManager get autoReportExecutions =>
+      $$AutoReportExecutionsTableTableManager(_db, _db.autoReportExecutions);
 }
 
 mixin _$TeacherDaoMixin on DatabaseAccessor<AppDatabase> {
@@ -10436,5 +12582,27 @@ class AttendanceAccessDaoManager {
       $$AttendanceAccessOfferingsTableTableManager(
         _db.attachedDatabase,
         _db.attendanceAccessOfferings,
+      );
+}
+
+mixin _$AutoReportDaoMixin on DatabaseAccessor<AppDatabase> {
+  $AutoReportRunsTable get autoReportRuns => attachedDatabase.autoReportRuns;
+  $AutoReportExecutionsTable get autoReportExecutions =>
+      attachedDatabase.autoReportExecutions;
+  AutoReportDaoManager get managers => AutoReportDaoManager(this);
+}
+
+class AutoReportDaoManager {
+  final _$AutoReportDaoMixin _db;
+  AutoReportDaoManager(this._db);
+  $$AutoReportRunsTableTableManager get autoReportRuns =>
+      $$AutoReportRunsTableTableManager(
+        _db.attachedDatabase,
+        _db.autoReportRuns,
+      );
+  $$AutoReportExecutionsTableTableManager get autoReportExecutions =>
+      $$AutoReportExecutionsTableTableManager(
+        _db.attachedDatabase,
+        _db.autoReportExecutions,
       );
 }

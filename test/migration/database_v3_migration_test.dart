@@ -105,6 +105,22 @@ void main() {
       NativeDatabase(
         file,
         setup: (sqlite) {
+          sqlite.execute('DROP TABLE auto_report_executions');
+          sqlite.execute('DROP TABLE auto_report_runs');
+          sqlite.execute('DROP TABLE attendance_access_offerings');
+          sqlite.execute('DROP TABLE attendance_access_grants');
+          sqlite.execute(
+            'ALTER TABLE app_settings DROP COLUMN automatic_report_mode',
+          );
+          sqlite.execute(
+            'ALTER TABLE app_settings DROP COLUMN automatic_report_hour',
+          );
+          sqlite.execute(
+            'ALTER TABLE app_settings DROP COLUMN automatic_report_minute',
+          );
+          sqlite.execute(
+            'ALTER TABLE app_settings DROP COLUMN automatic_report_weekday',
+          );
           sqlite.execute('DROP INDEX class_offering_identity_unique');
           sqlite.execute(
             'ALTER TABLE class_sections DROP COLUMN schedule_days',

@@ -1,0 +1,16 @@
+name: classattend_downloads
+description: ClassAttend MediaStore Downloads bridge for background report exports.
+version: 1.0.0
+publish_to: none
+environment:
+  sdk: ^3.13.3
+  flutter: ">=3.35.0"
+dependencies:
+  flutter:
+    sdk: flutter
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.classattend.downloads
+        pluginClass: ClassAttendDownloadsPlugin

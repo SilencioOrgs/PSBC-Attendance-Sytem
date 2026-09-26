@@ -7,7 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test(
-    'v3 to current schema creates attendance access storage and preserves local data',
+    'v3 to current schema preserves local data and creates new storage',
     () async {
       final file = File(
         '${Directory.systemTemp.path}${Platform.pathSeparator}'
@@ -88,7 +88,22 @@ void main() {
         ],
       );
 
+      await before.customStatement('DROP TABLE auto_report_executions');
+      await before.customStatement('DROP TABLE auto_report_runs');
+      await before.customStatement('DROP TABLE attendance_access_offerings');
       await before.customStatement('DROP TABLE attendance_access_grants');
+      await before.customStatement(
+        'ALTER TABLE app_settings DROP COLUMN automatic_report_mode',
+      );
+      await before.customStatement(
+        'ALTER TABLE app_settings DROP COLUMN automatic_report_hour',
+      );
+      await before.customStatement(
+        'ALTER TABLE app_settings DROP COLUMN automatic_report_minute',
+      );
+      await before.customStatement(
+        'ALTER TABLE app_settings DROP COLUMN automatic_report_weekday',
+      );
       await before.customStatement('PRAGMA user_version = 3');
       await before.close();
 
@@ -98,7 +113,7 @@ void main() {
         if (await file.exists()) await file.delete();
       });
 
-      expect(after.schemaVersion, 6);
+      expect(after.schemaVersion, 7);
       expect((await after.teacherDao.getTeacherOrNull())?.name, 'Ana Reyes');
       expect((await after.classDao.getClass('class-v3'))?.subject, 'General');
       expect(

@@ -45,6 +45,36 @@ class RecordStatusConverter
   String toSql(domain.AttendanceRecordStatus value) => value.name;
 }
 
+class AutomaticReportModeConverter
+    extends TypeConverter<domain.AutomaticReportMode, String> {
+  const AutomaticReportModeConverter();
+  @override
+  domain.AutomaticReportMode fromSql(String value) =>
+      domain.AutomaticReportMode.values.byName(value);
+  @override
+  String toSql(domain.AutomaticReportMode value) => value.name;
+}
+
+class AutoReportRunStatusConverter
+    extends TypeConverter<domain.AutoReportRunStatus, String> {
+  const AutoReportRunStatusConverter();
+  @override
+  domain.AutoReportRunStatus fromSql(String value) =>
+      domain.AutoReportRunStatus.values.byName(value);
+  @override
+  String toSql(domain.AutoReportRunStatus value) => value.name;
+}
+
+class AutoReportExecutionStatusConverter
+    extends TypeConverter<domain.AutoReportExecutionStatus, String> {
+  const AutoReportExecutionStatusConverter();
+  @override
+  domain.AutoReportExecutionStatus fromSql(String value) =>
+      domain.AutoReportExecutionStatus.values.byName(value);
+  @override
+  String toSql(domain.AutoReportExecutionStatus value) => value.name;
+}
+
 abstract class SyncColumns extends Table {
   TextColumn get id => text()();
   DateTimeColumn get updatedAt => dateTime()();
@@ -186,6 +216,15 @@ class AppSettingsRows extends Table {
   IntColumn get rssiThreshold => integer()();
   BoolColumn get soundEnabled => boolean()();
   BoolColumn get vibrationEnabled => boolean()();
+  TextColumn get automaticReportMode => text()
+      .map(const AutomaticReportModeConverter())
+      .withDefault(const Constant('off'))();
+  IntColumn get automaticReportHour =>
+      integer().withDefault(const Constant(17))();
+  IntColumn get automaticReportMinute =>
+      integer().withDefault(const Constant(0))();
+  IntColumn get automaticReportWeekday =>
+      integer().withDefault(const Constant(4))();
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -237,6 +276,44 @@ class AttendanceAccessOfferings extends Table {
   Set<Column> get primaryKey => {invitationId, sourceOfferingId};
 }
 
+@TableIndex(
+  name: 'auto_report_occurrence_unique',
+  columns: {#mode, #occurrenceAt},
+  unique: true,
+)
+@DataClassName('AutoReportRunRow')
+class AutoReportRuns extends Table {
+  TextColumn get id => text()();
+  TextColumn get mode => text().map(const AutomaticReportModeConverter())();
+  DateTimeColumn get occurrenceAt => dateTime()();
+  DateTimeColumn get windowStart => dateTime()();
+  DateTimeColumn get windowEnd => dateTime()();
+  DateTimeColumn get attemptedAt => dateTime()();
+  TextColumn get status => text().map(const AutoReportRunStatusConverter())();
+  IntColumn get generatedCount => integer().withDefault(const Constant(0))();
+  IntColumn get failedCount => integer().withDefault(const Constant(0))();
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@TableIndex(
+  name: 'auto_report_session_unique',
+  columns: {#runId, #sessionId},
+  unique: true,
+)
+@DataClassName('AutoReportExecutionRow')
+class AutoReportExecutions extends Table {
+  TextColumn get id => text()();
+  TextColumn get runId => text().references(AutoReportRuns, #id)();
+  TextColumn get sessionId => text()();
+  DateTimeColumn get attemptedAt => dateTime()();
+  TextColumn get status =>
+      text().map(const AutoReportExecutionStatusConverter())();
+  TextColumn get fileName => text().nullable()();
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 @DriftDatabase(
   tables: [
     Teachers,
@@ -250,6 +327,8 @@ class AttendanceAccessOfferings extends Table {
     AppSessionPreferences,
     AttendanceAccessGrants,
     AttendanceAccessOfferings,
+    AutoReportRuns,
+    AutoReportExecutions,
   ],
   daos: [
     TeacherDao,
@@ -261,6 +340,7 @@ class AttendanceAccessOfferings extends Table {
     SettingsDao,
     AppSessionDao,
     AttendanceAccessDao,
+    AutoReportDao,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -268,7 +348,7 @@ class AppDatabase extends _$AppDatabase {
     : super(executor ?? driftDatabase(name: 'classattend'));
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -342,9 +422,9 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 4) await m.createTable(attendanceAccessGrants);
       if (from < 5) {
-        await m.createAll();
+        await m.createTable(attendanceAccessOfferings);
         await customStatement('''
-          INSERT INTO attendance_access_offerings (
+          INSERT OR IGNORE INTO attendance_access_offerings (
             invitation_id, source_offering_id, local_offering_id,
             subject, section_code
           )
@@ -364,6 +444,20 @@ class AppDatabase extends _$AppDatabase {
         await customStatement(
           "DELETE FROM students WHERE id LIKE 'attendance:%'",
         );
+      }
+      if (from < 7) {
+        await m.addColumn(appSettingsRows, appSettingsRows.automaticReportMode);
+        await m.addColumn(appSettingsRows, appSettingsRows.automaticReportHour);
+        await m.addColumn(
+          appSettingsRows,
+          appSettingsRows.automaticReportMinute,
+        );
+        await m.addColumn(
+          appSettingsRows,
+          appSettingsRows.automaticReportWeekday,
+        );
+        await m.createTable(autoReportRuns);
+        await m.createTable(autoReportExecutions);
       }
     },
     beforeOpen: (details) async => customStatement('PRAGMA foreign_keys = ON'),
@@ -1084,6 +1178,11 @@ class SettingsDao extends DatabaseAccessor<AppDatabase>
     vibrationEnabled: row.vibrationEnabled,
     scanDurationSeconds: row.scanDurationSeconds,
     rssiThreshold: row.rssiThreshold,
+    automaticReportMode: row.automaticReportMode,
+    automaticReportHour: row.automaticReportHour,
+    automaticReportMinute: row.automaticReportMinute,
+    automaticReportWeekday:
+        domain.Weekday.values[row.automaticReportWeekday.clamp(0, 6)],
   );
   Future<domain.AppSettings?> getSettings() async {
     final row = await select(appSettingsRows).getSingleOrNull();
@@ -1096,6 +1195,128 @@ class SettingsDao extends DatabaseAccessor<AppDatabase>
           .map((row) => row == null ? null : _map(row));
   Future<void> save(AppSettingsRowsCompanion row) =>
       into(appSettingsRows).insertOnConflictUpdate(row);
+}
+
+@DriftAccessor(tables: [AutoReportRuns, AutoReportExecutions])
+class AutoReportDao extends DatabaseAccessor<AppDatabase>
+    with _$AutoReportDaoMixin {
+  AutoReportDao(super.db);
+
+  domain.AutoReportRun _mapRun(AutoReportRunRow row) => domain.AutoReportRun(
+    id: row.id,
+    mode: row.mode,
+    occurrenceAt: row.occurrenceAt,
+    windowStart: row.windowStart,
+    windowEnd: row.windowEnd,
+    attemptedAt: row.attemptedAt,
+    status: row.status,
+    generatedCount: row.generatedCount,
+    failedCount: row.failedCount,
+  );
+
+  domain.AutoReportExecution _mapExecution(AutoReportExecutionRow row) =>
+      domain.AutoReportExecution(
+        id: row.id,
+        runId: row.runId,
+        sessionId: row.sessionId,
+        attemptedAt: row.attemptedAt,
+        status: row.status,
+        fileName: row.fileName,
+      );
+
+  Future<domain.AutoReportRun?> getRun(
+    domain.AutomaticReportMode mode,
+    DateTime occurrenceAt,
+  ) async {
+    final row =
+        await (select(autoReportRuns)..where(
+              (run) =>
+                  run.mode.equals(mode.name) &
+                  run.occurrenceAt.equals(occurrenceAt),
+            ))
+            .getSingleOrNull();
+    return row == null ? null : _mapRun(row);
+  }
+
+  Future<domain.AutoReportRun?> getLatestRun() async {
+    final rows =
+        await (select(autoReportRuns)
+              ..orderBy([(run) => OrderingTerm.desc(run.attemptedAt)])
+              ..limit(1))
+            .get();
+    return rows.isEmpty ? null : _mapRun(rows.first);
+  }
+
+  Stream<domain.AutoReportRun?> watchLatestRun() =>
+      (select(autoReportRuns)
+            ..orderBy([(run) => OrderingTerm.desc(run.attemptedAt)])
+            ..limit(1))
+          .watch()
+          .map((rows) => rows.isEmpty ? null : _mapRun(rows.first));
+
+  Future<domain.AutoReportRun?> getLatestFailedRun() async {
+    final rows =
+        await (select(autoReportRuns)
+              ..where(
+                (run) =>
+                    run.status.equals(domain.AutoReportRunStatus.failed.name),
+              )
+              ..orderBy([(run) => OrderingTerm.desc(run.attemptedAt)])
+              ..limit(1))
+            .get();
+    return rows.isEmpty ? null : _mapRun(rows.first);
+  }
+
+  Future<domain.AutoReportExecution?> getExecution(
+    String runId,
+    String sessionId,
+  ) async {
+    final row =
+        await (select(autoReportExecutions)..where(
+              (execution) =>
+                  execution.runId.equals(runId) &
+                  execution.sessionId.equals(sessionId),
+            ))
+            .getSingleOrNull();
+    return row == null ? null : _mapExecution(row);
+  }
+
+  Future<List<domain.AutoReportExecution>> getExecutions(String runId) async =>
+      (await (select(autoReportExecutions)
+                ..where((execution) => execution.runId.equals(runId))
+                ..orderBy([
+                  (execution) => OrderingTerm.asc(execution.sessionId),
+                ]))
+              .get())
+          .map(_mapExecution)
+          .toList(growable: false);
+
+  Future<void> saveRun(domain.AutoReportRun run) =>
+      into(autoReportRuns).insertOnConflictUpdate(
+        AutoReportRunsCompanion.insert(
+          id: run.id,
+          mode: run.mode,
+          occurrenceAt: run.occurrenceAt,
+          windowStart: run.windowStart,
+          windowEnd: run.windowEnd,
+          attemptedAt: run.attemptedAt,
+          status: run.status,
+          generatedCount: Value(run.generatedCount),
+          failedCount: Value(run.failedCount),
+        ),
+      );
+
+  Future<void> saveExecution(domain.AutoReportExecution execution) =>
+      into(autoReportExecutions).insertOnConflictUpdate(
+        AutoReportExecutionsCompanion.insert(
+          id: execution.id,
+          runId: execution.runId,
+          sessionId: execution.sessionId,
+          attemptedAt: execution.attemptedAt,
+          status: execution.status,
+          fileName: Value(execution.fileName),
+        ),
+      );
 }
 
 @DriftAccessor(tables: [AppSessionPreferences])

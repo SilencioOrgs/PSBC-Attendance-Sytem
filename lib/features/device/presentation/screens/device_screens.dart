@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/app_feedback.dart';
 import '../../../../core/utils/iterable_extensions.dart';
 import '../../../../core/widgets/app_widgets.dart';
 import '../../../../domain/models.dart';
@@ -201,16 +202,12 @@ class _DeviceRegistrationScreenState
                                       backgroundAttendanceStateProvider,
                                     );
                                     if (context.mounted) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                            SnackBar(
-                                              content: Text(
-                                                backgroundActive
-                                                    ? 'Background attendance stopped.'
-                                                    : 'Background attendance enabled.',
-                                              ),
-                                            ),
-                                          );
+                                      AppFeedback.success(
+                                        context,
+                                        backgroundActive
+                                            ? 'Background attendance stopped.'
+                                            : 'Background attendance enabled.',
+                                      );
                                     }
                                   } catch (_) {
                                     if (context.mounted) {
@@ -283,10 +280,9 @@ class _DeviceRegistrationScreenState
                                   ClipboardData(text: device.bleUuid),
                                 );
                                 if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('BLE Service UUID copied.'),
-                                    ),
+                                  AppFeedback.success(
+                                    context,
+                                    'BLE Service UUID copied.',
                                   );
                                 }
                               },

@@ -13,6 +13,19 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../helpers/mock_ble_service.dart';
 
 void main() {
+  test('cancelling a scan does not trigger review navigation', () {
+    const scanning = AttendanceWorkflow(
+      state: AttendanceWorkflowState.scanning,
+    );
+    const cancelled = AttendanceWorkflow(
+      state: AttendanceWorkflowState.cancelled,
+    );
+    const review = AttendanceWorkflow(state: AttendanceWorkflowState.review);
+
+    expect(cancelled.hasJustEnteredReview(scanning), isFalse);
+    expect(review.hasJustEnteredReview(scanning), isTrue);
+  });
+
   test(
     'scan, review, manual overrides, and finalization preserve each status',
     () async {

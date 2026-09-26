@@ -146,12 +146,20 @@ class DriftStudentRepository implements StudentRepository {
     required String studentNumber,
     required String classId,
     String? bleUuid,
-  }) => addStudentToOfferings(
-    name: name,
-    studentNumber: studentNumber,
-    offeringIds: {classId},
-    bleUuid: bleUuid,
-  );
+  }) async {
+    await _assertCanManage(classId: classId);
+    final existing = await _db.studentDao.byNumber(studentNumber.trim());
+    if (existing != null &&
+        await _db.enrollmentDao.containsPair(existing.id, classId)) {
+      throw const DuplicateEnrollmentException();
+    }
+    return addStudentToOfferings(
+      name: name,
+      studentNumber: studentNumber,
+      offeringIds: {classId},
+      bleUuid: bleUuid,
+    );
+  }
 
   @override
   Future<Student> addStudentToOfferings({

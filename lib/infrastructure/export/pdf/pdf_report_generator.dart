@@ -10,10 +10,10 @@ import '../../../features/reports/models/report_models.dart';
 /// Builds print-ready A4 reports with repeating table headers and page numbers.
 class PdfReportGenerator {
   static const _ink = PdfColor.fromInt(0xFF172B4D);
-  static const _blue = PdfColor.fromInt(0xFF1769AA);
+  static const _blue = PdfColor.fromInt(0xFFC45A1A);
   static const _muted = PdfColor.fromInt(0xFF64748B);
   static const _line = PdfColor.fromInt(0xFFDCE3EB);
-  static const _softBlue = PdfColor.fromInt(0xFFEAF3FC);
+  static const _softBlue = PdfColor.fromInt(0xFFFBE8DC);
 
   Future<List<int>> attendanceSession(AttendanceSessionReport report) => _build(
     title: 'Attendance Report',

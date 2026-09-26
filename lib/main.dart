@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, kIsWeb, TargetPlatform;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
@@ -6,10 +8,12 @@ import 'core/auth/teacher_session.dart';
 import 'core/auth/application_session.dart';
 import 'core/providers/repository_providers.dart';
 import 'core/router/app_router.dart';
+import 'core/router/route_names.dart';
 import 'core/theme/app_theme.dart';
 import 'services/ble/production_ble_service.dart';
 import 'services/auth/teacher_pin_service.dart';
 import 'services/storage/app_database.dart';
+import 'services/reports/automatic_report_scheduler.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -41,6 +45,24 @@ Future<void> main() async {
     session: teacherSession,
     applicationSession: applicationSession,
   );
+  final reportScheduler = AutomaticReportScheduler();
+  await reportScheduler.initialize();
+  final localNotificationsSupported =
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS);
+  if (localNotificationsSupported) {
+    await initializeAutomaticReportNotifications(
+      onNotificationTap: () => router.goNamed(AppRoutes.teacherAttendance),
+    );
+    final launchedFromReport = await automaticReportNotifications
+        .getNotificationAppLaunchDetails();
+    if (launchedFromReport?.didNotificationLaunchApp == true) {
+      router.goNamed(AppRoutes.teacherAttendance);
+    }
+  }
+  final savedSettings = await database.settingsDao.getSettings();
+  if (savedSettings != null) await reportScheduler.sync(savedSettings);
   runApp(
     ProviderScope(
       overrides: [

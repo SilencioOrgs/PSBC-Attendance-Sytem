@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/widgets/app_feedback.dart';
 import '../../models/report_models.dart';
 
 Future<ReportFormat?> showExportReportSheet(
@@ -71,29 +72,20 @@ Future<void> exportReportFlow({
   final action = await showExportDestinationSheet(context);
   if (action == null || !context.mounted) return;
 
-  final messenger = ScaffoldMessenger.of(context);
-  messenger.hideCurrentSnackBar();
-  messenger.showSnackBar(const SnackBar(content: Text('Generating report...')));
+  AppFeedback.loading(context, 'Generating report...');
   try {
     final result = await export(format, action);
-    messenger.hideCurrentSnackBar();
-    if (!context.mounted || result.wasCancelled) return;
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(
-          result.wasSaved
-              ? 'Report saved: ${result.fileName}'
-              : 'Report shared: ${result.fileName}',
-        ),
-      ),
-    );
-  } catch (_) {
-    messenger.hideCurrentSnackBar();
     if (!context.mounted) return;
-    messenger.showSnackBar(
-      const SnackBar(
-        content: Text("We couldn't generate this report. Try again."),
-      ),
-    );
+    AppFeedback.hideLoading(context);
+    if (result.wasCancelled) return;
+    if (result.wasSaved) {
+      AppFeedback.success(context, 'Report saved: ${result.fileName}');
+    } else {
+      AppFeedback.success(context, 'Report shared: ${result.fileName}');
+    }
+  } catch (_) {
+    if (!context.mounted) return;
+    AppFeedback.hideLoading(context);
+    AppFeedback.error(context, "We couldn't generate this report. Try again.");
   }
 }

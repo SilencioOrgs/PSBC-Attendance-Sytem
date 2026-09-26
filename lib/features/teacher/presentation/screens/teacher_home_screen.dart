@@ -49,31 +49,33 @@ class TeacherHomeScreen extends ConsumerWidget {
                   ?.copyWith(color: AppColors.muted),
             ),
             const SizedBox(height: Spacing.md),
-            SecondaryActionButton(
-              label: 'Share Attendance Access',
-              icon: Icons.qr_code_2,
-              onPressed: () => context.push('/teacher/share-attendance'),
-            ),
-            const SizedBox(height: Spacing.sm),
-            SecondaryActionButton(
-              label: 'Add Student',
-              icon: Icons.person_add_alt_1_outlined,
-              onPressed: () => context.push('/teacher/students/add'),
-            ),
-            if (hasAttendanceAccess)
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  onPressed: () async {
-                    await ref
-                        .read(applicationSessionProvider)
-                        .selectAttendanceOfficer();
-                    if (context.mounted) context.go('/attendance-officer');
-                  },
-                  icon: const Icon(Icons.fact_check_outlined),
-                  label: const Text('Open Attendance Officer'),
+            Wrap(
+              spacing: Spacing.xs,
+              runSpacing: Spacing.xs,
+              children: [
+                TextButton.icon(
+                  onPressed: () => context.push('/teacher/share-attendance'),
+                  icon: const Icon(Icons.qr_code_2),
+                  label: const Text('Share access'),
                 ),
-              ),
+                TextButton.icon(
+                  onPressed: () => context.push('/teacher/students/add'),
+                  icon: const Icon(Icons.person_add_alt_1_outlined),
+                  label: const Text('Add student'),
+                ),
+                if (hasAttendanceAccess)
+                  TextButton.icon(
+                    onPressed: () async {
+                      await ref
+                          .read(applicationSessionProvider)
+                          .selectAttendanceOfficer();
+                      if (context.mounted) context.go('/attendance-officer');
+                    },
+                    icon: const Icon(Icons.fact_check_outlined),
+                    label: const Text('Officer mode'),
+                  ),
+              ],
+            ),
             const SizedBox(height: Spacing.lg),
             sessions.when(
               data: (list) {
@@ -155,9 +157,6 @@ class TeacherHomeScreen extends ConsumerWidget {
                   ? HelpfulEmptyState(
                       title: 'No class yet',
                       message: "You haven't created a class yet. Create one to begin taking attendance.",
-                      actionLabel: 'Create Class',
-                      onAction: () =>
-                          context.pushNamed(AppRoutes.teacherClassCreate),
                     )
                   : Column(
                       children: list
@@ -233,8 +232,7 @@ class TeacherHomeScreen extends ConsumerWidget {
                           ],
                         ),
                       ),
-                      IconButton(
-                        tooltip: label,
+                      FilledButton.icon(
                         onPressed: () {
                           if (active != null) {
                             context.pushNamed(
@@ -250,6 +248,7 @@ class TeacherHomeScreen extends ConsumerWidget {
                           }
                         },
                         icon: const Icon(Icons.arrow_forward),
+                        label: Text(label),
                       ),
                     ],
                   ),

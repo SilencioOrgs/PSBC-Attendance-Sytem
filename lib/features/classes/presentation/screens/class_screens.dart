@@ -8,6 +8,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/ble_identity.dart';
 import '../../../../core/utils/iterable_extensions.dart';
 import '../../../../core/widgets/app_widgets.dart';
+import '../../../../core/widgets/app_feedback.dart';
 import '../../../attendance/presentation/providers/attendance_provider.dart';
 import '../../../attendance/presentation/providers/attendance_controller.dart';
 import '../../../device/presentation/providers/device_provider.dart';
@@ -238,11 +239,7 @@ class ClassDetailsScreen extends ConsumerWidget {
                 if (context.mounted) context.goNamed(AppRoutes.teacherClasses);
               } catch (_) {
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Unable to delete this class.'),
-                    ),
-                  );
+                  AppFeedback.error(context, 'Unable to delete this class.');
                 }
               }
             },
@@ -450,12 +447,9 @@ class ClassDetailsScreen extends ConsumerWidget {
                                       manualOverride: override,
                                     );
                                 if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Attendance session started.',
-                                      ),
-                                    ),
+                                  AppFeedback.success(
+                                    context,
+                                    'Attendance session started.',
                                   );
                                   context.pushNamed(
                                     AppRoutes.bleScanner,
@@ -464,43 +458,60 @@ class ClassDetailsScreen extends ConsumerWidget {
                                 }
                               } catch (error) {
                                 if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        error is RepositoryException
-                                            ? error.message
-                                            : 'Unable to start attendance.',
-                                      ),
-                                    ),
+                                  AppFeedback.error(
+                                    context,
+                                    error is RepositoryException
+                                        ? error.message
+                                        : 'Unable to start attendance.',
                                   );
                                 }
                               }
                             },
                     ),
                     const SizedBox(height: Spacing.sm),
-                    SecondaryActionButton(
-                      label: 'Share Attendance Access',
-                      icon: Icons.qr_code_2,
-                      onPressed: () => context.pushNamed(
-                        AppRoutes.teacherAttendanceAccessQr,
-                        pathParameters: {'classId': classId},
+                    SectionCard(
+                      padding: EdgeInsets.zero,
+                      child: Column(
+                        children: [
+                          ListTile(
+                            leading: const Icon(Icons.groups_outlined),
+                            title: const Text('Students'),
+                            subtitle: Text('${section.studentCount} enrolled'),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () => context.pushNamed(
+                              AppRoutes.teacherStudentList,
+                              pathParameters: {'classId': classId},
+                            ),
+                          ),
+                          const Divider(
+                            height: 1,
+                            indent: Spacing.md,
+                            endIndent: Spacing.md,
+                          ),
+                          ListTile(
+                            leading: const Icon(Icons.qr_code_2),
+                            title: const Text('Share attendance access'),
+                            subtitle: const Text('Choose one or more subjects'),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () => context.pushNamed(
+                              AppRoutes.teacherAttendanceAccessQr,
+                              pathParameters: {'classId': classId},
+                            ),
+                          ),
+                          const Divider(
+                            height: 1,
+                            indent: Spacing.md,
+                            endIndent: Spacing.md,
+                          ),
+                          ListTile(
+                            leading: const Icon(Icons.history),
+                            title: const Text('Attendance history'),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () =>
+                                context.goNamed(AppRoutes.teacherAttendance),
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(height: Spacing.sm),
-                    SecondaryActionButton(
-                      label: 'View student list',
-                      icon: Icons.groups_outlined,
-                      onPressed: () => context.pushNamed(
-                        AppRoutes.teacherStudentList,
-                        pathParameters: {'classId': classId},
-                      ),
-                    ),
-                    const SizedBox(height: Spacing.sm),
-                    SecondaryActionButton(
-                      label: 'Attendance history',
-                      icon: Icons.history,
-                      onPressed: () =>
-                          context.goNamed(AppRoutes.teacherAttendance),
                     ),
                     if (section.studentCount == 0) ...[
                       const SizedBox(height: Spacing.sm),
@@ -812,9 +823,7 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
             .remove(widget.classId, student.id);
       } catch (_) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Unable to remove this student.')),
-          );
+          AppFeedback.error(context, 'Unable to remove this student.');
         }
       }
     }
@@ -916,26 +925,20 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
         );
       }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              student.deviceRegistered
-                  ? 'Student device replaced.'
-                  : 'Student device registered.',
-            ),
-          ),
+        AppFeedback.success(
+          context,
+          student.deviceRegistered
+              ? 'Student device replaced.'
+              : 'Student device registered.',
         );
       }
     } on RepositoryException catch (exception) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(exception.message)));
+        AppFeedback.error(context, exception.message);
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unable to register this device.')),
-        );
+        AppFeedback.error(context, 'Unable to register this device.');
       }
     } finally {
       code.dispose();
@@ -970,9 +973,7 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
           .removeDevice(widget.classId, student.id);
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unable to remove this device.')),
-        );
+        AppFeedback.error(context, 'Unable to remove this device.');
       }
     }
   }
@@ -1210,15 +1211,11 @@ class _StudentEditorFormState extends ConsumerState<StudentEditorForm> {
         );
       }
       if (mounted) {
-        final messenger = ScaffoldMessenger.of(context);
-        Navigator.pop(context);
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text(
-              widget.student == null ? 'Student saved.' : 'Student updated.',
-            ),
-          ),
+        AppFeedback.success(
+          context,
+          widget.student == null ? 'Student saved.' : 'Student updated.',
         );
+        Navigator.pop(context);
       }
     } on RepositoryException catch (error) {
       setState(() => _error = error.message);

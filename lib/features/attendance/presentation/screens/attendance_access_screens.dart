@@ -10,6 +10,7 @@ import '../../../../core/providers/repository_providers.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/iterable_extensions.dart';
 import '../../../../core/widgets/app_widgets.dart';
+import '../../../../core/widgets/app_feedback.dart';
 import '../../../../domain/attendance_access_invitation.dart';
 import '../../../../domain/attendance_window_policy.dart';
 import '../../../../domain/models.dart';
@@ -53,9 +54,7 @@ class _TeacherAttendanceAccessQrScreenState
             .where((offering) => selectedIds.contains(offering.id))
             .toList(growable: false);
       });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Attendance QR created.')));
+      AppFeedback.success(context, 'Attendance QR created.');
     } on RepositoryException catch (error) {
       if (mounted) setState(() => _error = error.message);
     } on FormatException catch (error) {
@@ -492,9 +491,7 @@ class AttendanceOfficerHomeScreen extends ConsumerWidget {
         .getClass(grant.localOfferingId);
     if (offering == null) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Subject or class not found.')),
-        );
+        AppFeedback.error(context, 'Subject or class not found.');
       }
       return;
     }
@@ -536,21 +533,16 @@ class AttendanceOfficerHomeScreen extends ConsumerWidget {
           .read(attendanceControllerProvider.notifier)
           .prepareSession(grant.localOfferingId, manualOverride: override);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Attendance session started.')),
-        );
+        AppFeedback.success(context, 'Attendance session started.');
         context.push('/attendance-officer/scanner/${session.id}');
       }
     } on RepositoryException catch (error) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(error.message)));
+        AppFeedback.error(context, error.message);
       }
     } catch (_) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unable to start attendance.')),
-        );
+        AppFeedback.error(context, 'Unable to start attendance.');
       }
     }
   }

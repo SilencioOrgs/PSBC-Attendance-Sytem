@@ -7,6 +7,7 @@ import '../../../../core/providers/repository_providers.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/teacher_pin.dart';
 import '../../../../core/widgets/app_widgets.dart';
+import '../../../../core/widgets/app_feedback.dart';
 import '../providers/teacher_provider.dart';
 import '../widgets/pin_keypad.dart';
 
@@ -65,8 +66,7 @@ class _TeacherSetupScreenState extends ConsumerState<TeacherSetupScreen> {
             pin: normalizeTeacherPin(_firstPin),
           );
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('PIN saved.')));
+        AppFeedback.success(context, 'PIN saved.');
         context.goNamed(AppRoutes.teacherHome);
       }
     } catch (_) {

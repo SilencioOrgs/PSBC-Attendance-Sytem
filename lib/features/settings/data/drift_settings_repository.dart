@@ -43,6 +43,10 @@ class DriftSettingsRepository implements SettingsRepository {
         rssiThreshold: settings.rssiThreshold,
         soundEnabled: settings.soundEnabled,
         vibrationEnabled: settings.vibrationEnabled,
+        automaticReportMode: Value(settings.automaticReportMode),
+        automaticReportHour: Value(settings.automaticReportHour),
+        automaticReportMinute: Value(settings.automaticReportMinute),
+        automaticReportWeekday: Value(settings.automaticReportWeekday.index),
       ),
     );
     return AppSettings(
@@ -53,6 +57,10 @@ class DriftSettingsRepository implements SettingsRepository {
       vibrationEnabled: settings.vibrationEnabled,
       scanDurationSeconds: settings.scanDurationSeconds,
       rssiThreshold: settings.rssiThreshold,
+      automaticReportMode: settings.automaticReportMode,
+      automaticReportHour: settings.automaticReportHour,
+      automaticReportMinute: settings.automaticReportMinute,
+      automaticReportWeekday: settings.automaticReportWeekday,
     );
   }
 }

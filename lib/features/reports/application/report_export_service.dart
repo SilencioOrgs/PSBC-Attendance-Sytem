@@ -26,6 +26,23 @@ class ReportExportService {
     };
   }
 
+  /// Generates a single session PDF without opening a picker or share sheet.
+  /// Background report jobs use this same typed report path as manual exports.
+  Future<GeneratedReportFile> generateAttendanceSessionPdf(
+    String sessionId, {
+    required String fileName,
+  }) async {
+    final file = await _generate(
+      AttendanceSessionRequest(sessionId),
+      ReportFormat.pdf,
+    );
+    return GeneratedReportFile(
+      bytes: file.bytes,
+      fileName: fileName,
+      mimeType: file.mimeType,
+    );
+  }
+
   Future<GeneratedReportFile> _generate(
     ReportRequest request,
     ReportFormat format,

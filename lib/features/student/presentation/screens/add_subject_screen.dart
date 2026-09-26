@@ -7,6 +7,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../../../core/providers/repository_providers.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/app_feedback.dart';
 import '../../../../core/utils/iterable_extensions.dart';
 import '../../../../core/widgets/app_widgets.dart';
 import '../../../../domain/subject_invitation.dart';
@@ -70,14 +71,11 @@ class _AddSubjectScreenState extends ConsumerState<AddSubjectScreen> {
           );
       ref.invalidate(currentStudentOfferingsProvider);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            count == 0
-                ? 'Those subjects are already in your list.'
-                : '$count subject${count == 1 ? '' : 's'} added.',
-          ),
-        ),
+      AppFeedback.info(
+        context,
+        count == 0
+            ? 'Those subjects are already in your list.'
+            : '$count subject${count == 1 ? '' : 's'} added.',
       );
       context.pop();
     } catch (_) {
